@@ -18,7 +18,8 @@
     "test": "pnpm -r --no-bail run test",
     "check-docs": "node scripts/check-docs.mjs",
     "board": "node scripts/board.mjs",
-    "board:web": "node scripts/board.mjs --web --open"
+    "board:web": "node scripts/board.mjs --web --open",
+    "lint:ci": "go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -no-color"
   },
   "devDependencies": {
     "@eslint/js": "catalog:",
