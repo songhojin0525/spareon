@@ -95,6 +95,14 @@ describe('check-docs', () => {
     expect(checkDocs(root)).toEqual([]);
   });
 
+  it('checks only the status table, not later tables keyed by stage ID', () => {
+    write(
+      'PROGRESS.md',
+      '| 차수 | 상태 |\n|---|---|\n| S00 | DONE | x |\n| S01 | WAT | x |\n\n## 가정 기록\n| 차수 | 가정 | 근거 |\n|---|---|---|\n| S00 | pnpm 11 고정 | 이유 |\n',
+    );
+    expect(checkDocs(root)).toEqual(["PROGRESS.md:4: S01 has unknown status 'WAT'"]);
+  });
+
   it('the repository itself passes', () => {
     expect(checkDocs(repoRoot)).toEqual([]);
   });

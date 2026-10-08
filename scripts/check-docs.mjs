@@ -159,9 +159,16 @@ export function checkStatuses(root) {
   const problems = [];
   const progress = path.join(root, 'PROGRESS.md');
   if (existsSync(progress)) {
+    // Only the first table is the status table; later tables (assumptions, run log) also start rows with stage IDs.
+    let tableIndex = -1;
+    let inTable = false;
     readFileSync(progress, 'utf8')
       .split(/\r?\n/)
       .forEach((line, i) => {
+        const isRow = line.trim().startsWith('|');
+        if (isRow && !inTable) tableIndex += 1;
+        inTable = isRow;
+        if (tableIndex !== 0) return;
         const m = /^\|\s*(S\d{2})\s*\|\s*([^|]*?)\s*\|/.exec(line);
         if (m === null) return;
         const status = (m[2] ?? '').replace(/\(.*\)$/, '').trim();
