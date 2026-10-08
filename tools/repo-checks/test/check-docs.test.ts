@@ -5,7 +5,14 @@ import { fileURLToPath } from 'node:url';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { checkDocs, stripCode } from '../../../scripts/check-docs.mjs';
+import {
+  checkDocs,
+  extractMermaidBlocks,
+  REQUIRED_FILES,
+  splitRow,
+  STATE_ACTORS,
+  stripCode,
+} from '../../../scripts/check-docs.mjs';
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 
@@ -103,7 +110,141 @@ describe('check-docs', () => {
     expect(checkDocs(root)).toEqual(["PROGRESS.md:4: S01 has unknown status 'WAT'"]);
   });
 
-  it('the repository itself passes', () => {
-    expect(checkDocs(repoRoot)).toEqual([]);
+  it('the repository itself passes, including the required design documents', () => {
+    expect(checkDocs(repoRoot, { requiredFiles: REQUIRED_FILES })).toEqual([]);
+  });
+});
+
+const STAGES = '| ID | 파일 |\n|---|---|\n| S00 | a |\n| S01 | b |\n| S12 | c |\n';
+
+describe('check-docs: stage and ADR references', () => {
+  it('flags stage IDs that are not in prompts/STAGES.md', () => {
+    write('prompts/STAGES.md', STAGES);
+    write(
+      'docs/a.md',
+      'S00 and S12 exist.\nS13 does not, nor `SKELETON(S40)`.\nS1 and SNN are not IDs.\n',
+    );
+    expect(checkDocs(root)).toEqual([
+      'docs/a.md:2: unknown stage S13 (not in prompts/STAGES.md)',
+      'docs/a.md:2: unknown stage S40 (not in prompts/STAGES.md)',
+    ]);
+  });
+
+  it('does not treat longer tokens as stage IDs', () => {
+    write('prompts/STAGES.md', STAGES);
+    write('docs/a.md', 'S300 매장, AS01, S12a, xS99 are not stage references.\n');
+    expect(checkDocs(root)).toEqual([]);
+  });
+
+  it('skips the stage check when there is no STAGES.md', () => {
+    write('docs/a.md', 'S99\n');
+    expect(checkDocs(root)).toEqual([]);
+  });
+
+  it('requires an ADR file for every "ADR NNNN" text reference', () => {
+    write('docs/adr/0001-something.md', GOOD_ADR);
+    write('docs/a.md', 'ADR 0001 ok, ADR-0001 ok\nADR 0007 missing\n');
+    expect(checkDocs(root)).toEqual(['docs/a.md:2: ADR 0007 has no file in docs/adr/']);
+  });
+});
+
+describe('check-docs: mermaid structure and state machine actors', () => {
+  it('rejects empty and unclosed mermaid blocks', () => {
+    write('docs/a.md', '# a\n```mermaid\n\n%% only a comment\n```\n');
+    write('docs/b.md', '# b\n```mermaid\nflowchart LR\n  a --> b\n');
+    expect(checkDocs(root)).toEqual([
+      'docs/a.md:2: mermaid block is empty',
+      'docs/b.md:2: mermaid block is not closed',
+    ]);
+  });
+
+  it('extracts mermaid blocks but not other fences', () => {
+    const blocks = extractMermaidBlocks('```js\nx\n```\n```mermaid\nflowchart LR\n  a-->b\n```\n');
+    expect(blocks).toEqual([{ line: 4, body: ['flowchart LR', '  a-->b'], closed: true }]);
+  });
+
+  it('requires a known trigger actor on every state transition under docs/', () => {
+    write(
+      'docs/a.md',
+      [
+        '```mermaid',
+        'stateDiagram-v2',
+        '  [*] --> idle : [에이전트] 인증 성공',
+        '  idle --> running : [스케줄러/에이전트] 수락',
+        '  running --> idle',
+        '  idle --> gone : 이유만 있음',
+        '  idle --> x : [고양이] 모름',
+        '```',
+        '',
+      ].join('\n'),
+    );
+    expect(checkDocs(root)).toEqual([
+      "docs/a.md:5: state transition without a trigger actor (': [actor] event')",
+      "docs/a.md:6: state transition without a trigger actor (': [actor] event')",
+      "docs/a.md:7: unknown trigger actor '고양이' (see STATE_ACTORS)",
+    ]);
+    expect(STATE_ACTORS).toContain('손님');
+  });
+
+  it('does not apply the actor rule outside docs/ or to non-state diagrams', () => {
+    write('prompts/x.md', '```mermaid\nstateDiagram-v2\n  a --> b\n```\n');
+    write('docs/f.md', '```mermaid\nflowchart LR\n  a --> b\n```\n');
+    expect(checkDocs(root)).toEqual([]);
+  });
+});
+
+describe('check-docs: threat model tables', () => {
+  const header = '| ID | 위협 | 완화 | 담당 차수 |\n|---|---|---|---|\n';
+
+  it('accepts stage IDs and explicit acceptance reasons', () => {
+    write(
+      'docs/THREAT_MODEL.md',
+      `# t\n${header}| T-1 | a | b | S06, S12 |\n| T-2 | a | 없음 | 수용: 1인 운영 비용이 이득보다 크다 |\n\n| 다른 표 | x |\n|---|---|\n| y | z |\n`,
+    );
+    expect(checkDocs(root)).toEqual([]);
+  });
+
+  it('rejects rows without a stage or a reason, and duplicate IDs', () => {
+    write(
+      'docs/THREAT_MODEL.md',
+      `# t\n${header}| T-1 | a | b | 나중에 |\n| T-2 | a | b | 수용: |\n| T-1 | a | b | S06 |\n| | a | b | S06 |\n`,
+    );
+    expect(checkDocs(root)).toEqual([
+      "docs/THREAT_MODEL.md:4: '담당 차수' must name a stage (SNN) or '수용: <reason>'",
+      "docs/THREAT_MODEL.md:5: '담당 차수' must name a stage (SNN) or '수용: <reason>'",
+      'docs/THREAT_MODEL.md:6: duplicate threat ID T-1 (also line 4)',
+      'docs/THREAT_MODEL.md:7: threat row without ID',
+    ]);
+  });
+
+  it('requires at least one threat table', () => {
+    write('docs/THREAT_MODEL.md', '# t\n| a | b |\n|---|---|\n| 1 | 2 |\n');
+    expect(checkDocs(root)).toEqual([
+      "docs/THREAT_MODEL.md: no threat table with a '담당 차수' column",
+    ]);
+  });
+
+  it('keeps escaped pipes inside a cell', () => {
+    expect(splitRow('| a \\| b | c |')).toEqual(['a \\| b', 'c']);
+  });
+});
+
+describe('check-docs: required files', () => {
+  it('reports missing required files and supports * in the file name', () => {
+    write('docs/adr/0002-postgres-queue.md', GOOD_ADR.replace('0001', '0002'));
+    write('docs/MVP.md', '# mvp\n');
+    expect(
+      checkDocs(root, {
+        requiredFiles: ['docs/MVP.md', 'docs/adr/0002-*.md', 'docs/adr/0003-*.md', 'docs/X.md'],
+      }),
+    ).toEqual([
+      'docs/adr/0003-*.md: required file is missing',
+      'docs/X.md: required file is missing',
+    ]);
+  });
+
+  it('lists every S01 design document', () => {
+    expect(REQUIRED_FILES).toContain('docs/THREAT_MODEL.md');
+    expect(REQUIRED_FILES.filter((f) => f.startsWith('docs/adr/'))).toHaveLength(15);
   });
 });

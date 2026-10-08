@@ -1,9 +1,17 @@
 #!/usr/bin/env node
 // @ts-check
-// Documentation checks (initial version, later stages extend it). Exit code 1 on any problem.
+// Documentation checks. Exit code 1 on any problem.
 //   1. Relative Markdown links point to files that exist.
 //   2. ADRs (docs/adr/NNNN-*.md) have unique 4-digit numbers, a title and the required sections.
 //   3. PROGRESS.md stage rows and stage REPORT.md files use only the allowed status values.
+//   4. Every stage reference (S00..) exists in prompts/STAGES.md; every "ADR NNNN" text reference has a file.
+//   5. Mermaid blocks are closed and not empty; stateDiagram transitions under docs/ name a trigger actor
+//      (": [actor] event", actor from STATE_ACTORS).
+//   6. docs/THREAT_MODEL.md: every row of a table with a '담당 차수' column names a stage ID or
+//      '수용: <reason>', and threat IDs are unique.
+//   7. (CLI only) the design documents every later stage relies on exist (REQUIRED_FILES).
+// Mermaid *syntax* is checked by tools/repo-checks/test/mermaid-syntax.test.ts with the real parser,
+// because that needs dependencies and this script must run before `pnpm install`.
 // Dependency-free on purpose (Node built-ins only) so it runs before `pnpm install` too.
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
@@ -24,6 +32,42 @@ const SKIP_DIRS = new Set([
 export const ADR_SECTIONS = ['맥락', '결정', '검토한 대안', '결과와 트레이드오프', '재검토 조건'];
 export const STAGE_STATUSES = ['TODO', 'IN_PROGRESS', 'DONE', 'DONE_NEEDS_HUMAN', 'BLOCKED'];
 const REPORT_STATUSES = ['DONE', 'DONE_NEEDS_HUMAN', 'BLOCKED', 'IN_PROGRESS'];
+
+/** Design documents later stages rely on (S01). Checked by the CLI run, not by checkDocs() defaults. */
+export const REQUIRED_FILES = [
+  'docs/ARCHITECTURE.md',
+  'docs/THREAT_MODEL.md',
+  'docs/MVP.md',
+  'docs/GLOSSARY.md',
+  'docs/KNOWN_UNKNOWNS.md',
+  ...Array.from({ length: 15 }, (_, i) => `docs/adr/${String(i + 2).padStart(4, '0')}-*.md`),
+];
+
+/** Who may trigger a state transition (ARCHITECTURE.md state machines). */
+export const STATE_ACTORS = [
+  '에이전트',
+  '헬퍼',
+  '업데이터',
+  '손님',
+  '사장님',
+  '운영자',
+  '구매자',
+  '서버',
+  '게이트웨이',
+  '스케줄러',
+  '플릿',
+  '원장',
+  '계량',
+  '검증',
+  '배치',
+  '외부제공사',
+  '릴리스',
+  '시계',
+  'CI',
+];
+
+const THREAT_FILE = 'docs/THREAT_MODEL.md';
+const THREAT_STAGE_COLUMN = '담당 차수';
 
 /**
  * @param {string} root
@@ -192,16 +236,242 @@ export function checkStatuses(root) {
 }
 
 /**
- * @param {string} [root]
- * @returns {string[]} all problems
+ * Stage IDs declared in the prompts/STAGES.md table, or null when the file does not exist.
+ * @param {string} root
+ * @returns {Set<string> | null}
  */
-export function checkDocs(root = DEFAULT_ROOT) {
+export function readStageIds(root) {
+  const file = path.join(root, 'prompts', 'STAGES.md');
+  if (!existsSync(file)) return null;
+  /** @type {Set<string>} */
+  const ids = new Set();
+  for (const m of readFileSync(file, 'utf8').matchAll(/^\|\s*(S\d{2})\s*\|/gm)) {
+    if (m[1] !== undefined) ids.add(m[1]);
+  }
+  return ids;
+}
+
+/**
+ * @param {string} file repo-relative path
+ * @param {string} text
+ * @param {Set<string>} stageIds
+ * @returns {string[]} problems
+ */
+export function checkStageRefs(file, text, stageIds) {
   /** @type {string[]} */
   const problems = [];
-  for (const file of listMarkdown(root)) {
-    problems.push(...checkLinks(root, file, readFileSync(path.join(root, file), 'utf8')));
+  text.split(/\r?\n/).forEach((line, i) => {
+    for (const m of line.matchAll(/(?<![A-Za-z0-9_])S(\d{2})(?![0-9])/g)) {
+      const id = `S${m[1] ?? ''}`;
+      if (!stageIds.has(id))
+        problems.push(`${file}:${i + 1}: unknown stage ${id} (not in prompts/STAGES.md)`);
+    }
+  });
+  return problems;
+}
+
+/**
+ * @param {string} root
+ * @returns {Set<string>} 4-digit ADR numbers that have a file
+ */
+export function listAdrNumbers(root) {
+  const dir = path.join(root, 'docs', 'adr');
+  /** @type {Set<string>} */
+  const out = new Set();
+  if (!existsSync(dir)) return out;
+  for (const name of readdirSync(dir)) {
+    const num = /^(\d{4})-.+\.md$/.exec(name)?.[1];
+    if (num !== undefined) out.add(num);
   }
-  problems.push(...checkAdrs(root), ...checkStatuses(root));
+  return out;
+}
+
+/**
+ * Text references such as "ADR 0008" or "ADR-0011" must point to an existing ADR file.
+ * @param {string} file
+ * @param {string} text
+ * @param {Set<string>} adrNumbers
+ * @returns {string[]} problems
+ */
+export function checkAdrRefs(file, text, adrNumbers) {
+  /** @type {string[]} */
+  const problems = [];
+  text.split(/\r?\n/).forEach((line, i) => {
+    for (const m of line.matchAll(/\bADR[\s-]?(\d{4})\b/g)) {
+      if (!adrNumbers.has(m[1] ?? ''))
+        problems.push(`${file}:${i + 1}: ADR ${m[1] ?? ''} has no file in docs/adr/`);
+    }
+  });
+  return problems;
+}
+
+/**
+ * @typedef {{ line: number, body: string[], closed: boolean }} MermaidBlock
+ * line = 1-based line number of the opening fence
+ */
+
+/**
+ * @param {string} text
+ * @returns {MermaidBlock[]}
+ */
+export function extractMermaidBlocks(text) {
+  /** @type {MermaidBlock[]} */
+  const blocks = [];
+  /** @type {MermaidBlock | null} */
+  let current = null;
+  let fence = '';
+  text.split(/\r?\n/).forEach((line, i) => {
+    const m = /^\s*(```+|~~~+)\s*([A-Za-z0-9_-]*)/.exec(line);
+    if (fence === '') {
+      if (m?.[1] === undefined) return;
+      fence = m[1];
+      if ((m[2] ?? '').toLowerCase() === 'mermaid') {
+        current = { line: i + 1, body: [], closed: false };
+        blocks.push(current);
+      }
+      return;
+    }
+    if (m?.[1] !== undefined && m[1].startsWith(fence) && (m[2] ?? '') === '') {
+      fence = '';
+      if (current !== null) current.closed = true;
+      current = null;
+      return;
+    }
+    if (current !== null) current.body.push(line);
+  });
+  return blocks;
+}
+
+/**
+ * @param {string} file
+ * @param {string} text
+ * @returns {string[]} problems
+ */
+export function checkMermaid(file, text) {
+  /** @type {string[]} */
+  const problems = [];
+  const underDocs = file.startsWith('docs/');
+  for (const block of extractMermaidBlocks(text)) {
+    if (!block.closed) problems.push(`${file}:${block.line}: mermaid block is not closed`);
+    const content = block.body.filter((l) => l.trim() !== '' && !l.trim().startsWith('%%'));
+    if (content.length === 0) {
+      problems.push(`${file}:${block.line}: mermaid block is empty`);
+      continue;
+    }
+    if (!underDocs || !/^stateDiagram/.test(content[0]?.trim() ?? '')) continue;
+    block.body.forEach((raw, j) => {
+      const line = raw.trim();
+      if (!line.includes('-->') || line.startsWith('%%')) return;
+      const where = `${file}:${block.line + j + 1}`;
+      const label = /:\s*\[([^\]]+)\]/.exec(line);
+      if (label?.[1] === undefined) {
+        problems.push(`${where}: state transition without a trigger actor (': [actor] event')`);
+        return;
+      }
+      for (const actor of label[1].split(/[/·,]/).map((a) => a.trim())) {
+        if (!STATE_ACTORS.includes(actor))
+          problems.push(`${where}: unknown trigger actor '${actor}' (see STATE_ACTORS)`);
+      }
+    });
+  }
+  return problems;
+}
+
+/**
+ * Split a Markdown table row into trimmed cells (an escaped \| stays inside its cell).
+ * @param {string} line
+ */
+export function splitRow(line) {
+  const body = line.trim().replace(/^\|/, '').replace(/\|$/, '');
+  return body.split(/(?<!\\)\|/).map((c) => c.trim());
+}
+
+/**
+ * @param {string} root
+ * @returns {string[]} problems
+ */
+export function checkThreatModel(root) {
+  const full = path.join(root, ...THREAT_FILE.split('/'));
+  if (!existsSync(full)) return [];
+  /** @type {string[]} */
+  const problems = [];
+  const lines = stripCode(readFileSync(full, 'utf8')).split('\n');
+  /** @type {Map<string, number>} */
+  const ids = new Map();
+  let tables = 0;
+  for (let i = 0; i < lines.length; i += 1) {
+    const header = lines[i] ?? '';
+    if (!header.trim().startsWith('|') || !/^\s*\|?\s*:?-{3,}/.test(lines[i + 1] ?? '')) continue;
+    const cols = splitRow(header);
+    const stageCol = cols.indexOf(THREAT_STAGE_COLUMN);
+    const idCol = cols.indexOf('ID');
+    if (stageCol >= 0) tables += 1;
+    let j = i + 2;
+    for (; j < lines.length && (lines[j] ?? '').trim().startsWith('|'); j += 1) {
+      if (stageCol < 0) continue;
+      const cells = splitRow(lines[j] ?? '');
+      const where = `${THREAT_FILE}:${j + 1}`;
+      const value = cells[stageCol] ?? '';
+      if (!/\bS\d{2}\b/.test(value) && !/^수용\s*[:：]\s*\S/.test(value)) {
+        problems.push(
+          `${where}: '${THREAT_STAGE_COLUMN}' must name a stage (SNN) or '수용: <reason>'`,
+        );
+      }
+      if (idCol < 0) continue;
+      const id = cells[idCol] ?? '';
+      const prev = ids.get(id);
+      if (id === '') problems.push(`${where}: threat row without ID`);
+      else if (prev !== undefined)
+        problems.push(`${where}: duplicate threat ID ${id} (also line ${prev})`);
+      else ids.set(id, j + 1);
+    }
+    i = j - 1;
+  }
+  if (tables === 0)
+    problems.push(`${THREAT_FILE}: no threat table with a '${THREAT_STAGE_COLUMN}' column`);
+  return problems;
+}
+
+/**
+ * @param {string} root
+ * @param {string[]} required repo-relative paths; '*' in the file name matches any characters
+ * @returns {string[]} problems
+ */
+export function checkRequiredFiles(root, required) {
+  /** @type {string[]} */
+  const problems = [];
+  for (const rel of required) {
+    const dir = path.join(root, ...path.posix.dirname(rel).split('/'));
+    const pattern = path.posix
+      .basename(rel)
+      .split('*')
+      .map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
+      .join('.*');
+    const re = new RegExp(`^${pattern}$`);
+    const found = existsSync(dir) && readdirSync(dir).some((name) => re.test(name));
+    if (!found) problems.push(`${rel}: required file is missing`);
+  }
+  return problems;
+}
+
+/**
+ * @param {string} [root]
+ * @param {{ requiredFiles?: string[] }} [options]
+ * @returns {string[]} all problems
+ */
+export function checkDocs(root = DEFAULT_ROOT, options = {}) {
+  /** @type {string[]} */
+  const problems = [];
+  const stageIds = readStageIds(root);
+  const adrNumbers = listAdrNumbers(root);
+  for (const file of listMarkdown(root)) {
+    const text = readFileSync(path.join(root, file), 'utf8');
+    problems.push(...checkLinks(root, file, text));
+    if (stageIds !== null) problems.push(...checkStageRefs(file, text, stageIds));
+    problems.push(...checkAdrRefs(file, text, adrNumbers), ...checkMermaid(file, text));
+  }
+  problems.push(...checkAdrs(root), ...checkStatuses(root), ...checkThreatModel(root));
+  problems.push(...checkRequiredFiles(root, options.requiredFiles ?? []));
   return problems;
 }
 
@@ -217,7 +487,7 @@ function isMain() {
 }
 
 if (isMain()) {
-  const problems = checkDocs();
+  const problems = checkDocs(DEFAULT_ROOT);
   if (problems.length > 0) {
     process.stderr.write(
       `check-docs: ${problems.length} problem(s)\n${problems.map((p) => `  - ${p}`).join('\n')}\n`,
