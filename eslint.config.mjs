@@ -2,6 +2,7 @@
 // Root ESLint flat config for the whole monorepo.
 // Custom restrictions (time and money) are exported so tools/repo-checks can prove they fire.
 import js from '@eslint/js';
+import eslintComments from '@eslint-community/eslint-plugin-eslint-comments';
 import { defineConfig } from 'eslint/config';
 import prettierConfig from 'eslint-config-prettier';
 import simpleImportSort from 'eslint-plugin-simple-import-sort';
@@ -10,51 +11,62 @@ import tseslint from 'typescript-eslint';
 
 /**
  * Server code must get time only from the injected Clock (apps/server/src/lib/clock.ts).
+ * References are banned, not just calls, so `{ now: Date.now }` and `Date['now']` are caught too.
+ * Monotonic timers (performance.now, process.hrtime) stay allowed: they measure durations, not wall-clock time.
  * @type {Array<{ selector: string, message: string }>}
  */
 export const timeRestrictions = [
   {
     selector:
-      "CallExpression[callee.type='MemberExpression'][callee.object.name='Date'][callee.property.name='now']",
+      "MemberExpression[object.name='Date'][property.name='now'], MemberExpression[object.name='Date'][property.value='now']",
     message:
-      'Date.now() is forbidden in server code. Use the injected Clock (apps/server/src/lib/clock.ts).',
+      'Date.now is forbidden in server code. Use the injected Clock (apps/server/src/lib/clock.ts).',
   },
   {
-    selector: "NewExpression[callee.name='Date'][arguments.length=0]",
-    message: 'new Date() without arguments is forbidden in server code. Use the injected Clock.',
+    selector:
+      "NewExpression[callee.name='Date'][arguments.length=0], NewExpression[callee.name='Date'] > SpreadElement",
+    message:
+      'new Date() without explicit arguments is forbidden in server code. Use the injected Clock.',
   },
   {
     selector: "CallExpression[callee.name='Date']",
     message:
       'Date() returns the current time; it is forbidden in server code. Use the injected Clock.',
   },
+  {
+    selector:
+      "MemberExpression[object.name=/^(globalThis|window|global|self)$/][property.name='Date'], MemberExpression[object.name='Temporal'][property.name='Now']",
+    message:
+      'Reaching the clock through globalThis.Date or Temporal.Now is forbidden in server code. Use the injected Clock.',
+  },
 ];
 
 /**
  * Money is bigint in minimal units only (µCR, µUSD, KRW). No floating point anywhere near it.
+ * Identifiers are banned (not only calls) so `.map(Number)`, `const { round } = Math` etc. are caught.
  * @type {Array<{ selector: string, message: string }>}
  */
 export const moneyRestrictions = [
   {
-    selector: "CallExpression[callee.name='parseFloat']",
-    message: 'parseFloat is forbidden in money code. Use bigint minimal units.',
-  },
-  {
-    selector: "CallExpression[callee.name='Number'], NewExpression[callee.name='Number']",
-    message: 'Number(...) is forbidden in money code. Use bigint minimal units.',
-  },
-  {
-    selector: "MemberExpression[object.name='Number'][property.name=/^parse(Float|Int)$/]",
-    message: 'Number.parseFloat/parseInt is forbidden in money code. Use BigInt parsing helpers.',
-  },
-  {
-    selector: "MemberExpression[object.name='Math']",
+    selector: 'Identifier[name=/^(parseFloat|parseInt|Number|Math|Infinity|NaN)$/]',
     message:
-      'Math.* (round, floor, ...) is forbidden in money code. Money is bigint; rounding must be explicit integer arithmetic.',
+      'Number, Math, parseFloat/parseInt, Infinity and NaN are forbidden in money code. Use bigint minimal units.',
   },
   {
-    selector: "MemberExpression[property.name='toFixed']",
-    message: 'toFixed is forbidden in money code. Format bigint minimal units explicitly.',
+    selector: 'MemberExpression[object.name=/^(globalThis|window|global|self)$/]',
+    message:
+      'globalThis access is forbidden in money code (it bypasses the number/float restrictions).',
+  },
+  {
+    selector:
+      'MemberExpression[property.name=/^to(Fixed|Precision|Exponential)$/], MemberExpression[property.value=/^to(Fixed|Precision|Exponential)$/]',
+    message:
+      'toFixed/toPrecision/toExponential are forbidden in money code. Format bigint minimal units explicitly.',
+  },
+  {
+    selector: "UnaryExpression[operator='+']",
+    message:
+      'Unary plus converts to a float number; forbidden in money code. Use BigInt parsing helpers.',
   },
   {
     // Decimal-point or exponent number literals (1.5, .5, 1., 1e6). Hex/binary/octal and bigint literals do not match.
@@ -65,22 +77,17 @@ export const moneyRestrictions = [
   },
 ];
 
+const CODE_EXT = '{ts,tsx,mts,cts,js,jsx,mjs,cjs}';
 /** Paths treated as money code anywhere in the repo. */
-export const moneyFiles = [
-  '**/money/**/*.{ts,tsx,mts,cts,js,mjs}',
-  '**/ledger/**/*.{ts,tsx,mts,cts,js,mjs}',
-  '**/pricing/**/*.{ts,tsx,mts,cts,js,mjs}',
-];
+export const moneyFiles = ['money', 'ledger', 'pricing'].map((d) => `**/${d}/**/*.${CODE_EXT}`);
 /** Server source files subject to the clock rule. */
-export const serverFiles = ['apps/server/src/**/*.{ts,mts,cts,js,mjs}'];
+export const serverFiles = [`apps/server/src/**/*.${CODE_EXT}`];
 /** The single place allowed to read the wall clock. */
 export const clockFile = 'apps/server/src/lib/clock.ts';
 /** Server money paths: both restriction sets must apply (flat config replaces, not merges, rule options). */
-export const serverMoneyFiles = [
-  'apps/server/src/**/money/**/*.{ts,mts,cts,js,mjs}',
-  'apps/server/src/**/ledger/**/*.{ts,mts,cts,js,mjs}',
-  'apps/server/src/**/pricing/**/*.{ts,mts,cts,js,mjs}',
-];
+export const serverMoneyFiles = ['money', 'ledger', 'pricing'].map(
+  (d) => `apps/server/src/**/${d}/**/*.${CODE_EXT}`,
+);
 
 export default defineConfig(
   {
@@ -140,6 +147,28 @@ export default defineConfig(
     rules: {
       'simple-import-sort/imports': 'error',
       'simple-import-sort/exports': 'error',
+    },
+  },
+
+  // Restrictions must not be switched off with comments: no disabling no-restricted-syntax, no blanket
+  // disables, no inline rule configuration (/* eslint rule: off */).
+  {
+    files: ['**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}'],
+    plugins: { '@eslint-community/eslint-comments': eslintComments },
+    rules: {
+      '@eslint-community/eslint-comments/no-restricted-disable': ['error', 'no-restricted-syntax'],
+      '@eslint-community/eslint-comments/no-unlimited-disable': 'error',
+      '@eslint-community/eslint-comments/no-use': [
+        'error',
+        {
+          allow: [
+            'eslint-disable-next-line',
+            'eslint-disable-line',
+            'eslint-disable',
+            'eslint-enable',
+          ],
+        },
+      ],
     },
   },
 

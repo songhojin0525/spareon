@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -7,7 +7,10 @@ import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
 
 import {
+  isNotFound,
   isSuccess,
+  MIN_NODE,
+  nodeVersionAtLeast,
   parseArgs,
   resolvePnpm,
   runAll,
@@ -139,6 +142,12 @@ describe('summarize', () => {
     expect(s.text).toMatch(/SKIPPED — this is NOT a full verification/);
   });
 
+  it('fails when every step was skipped (nothing verified)', () => {
+    const s = summarize([{ name: 'go:test', status: 'SKIPPED', ms: 0 }]);
+    expect(s.exitCode).toBe(1);
+    expect(s.text).toMatch(/nothing was verified/);
+  });
+
   it('treats an empty run as a failure', () => {
     expect(summarize([]).exitCode).toBe(1);
   });
@@ -147,7 +156,12 @@ describe('summarize', () => {
 describe('Go steps', () => {
   const goMissing = (s: Spec): Result =>
     s.cmd.command === 'go' || s.cmd.command === 'gofmt'
-      ? { code: null, signal: null, error: new Error('spawn go ENOENT'), stdout: '' }
+      ? {
+          code: null,
+          signal: null,
+          error: Object.assign(new Error('spawn go ENOENT'), { code: 'ENOENT' }),
+          stdout: '',
+        }
       : ok();
 
   it('are SKIPPED when Go is missing', async () => {
@@ -183,6 +197,39 @@ describe('Go steps', () => {
     expect(calls.map((c) => c.args.join(' '))).toEqual(
       expect.arrayContaining(['vet ./...', 'test ./...', 'build ./...', '-l .']),
     );
+  });
+});
+
+describe('Go probe failures other than "not found"', () => {
+  it('FAIL instead of SKIPPED when go exists but is broken', async () => {
+    const broken = fakeRunner((s) => (s.cmd.command === 'go' ? exit(1) : ok()));
+    const r = await runGo({}, broken.runner);
+    expect(r).toEqual([expect.objectContaining({ name: 'go:probe', status: 'FAIL' })]);
+    const eacces = fakeRunner(() => ({
+      code: null,
+      signal: null,
+      error: Object.assign(new Error('spawn go EACCES'), { code: 'EACCES' }),
+      stdout: '',
+    }));
+    expect((await runGo({}, eacces.runner))[0]?.status).toBe('FAIL');
+    expect(isNotFound({ error: Object.assign(new Error('x'), { code: 'EACCES' }) })).toBe(false);
+  });
+});
+
+describe('Node version check', () => {
+  it('compares versions numerically', () => {
+    expect(nodeVersionAtLeast('22.18.0', '22.13.0')).toBe(true);
+    expect(nodeVersionAtLeast('22.13.0', '22.13.0')).toBe(true);
+    expect(nodeVersionAtLeast('22.9.0', '22.13.0')).toBe(false);
+    expect(nodeVersionAtLeast('20.19.1', '22.13.0')).toBe(false);
+    expect(nodeVersionAtLeast('24.0.0', '22.13.0')).toBe(true);
+  });
+
+  it('matches package.json engines.node', () => {
+    const pkg = JSON.parse(readFileSync(path.join(repoRoot, 'package.json'), 'utf8')) as {
+      engines: { node: string };
+    };
+    expect(pkg.engines.node).toBe(`>=${MIN_NODE}`);
   });
 });
 
@@ -306,9 +353,10 @@ describe('verify.mjs as a process', () => {
     expect(run(['--nope'], { PATH: emptyDir }).status).toBe(2);
   });
 
-  it('exits 0 with SKIPPED when Go is not on PATH', () => {
+  it('exits 1 when only Go was requested and Go is not on PATH (nothing verified)', () => {
     const r = run(['--only=go'], { PATH: emptyDir });
-    expect(r.status).toBe(0);
+    expect(r.status).toBe(1);
+    expect(r.stdout).toMatch(/nothing was verified/);
     expect(r.stdout).toMatch(/go:test\s+SKIPPED/);
   });
 

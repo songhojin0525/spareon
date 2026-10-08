@@ -38,6 +38,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Lint workflows (actionlint)
+        run: pnpm lint:ci
+
       - name: Verify (Go required)
         run: pnpm verify
         env:

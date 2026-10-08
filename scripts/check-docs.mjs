@@ -88,10 +88,30 @@ export function checkLinks(root, file, text) {
       const resolved = clean.startsWith('/')
         ? path.join(root, clean)
         : path.join(root, path.dirname(file), clean);
-      if (!existsSync(resolved)) problems.push(`${file}:${i + 1}: broken link -> ${target}`);
+      if (!existsExactCase(root, resolved)) {
+        problems.push(`${file}:${i + 1}: broken link -> ${target}`);
+      }
     }
   });
   return problems;
+}
+
+/**
+ * Like existsSync, but also requires the exact letter case of every path segment under root.
+ * Windows and macOS file systems ignore case; Linux (CI) does not, so a link must match exactly.
+ * @param {string} root
+ * @param {string} target absolute path
+ */
+export function existsExactCase(root, target) {
+  if (!existsSync(target)) return false;
+  const rel = path.relative(root, target);
+  if (rel.startsWith('..') || path.isAbsolute(rel)) return true; // outside the repo: best effort
+  let dir = root;
+  for (const segment of rel.split(path.sep).filter((x) => x !== '' && x !== '.')) {
+    if (!readdirSync(dir).includes(segment)) return false;
+    dir = path.join(dir, segment);
+  }
+  return true;
 }
 
 /**

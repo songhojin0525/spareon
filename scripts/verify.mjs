@@ -15,6 +15,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const AGENT_DIR = path.join(ROOT, 'apps', 'agent');
+/** Keep in sync with package.json "engines.node" (checked by tools/repo-checks). */
+export const MIN_NODE = '22.13.0';
 
 const USAGE = `usage: node scripts/verify.mjs [--quick] [--only=ts|go]
   --quick      skip integration tests (*.int.test.ts) and the test database
@@ -132,6 +134,28 @@ export function runCommand(spec) {
   });
 }
 
+/**
+ * True only when the executable does not exist (spawn ENOENT).
+ * @param {Pick<CommandResult, 'error'>} r
+ */
+export function isNotFound(r) {
+  return r.error !== undefined && /** @type {NodeJS.ErrnoException} */ (r.error).code === 'ENOENT';
+}
+
+/**
+ * @param {string} actual e.g. process.versions.node
+ * @param {string} minimum e.g. "22.13.0"
+ */
+export function nodeVersionAtLeast(actual, minimum) {
+  const a = actual.split('.').map((x) => Number.parseInt(x, 10));
+  const m = minimum.split('.').map((x) => Number.parseInt(x, 10));
+  for (let i = 0; i < 3; i++) {
+    const d = (a[i] ?? 0) - (m[i] ?? 0);
+    if (d !== 0) return d > 0;
+  }
+  return true;
+}
+
 /** @param {unknown} err */
 function toError(err) {
   return err instanceof Error ? err : new Error(String(err));
@@ -209,12 +233,13 @@ export function summarize(results) {
       `!!! ${skipped.length} step(s) SKIPPED — this is NOT a full verification. See details above.`,
     );
   }
-  // An empty run verifies nothing; treat it as a failure rather than a silent pass.
-  const exitCode = failed.length > 0 || results.length === 0 ? 1 : 0;
-  lines.push(
-    '',
-    exitCode === 0 ? 'RESULT: PASS' : `RESULT: FAIL (${failed.length} failed step(s))`,
-  );
+  // A run that verified nothing (no step passed) is a failure, never a silent pass.
+  const passed = results.filter((r) => r.status === 'PASS');
+  const exitCode = failed.length > 0 || passed.length === 0 ? 1 : 0;
+  let verdict = `RESULT: PASS (${passed.length} step(s) passed)`;
+  if (failed.length > 0) verdict = `RESULT: FAIL (${failed.length} failed step(s))`;
+  else if (exitCode === 1) verdict = 'RESULT: FAIL (nothing was verified)';
+  lines.push('', verdict);
   return { text: lines.join('\n'), exitCode };
 }
 
@@ -303,6 +328,13 @@ export async function runGo(env, runner = runCommand) {
   const go = { command: 'go', prefixArgs: [] };
   const gofmt = { command: 'gofmt', prefixArgs: [] };
   const probe = await runner({ cmd: go, args: ['version'], cwd: AGENT_DIR, captureStdout: true });
+  if (!isSuccess(probe) && !isNotFound(probe)) {
+    // Go exists but is broken (bad binary, permissions, ...): that is a failure, not "not installed".
+    let why = `exit code ${String(probe.code)}`;
+    if (probe.error) why = probe.error.message;
+    else if (probe.signal !== null) why = `killed by ${probe.signal}`;
+    return [{ name: 'go:probe', status: 'FAIL', ms: 0, detail: `"go version" failed: ${why}` }];
+  }
   if (!isSuccess(probe)) {
     const banner = [
       '',
@@ -377,6 +409,12 @@ async function main() {
   if (opts.help) {
     process.stdout.write(`${USAGE}\n`);
     return 0;
+  }
+  if (!nodeVersionAtLeast(process.versions.node, MIN_NODE)) {
+    process.stderr.write(
+      `Node.js ${MIN_NODE} or newer is required (found ${process.versions.node}). See docs/ENVIRONMENT.md.\n`,
+    );
+    return 1;
   }
   const results = await runAll(opts, { env: process.env });
   const { text, exitCode } = summarize(results);

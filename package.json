@@ -22,6 +22,7 @@
     "lint:ci": "go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -no-color"
   },
   "devDependencies": {
+    "@eslint-community/eslint-plugin-eslint-comments": "catalog:",
     "@eslint/js": "catalog:",
     "@types/node": "catalog:",
     "eslint": "catalog:",

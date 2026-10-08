@@ -32,7 +32,7 @@ Windows 11 / Node 22.18.0 / corepack 0.33.0 / pnpm 11.28.2(전역) / Go 1.27.0 /
      못 찾으면 FAIL.
    - Go 단계: `go version`이 ENOENT면 SKIPPED를 크게 표시한다. `REQUIRE_GO=1`이면 FAIL이다. `gofmt -l` 출력이 비어 있지 않으면 FAIL이다.
    - 실패 판정: 종료 코드 ≠ 0, 시그널 종료, spawn 오류는 모두 FAIL이다. 반박: "에러만 출력하고 성공 처리"하는 경로를 막으려고 판정 함수를 분리해 단위 테스트한다.
-   - `--quick`은 환경변수 `BINJARI_TEST_QUICK=1`로 전달한다. 공용 Vitest 설정(`vitest.shared.mjs`)이 이 값을 보고 `*.int.test.ts`와 DB globalSetup을 뺀다. CLI 글롭 인자를 pnpm 경유로 넘기면 셸마다 글롭 해석이 달라서 이 방식을 쓴다.
+   - `--quick`은 환경변수 `BINJARI_TEST_QUICK=1`로 전달한다. 공용 Vitest 설정(`packages/testkit/src/vitest-config.ts`의 `defineBinjariVitestConfig`)이 이 값을 보고 `*.int.test.ts`와 DB globalSetup을 뺀다. CLI 글롭 인자를 pnpm 경유로 넘기면 셸마다 글롭 해석이 달라서 이 방식을 쓴다.
    - `docs` 단계(`scripts/check-docs.mjs`)를 format 다음에 둔다. 게이트 4번 요구사항이다.
 7. **테스트 DB (`packages/testkit`)**
    - `TEST_DATABASE_URL` → `DATABASE_URL` → embedded-postgres 순서로 고른다. embedded-postgres는 **16.x**(`16.14.0-beta.17`)로 고정한다. 운영 하한이 16이므로 하한 버전에서 테스트해야 17+ 전용 기능을 실수로 쓰지 않는다.

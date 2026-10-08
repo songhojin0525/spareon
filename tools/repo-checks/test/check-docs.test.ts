@@ -51,6 +51,12 @@ describe('check-docs', () => {
     expect(checkDocs(root)).toEqual(['docs/a.md:2: broken link -> ../missing.md#part']);
   });
 
+  it('requires the exact letter case of link targets (Linux CI is case-sensitive)', () => {
+    write('START_HERE.md', '# hi\n');
+    write('README.md', '[a](START_HERE.md)\n[b](start_here.md)\n');
+    expect(checkDocs(root)).toEqual(['README.md:2: broken link -> start_here.md']);
+  });
+
   it('ignores links inside code fences and inline code', () => {
     write('a.md', '```\n[x](nope.md)\n```\n`[y](nope.md)`\n');
     expect(checkDocs(root)).toEqual([]);

@@ -10,6 +10,10 @@ import { newRunId, templateName } from './naming.js';
  * database. Each test file then clones the template via createIsolatedDatabase(), so files never share state.
  * SKELETON(S03): apply migrations to the template once migrations exist.
  */
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
 export default async function setup(project: TestProject): Promise<() => Promise<void>> {
   const db = await startTestDatabase();
   const runId = newRunId();
@@ -24,10 +28,25 @@ export default async function setup(project: TestProject): Promise<() => Promise
   project.provide('binjariTestDb', info);
 
   return async () => {
+    const problems: string[] = [];
     try {
       await dropRunDatabases(db.adminUrl, runId);
-    } finally {
+    } catch (err) {
+      problems.push(`dropping run databases failed: ${errorMessage(err)}`);
+    }
+    try {
       await db.stop();
+    } catch (err) {
+      problems.push(`stopping the test database failed: ${errorMessage(err)}`);
+    }
+    if (problems.length > 0) {
+      // Vitest prints teardown errors but still exits 0 (it calls process.exit(0) itself). Overriding the
+      // exit code in an exit listener runs after that, so the run really fails.
+      process.exitCode = 1;
+      process.once('exit', () => {
+        process.exitCode = 1;
+      });
+      throw new Error(`[testkit] teardown failed:\n- ${problems.join('\n- ')}`);
     }
   };
 }

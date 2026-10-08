@@ -54,6 +54,20 @@ describe('workspace wiring', () => {
     }
   });
 
+  it('every package that contains test files has a test script (pnpm -r skips packages without one)', () => {
+    const hasTests = (dir: string): boolean =>
+      readdirSync(dir, { withFileTypes: true }).some((e) =>
+        e.isDirectory()
+          ? e.name !== 'node_modules' && hasTests(path.join(dir, e.name))
+          : /\.test\.[cm]?[jt]sx?$/.test(e.name),
+      );
+    for (const { dir, pkg } of workspacePackages()) {
+      if (hasTests(path.join(repoRoot, dir))) {
+        expect(pkg.scripts?.['test'], dir).toBe('vitest run');
+      }
+    }
+  });
+
   it('every package with tests uses the shared vitest config (so --quick works everywhere)', () => {
     for (const { dir, pkg } of workspacePackages()) {
       if (pkg.scripts?.['test'] === undefined) continue;

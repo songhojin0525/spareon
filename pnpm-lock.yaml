@@ -6,6 +6,9 @@ settings:
 
 catalogs:
   default:
+    '@eslint-community/eslint-plugin-eslint-comments':
+      specifier: 4.8.1
+      version: 4.8.1
     '@eslint/js':
       specifier: 10.0.1
       version: 10.0.1
@@ -62,6 +65,9 @@ importers:
 
   .:
     devDependencies:
+      '@eslint-community/eslint-plugin-eslint-comments':
+        specifier: 'catalog:'
+        version: 4.8.1(eslint@10.12.0)
       '@eslint/js':
         specifier: 'catalog:'
         version: 10.0.1(eslint@10.12.0)
@@ -414,6 +420,12 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
+
+  '@eslint-community/eslint-plugin-eslint-comments@4.8.1':
+    resolution: {integrity: sha512-vafrdi15JHBFh1qWOAucyJwlEEuhdoMof28jOdKdgnwZ7bXwd6v4wzHYSmAVLwnx0yc7bqAtfJ0EZQV1WAzV/Q==}
+    engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
+    peerDependencies:
+      eslint: ^6.0.0 || ^7.0.0 || ^8.0.0 || ^9.0.0 || ^10.0.0
 
   '@eslint-community/eslint-utils@4.10.1':
     resolution: {integrity: sha512-cuadcxVFE8sDK6iWJbs8Sn0av2Nrh2QSGQhVlBW9AaAHqHwjWsZHT8LJ4hFGPh7ASBV2deFdM7H/DPjulmh8rg==}
@@ -1561,6 +1573,12 @@ snapshots:
 
   '@esbuild/win32-x64@0.28.2':
     optional: true
+
+  '@eslint-community/eslint-plugin-eslint-comments@4.8.1(eslint@10.12.0)':
+    dependencies:
+      escape-string-regexp: 4.0.0
+      eslint: 10.12.0
+      ignore: 7.0.12
 
   '@eslint-community/eslint-utils@4.10.1(eslint@10.12.0)':
     dependencies:

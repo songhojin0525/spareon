@@ -23,13 +23,31 @@ describe('resolveDatabaseSource', () => {
   });
 
   it('falls back to DATABASE_URL, then to embedded', () => {
-    expect(resolveDatabaseSource({ DATABASE_URL: 'postgresql://d@h/db' })).toMatchObject({
+    expect(resolveDatabaseSource({ DATABASE_URL: 'postgresql://d@localhost/db' })).toMatchObject({
       kind: 'external',
       envVar: 'DATABASE_URL',
     });
+    expect(resolveDatabaseSource({ DATABASE_URL: 'postgres://d@127.0.0.1:5433/db' })).toMatchObject(
+      {
+        kind: 'external',
+      },
+    );
     expect(resolveDatabaseSource({})).toEqual({ kind: 'embedded' });
     expect(resolveDatabaseSource({ TEST_DATABASE_URL: '  ', DATABASE_URL: '' })).toEqual({
       kind: 'embedded',
+    });
+  });
+
+  it('refuses a remote DATABASE_URL unless explicitly allowed (tests create/drop databases)', () => {
+    const remote = 'postgres://u:secret@db.example.com/app';
+    expect(() => resolveDatabaseSource({ DATABASE_URL: remote })).toThrow(/remote host/);
+    expect(() => resolveDatabaseSource({ DATABASE_URL: remote })).not.toThrow(/secret/);
+    expect(
+      resolveDatabaseSource({ DATABASE_URL: remote, BINJARI_ALLOW_REMOTE_TEST_DB: '1' }),
+    ).toMatchObject({ kind: 'external' });
+    // A dedicated TEST_DATABASE_URL is always trusted.
+    expect(resolveDatabaseSource({ TEST_DATABASE_URL: remote })).toMatchObject({
+      kind: 'external',
     });
   });
 

@@ -4,8 +4,6 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import EmbeddedPostgres from 'embedded-postgres';
-
 import { redactUrl } from './naming.js';
 
 export type DatabaseSource =
@@ -27,10 +25,28 @@ export function resolveDatabaseSource(
       if (protocol !== 'postgres:' && protocol !== 'postgresql:') {
         throw new Error(`${envVar} must be a postgres:// URL (got ${redactUrl(value)})`);
       }
+      // Safety: tests create and drop databases. DATABASE_URL is often the app's real database, so it is
+      // only used for tests when it points at this machine, unless explicitly allowed.
+      if (
+        envVar === 'DATABASE_URL' &&
+        !isLocalHost(value) &&
+        env['BINJARI_ALLOW_REMOTE_TEST_DB'] !== '1'
+      ) {
+        throw new Error(
+          `DATABASE_URL points at a remote host (${redactUrl(value)}); tests would create/drop databases there. ` +
+            'Set TEST_DATABASE_URL for a dedicated test server, unset DATABASE_URL to use embedded Postgres, ' +
+            'or set BINJARI_ALLOW_REMOTE_TEST_DB=1.',
+        );
+      }
       return { kind: 'external', url: value, envVar };
     }
   }
   return { kind: 'embedded' };
+}
+
+function isLocalHost(value: string): boolean {
+  const host = new URL(value).hostname;
+  return host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host === '';
 }
 
 function safeProtocol(value: string): string | undefined {
@@ -89,13 +105,17 @@ async function startEmbedded(onLog?: (line: string) => void): Promise<TestDataba
     onLog?.(line);
   };
 
+  // Loaded lazily: importing embedded-postgres installs process exit hooks (see preserveFailingExitCode).
+  const { default: EmbeddedPostgres } = await import('embedded-postgres');
+  preserveFailingExitCode();
   const pg = new EmbeddedPostgres({
     databaseDir: join(root, 'data'),
     port,
     user: 'postgres',
     password,
     authMethod: 'scram-sha-256',
-    persistent: false,
+    // We delete the files ourselves (with retries): the library's own delete races the killed process on Windows (EBUSY).
+    persistent: true,
     // initdb/postgres refuse to run as root (some cloud containers); embedded-postgres then creates a 'postgres' OS user.
     createPostgresUser: typeof process.getuid === 'function' && process.getuid() === 0,
     initdbFlags: ['--encoding=UTF8', '--no-sync'],
@@ -117,7 +137,7 @@ async function startEmbedded(onLog?: (line: string) => void): Promise<TestDataba
   });
 
   const cleanupFiles = (): Promise<void> =>
-    rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+    rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 });
   try {
     await pg.initialise();
     await pg.start();
@@ -145,6 +165,28 @@ async function startEmbedded(onLog?: (line: string) => void): Promise<TestDataba
       }
     },
   };
+}
+
+let exitCodeGuardInstalled = false;
+
+/**
+ * embedded-postgres pulls in async-exit-hook, which handles 'beforeExit' by calling process.exit(0).
+ * Vitest reports failed tests by setting process.exitCode = 1 and letting the process end, so without
+ * this guard every failing test run that started an embedded Postgres would exit 0 (a silent pass).
+ * We remember the exit code at 'beforeExit' and restore it in 'exit' (Node honours exitCode changes there).
+ */
+export function preserveFailingExitCode(): void {
+  if (exitCodeGuardInstalled) return;
+  exitCodeGuardInstalled = true;
+  let pending: number | string | null | undefined;
+  process.on('beforeExit', () => {
+    pending ??= process.exitCode;
+  });
+  process.on('exit', (code) => {
+    if (code === 0 && pending !== undefined && pending !== null && Number(pending) !== 0) {
+      process.exitCode = pending;
+    }
+  });
 }
 
 function getFreePort(): Promise<number> {

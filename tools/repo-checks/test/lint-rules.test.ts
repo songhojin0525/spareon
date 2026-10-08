@@ -38,6 +38,11 @@ describe('server clock restriction', () => {
     ['Date.now()', 'export const t = Date.now();'],
     ['new Date()', 'export const d = new Date();'],
     ['Date()', 'export const s = Date();'],
+    ['Date.now as a reference', 'export const clock = { now: Date.now };'],
+    ['computed Date["now"]', "export const t = Date['now']();"],
+    ['new Date(...[])', 'export const d = new Date(...[]);'],
+    ['globalThis.Date', 'export const d = new globalThis.Date(0);'],
+    ['Temporal.Now', 'export const t = Temporal.Now;'],
   ])('rejects %s in server code', async (_label, code) => {
     const msgs = await restricted(SERVER_FILE, code);
     expect(msgs).toHaveLength(1);
@@ -80,6 +85,13 @@ describe('money restriction', () => {
     ['decimal literal', 'export const rate = 1.5;'],
     ['leading-dot literal', 'export const rate = .5;'],
     ['exponent literal', 'export const big = 1e6;'],
+    ['parseInt', "export const a = parseInt('15', 10);"],
+    ['map(Number)', "export const a = ['1'].map(Number);"],
+    ['unary plus', "export const a = +'1.5';"],
+    ['globalThis.parseFloat', "export const a = globalThis.parseFloat('1.5');"],
+    ['toPrecision', 'export const a = (15).toPrecision(2);'],
+    ['destructured Math', 'const { round } = Math;\nexport const a = round;'],
+    ['Infinity', 'export const a = Infinity;'],
   ];
 
   for (const file of MONEY_FILES) {
@@ -116,6 +128,23 @@ describe('money restriction', () => {
     );
     expect(msgs).toHaveLength(2);
     expect(msgs.map((m) => m.line).sort()).toEqual([1, 2]);
+  });
+});
+
+describe('restrictions cannot be switched off with comments', () => {
+  it.each([
+    [
+      'disable-next-line',
+      '// eslint-disable-next-line no-restricted-syntax\nexport const t = Date.now();',
+    ],
+    ['blanket disable', '/* eslint-disable */\nexport const t = Date.now();'],
+    ['inline rule config', '/* eslint no-restricted-syntax: off */\nexport const t = Date.now();'],
+  ])('%s is reported', async (_label, code) => {
+    const [result] = await syntaxOnly.lintText(code, { filePath: SERVER_FILE });
+    const errors = result?.messages.filter((m) => m.severity === 2) ?? [];
+    expect(
+      errors.some((m) => (m.ruleId ?? '').startsWith('@eslint-community/eslint-comments/')),
+    ).toBe(true);
   });
 });
 
