@@ -77,7 +77,9 @@ export function resolvePnpm({ env, platform, execPath, exists = existsSync }) {
   }
   const pathKey = Object.keys(env).find((k) => k.toUpperCase() === 'PATH') ?? 'PATH';
   const dirs = (env[pathKey] ?? '').split(platform === 'win32' ? ';' : ':').filter(Boolean);
-  const join = platform === 'win32' ? path.win32.join : path.posix.join;
+  // Use the target platform's path rules, not the host's (tests resolve Windows paths on Linux CI).
+  const pathFor = platform === 'win32' ? path.win32 : path.posix;
+  const join = pathFor.join;
   for (const dir of dirs) {
     for (const candidate of [
       join(dir, 'node_modules', 'pnpm', 'bin', 'pnpm.cjs'),
@@ -88,7 +90,7 @@ export function resolvePnpm({ env, platform, execPath, exists = existsSync }) {
     const exe = join(dir, platform === 'win32' ? 'pnpm.exe' : 'pnpm');
     if (exists(exe)) return { command: exe, prefixArgs: [] };
   }
-  const nodeDir = path.dirname(execPath);
+  const nodeDir = pathFor.dirname(execPath);
   for (const corepack of [
     join(nodeDir, 'node_modules', 'corepack', 'dist', 'corepack.js'),
     join(nodeDir, '..', 'lib', 'node_modules', 'corepack', 'dist', 'corepack.js'),
