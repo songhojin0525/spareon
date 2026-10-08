@@ -1,6 +1,43 @@
-# S00 will extend this file.
+# dependencies
 node_modules/
+
+# secrets (never commit)
 .env
 .env.*
 !.env.example
+
+# runner / progress board state (local only)
 .runner/
+
+# build outputs
+dist/
+.next/
+out/
+coverage/
+.turbo/
+*.tsbuildinfo
+apps/agent/bin/
+
+# models and large binaries
+*.gguf
+models-cache/
+*.msi
+
+# test artifacts
+playwright-report/
+test-results/
+.tmp/
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+.idea/
+.vscode/*
+!.vscode/extensions.json
