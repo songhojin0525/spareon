@@ -42,6 +42,3 @@ desktop.ini
 .obsidian/
 .vscode/*
 !.vscode/extensions.json
-
-# Local copy of scripts/board-web.cmd kept by the owner (not part of the repo)
-/board-web.cmd
