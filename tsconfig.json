@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true
+  },
+  "include": ["scripts/verify.mjs", "scripts/check-docs.mjs", "scripts/lib/**/*.mjs", "*.mjs"],
+  "exclude": ["node_modules", "scripts/board.mjs", "scripts/status.mjs"]
+}

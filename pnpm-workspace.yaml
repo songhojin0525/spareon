@@ -1,0 +1,38 @@
+packages:
+  - apps/*
+  - packages/*
+  - tools/*
+
+# Dependencies allowed to run install scripts (pnpm blocks all others).
+# - @embedded-postgres/*: postinstall re-creates the Postgres binary symlinks (needed on Linux/macOS).
+# - esbuild: postinstall validates the platform binary (used by Vite/Vitest and tsx).
+allowBuilds:
+  '@embedded-postgres/darwin-arm64': true
+  '@embedded-postgres/darwin-x64': true
+  '@embedded-postgres/linux-arm': true
+  '@embedded-postgres/linux-arm64': true
+  '@embedded-postgres/linux-ia32': true
+  '@embedded-postgres/linux-ppc64': true
+  '@embedded-postgres/linux-x64': true
+  '@embedded-postgres/windows-x64': true
+  esbuild: true
+
+# Single place to pin shared dependency versions. Packages reference them as "catalog:".
+catalog:
+  '@eslint/js': 10.0.1
+  '@types/node': 22.20.5
+  '@types/pg': 8.23.1
+  embedded-postgres: 16.14.0-beta.17
+  eslint: 10.12.0
+  eslint-config-prettier: 10.1.8
+  eslint-plugin-simple-import-sort: 14.0.0
+  fastify: 5.12.5
+  globals: 17.13.0
+  pg: 8.23.1
+  prettier: 3.9.9
+  tsx: 4.23.15
+  typescript: 6.0.3
+  typescript-eslint: 8.71.1
+  vitest: 5.0.3
+  yaml: 2.9.1
+  zod: 4.6.5

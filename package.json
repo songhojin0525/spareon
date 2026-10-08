@@ -1,0 +1,34 @@
+{
+  "name": "binjari",
+  "version": "0.0.0",
+  "private": true,
+  "description": "binjari monorepo: idle PC-bang GPUs serve open-source model inference for credits.",
+  "type": "module",
+  "packageManager": "pnpm@11.28.2",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "verify": "node scripts/verify.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint --max-warnings=0 .",
+    "lint:fix": "eslint --fix .",
+    "typecheck": "pnpm -r --no-bail run typecheck && tsc -p tsconfig.json",
+    "test": "pnpm -r --no-bail run test",
+    "check-docs": "node scripts/check-docs.mjs",
+    "board": "node scripts/board.mjs",
+    "board:web": "node scripts/board.mjs --web --open"
+  },
+  "devDependencies": {
+    "@eslint/js": "catalog:",
+    "@types/node": "catalog:",
+    "eslint": "catalog:",
+    "eslint-config-prettier": "catalog:",
+    "eslint-plugin-simple-import-sort": "catalog:",
+    "globals": "catalog:",
+    "prettier": "catalog:",
+    "typescript": "catalog:",
+    "typescript-eslint": "catalog:"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "@binjari/repo-checks",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Tests that guard repository-wide rules: lint restrictions, verify orchestration, docs checks, CI config, workspace wiring.",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@binjari/protocol": "workspace:*",
+    "@binjari/shared": "workspace:*",
+    "@binjari/testkit": "workspace:*",
+    "@binjari/web": "workspace:*",
+    "@types/node": "catalog:",
+    "eslint": "catalog:",
+    "typescript": "catalog:",
+    "typescript-eslint": "catalog:",
+    "vitest": "catalog:",
+    "yaml": "catalog:"
+  }
+}

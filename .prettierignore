@@ -1,0 +1,18 @@
+# Documents are prose (Korean) and PROGRESS.md tables are parsed by the board; docs are checked by scripts/check-docs.mjs instead.
+*.md
+
+# Kit tools: must not be modified (prompts/S00_bootstrap.md §3).
+scripts/board.mjs
+scripts/status.mjs
+scripts/board-web.cmd
+scripts/run-stages.ps1
+scripts/run-stages.sh
+
+# Generated / external
+pnpm-lock.yaml
+node_modules/
+dist/
+coverage/
+.next/
+.runner/
+apps/agent/
