@@ -45,6 +45,11 @@ describe('resolveDatabaseSource', () => {
     expect(
       resolveDatabaseSource({ DATABASE_URL: remote, BINJARI_ALLOW_REMOTE_TEST_DB: '1' }),
     ).toMatchObject({ kind: 'external' });
+    // Host overrides that pg honours, and an empty host (PGHOST decides), count as possibly remote.
+    expect(() =>
+      resolveDatabaseSource({ DATABASE_URL: 'postgres://u@localhost/db?host=prod.example.com' }),
+    ).toThrow(/remote host/);
+    expect(() => resolveDatabaseSource({ DATABASE_URL: 'postgres:///db' })).toThrow(/remote host/);
     // A dedicated TEST_DATABASE_URL is always trusted.
     expect(resolveDatabaseSource({ TEST_DATABASE_URL: remote })).toMatchObject({
       kind: 'external',

@@ -132,19 +132,33 @@ describe('money restriction', () => {
 });
 
 describe('restrictions cannot be switched off with comments', () => {
-  it.each([
+  const tricks: [string, string][] = [
+    ['disable-next-line', '// eslint-disable-next-line no-restricted-syntax'],
+    ['blanket disable', '/* eslint-disable */'],
+    ['inline rule config', '/* eslint no-restricted-syntax: off */'],
     [
-      'disable-next-line',
-      '// eslint-disable-next-line no-restricted-syntax\nexport const t = Date.now();',
+      'self-disabling the comment guard',
+      '/* eslint-disable @eslint-community/eslint-comments/no-restricted-disable, no-restricted-syntax */',
     ],
-    ['blanket disable', '/* eslint-disable */\nexport const t = Date.now();'],
-    ['inline rule config', '/* eslint no-restricted-syntax: off */\nexport const t = Date.now();'],
-  ])('%s is reported', async (_label, code) => {
-    const [result] = await syntaxOnly.lintText(code, { filePath: SERVER_FILE });
-    const errors = result?.messages.filter((m) => m.severity === 2) ?? [];
-    expect(
-      errors.some((m) => (m.ruleId ?? '').startsWith('@eslint-community/eslint-comments/')),
-    ).toBe(true);
+  ];
+  const files: [string, string][] = [
+    [SERVER_FILE, 'export const t = Date.now();'],
+    ['packages/shared/src/money/sample.ts', "export const a = parseFloat('1.5');"],
+  ];
+  for (const [file, violation] of files) {
+    it.each(tricks)(`%s still reports the violation in ${file}`, async (_label, comment) => {
+      const [result] = await syntaxOnly.lintText(`${comment}\n${violation}\n`, { filePath: file });
+      const ids = result?.messages.filter((m) => m.severity === 2).map((m) => m.ruleId) ?? [];
+      expect(ids).toContain('no-restricted-syntax');
+    });
+  }
+
+  it('also reports the ignored comment itself (fails lint under --max-warnings=0)', async () => {
+    const [result] = await syntaxOnly.lintText(
+      '/* eslint-disable */\nexport const t = Date.now();\n',
+      { filePath: SERVER_FILE },
+    );
+    expect(result?.warningCount ?? 0).toBeGreaterThanOrEqual(1);
   });
 });
 

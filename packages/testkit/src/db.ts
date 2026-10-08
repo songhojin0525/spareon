@@ -44,9 +44,14 @@ export function resolveDatabaseSource(
   return { kind: 'embedded' };
 }
 
+/**
+ * Conservative: only an explicit loopback hostname counts as local. An empty hostname (target decided
+ * by PGHOST) or a `host=` query override (honoured by pg) is treated as possibly remote.
+ */
 function isLocalHost(value: string): boolean {
-  const host = new URL(value).hostname;
-  return host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host === '';
+  const u = new URL(value);
+  if (u.searchParams.has('host') || u.searchParams.has('hostaddr')) return false;
+  return u.hostname === 'localhost' || u.hostname === '127.0.0.1' || u.hostname === '[::1]';
 }
 
 function safeProtocol(value: string): string | undefined {

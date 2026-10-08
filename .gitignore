@@ -39,5 +39,6 @@ Thumbs.db
 desktop.ini
 *.swp
 .idea/
+.obsidian/
 .vscode/*
 !.vscode/extensions.json

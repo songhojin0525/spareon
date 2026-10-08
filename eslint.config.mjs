@@ -172,6 +172,10 @@ export default defineConfig(
     },
   },
 
+  // In restricted code, inline ESLint comments are ignored entirely (and reported as warnings, which
+  // fail lint via --max-warnings=0). A plugin rule cannot stop a comment that disables the plugin rule itself.
+  { files: [...moneyFiles, ...serverFiles], linterOptions: { noInlineConfig: true } },
+
   // Custom restriction 1: money paths (anywhere).
   { files: moneyFiles, rules: { 'no-restricted-syntax': ['error', ...moneyRestrictions] } },
   // Custom restriction 2: server time (overrides 1 for server files, so server money paths are re-merged below).
