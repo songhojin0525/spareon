@@ -23,12 +23,22 @@ export interface IsolatedDatabase {
   drop(): Promise<void>;
 }
 
+export interface IsolatedDatabaseOptions {
+  /**
+   * true: an empty database (Postgres' default template) instead of a clone of this run's prepared
+   * template. For tests that apply or roll back migrations themselves.
+   */
+  readonly empty?: boolean;
+}
+
 /**
  * Create a fresh database for one test file by cloning this run's template database.
  * Requires `defineBinjariVitestConfig({ useTestDatabase: true })` in the package's vitest config
  * and a `*.int.test.ts` file name.
  */
-export async function createIsolatedDatabase(): Promise<IsolatedDatabase> {
+export async function createIsolatedDatabase(
+  options: IsolatedDatabaseOptions = {},
+): Promise<IsolatedDatabase> {
   const info = inject('binjariTestDb') as TestDatabaseInfo | undefined;
   if (info === undefined) {
     throw new Error(
@@ -36,7 +46,7 @@ export async function createIsolatedDatabase(): Promise<IsolatedDatabase> {
     );
   }
   const name = isolatedName(info.runId);
-  await createDatabase(info.adminUrl, name, info.template);
+  await createDatabase(info.adminUrl, name, options.empty === true ? 'template0' : info.template);
   let dropped = false;
   return {
     name,

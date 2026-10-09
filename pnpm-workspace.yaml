@@ -25,6 +25,8 @@ catalog:
   '@types/node': 22.20.5
   '@types/pg': 8.23.1
   ajv: 8.20.0
+  drizzle-kit: 0.31.11
+  drizzle-orm: 0.45.3
   embedded-postgres: 16.14.0-beta.17
   eslint: 10.12.0
   eslint-config-prettier: 10.1.8

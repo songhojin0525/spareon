@@ -17,6 +17,11 @@ export function isQuickMode(
 export interface BinjariVitestOptions {
   /** Start the shared test PostgreSQL once per run (packages/testkit/src/global-setup.ts). */
   readonly useTestDatabase?: boolean;
+  /**
+   * Absolute path of the package's own globalSetup module (default: testkit's, empty template).
+   * A package with a schema exports `createTestDatabaseSetup({ prepareTemplate })` from that module.
+   */
+  readonly globalSetup?: string;
   readonly env?: Readonly<Record<string, string | undefined>>;
 }
 
@@ -29,7 +34,10 @@ export function defineBinjariVitestConfig(options: BinjariVitestOptions = {}): V
     test: {
       include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
       exclude: ['**/node_modules/**', '**/dist/**', ...(quick ? [INTEGRATION_TEST_PATTERN] : [])],
-      globalSetup: options.useTestDatabase === true && !quick ? [GLOBAL_SETUP_PATH] : [],
+      globalSetup:
+        options.useTestDatabase === true && !quick
+          ? [options.globalSetup ?? GLOBAL_SETUP_PATH]
+          : [],
       // In quick mode a package may legitimately have only integration tests.
       passWithNoTests: quick,
       testTimeout: 20_000,

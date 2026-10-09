@@ -10,12 +10,18 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@binjari/shared": "workspace:*",
+    "drizzle-orm": "catalog:",
     "fastify": "catalog:",
+    "pg": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@binjari/testkit": "workspace:*",
     "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "drizzle-kit": "catalog:",
+    "fast-check": "catalog:",
     "tsx": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
