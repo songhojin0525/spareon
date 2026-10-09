@@ -28,7 +28,7 @@
 | `v` | 정수 `1` |
 | `type` | 등록된 타입(5절). 형식 `^[a-z][a-z0-9]{0,15}(\.[a-z][a-z0-9]{0,15}){0,2}$` |
 | `id` | 소문자 UUIDv7. 보내는 쪽이 만든다(서버는 주입된 Clock, 에이전트는 `NewUUIDv7(now, rand)`) |
-| `ts` | RFC 3339 UTC 밀리초 정확히(`2026-10-09T04:36:00.000Z`). **정보용**이다. 판단에는 받는 쪽 시계를 쓴다(ARCHITECTURE 7절) |
+| `ts` | RFC 3339 UTC 밀리초 정확히(`2026-10-09T04:36:00.000Z`). **정보용**이다. 판단에는 받는 쪽 시계를 쓴다(ARCHITECTURE 7절). 코덱은 모양(정규식)만 검사하므로 `2026-02-30T…`·`T24:00`처럼 형식은 맞고 달력에 없는 값도 통과한다 — 시각을 값으로 쓰는 쪽(`measuredAt`·`serverTime` 등)은 `parseTimestamp`/`ParseTimestamp`로 읽고, 이 함수는 달력 검사까지 해서 그런 값을 거부한다(양쪽 테스트) |
 | `corr` | 응답 대상 메시지의 `id`. 타입마다 필수·선택·금지가 정해져 있다(5절 표) |
 | `payload` | 객체. 타입별 스키마가 닫는다(추가 필드 금지) |
 
@@ -133,7 +133,7 @@ HTTPS 본문: 1(한도 64 KiB, `maxHttpBodyBytes`) → 2 → `http/<name>.json`�
 - **정책** `defs/policy.json`(`config.update.policy`):
   - `weeklySchedule`: 7개 문자열(0 = 월요일 … 6 = 일요일), 각 12자리 소문자 hex = 48비트. 비트 i(왼쪽 첫 비트가 i = 0)가 1이면 그 요일 `i × 30분`부터 30분 동안 작업 허용. `ffffffffffff` = 하루 종일.
   - `utcOffsetMinutes`: 매장 시간대(한국 540). 하루 중 시각은 PC 시계가 아니라 서버 시각(`auth.ok`·`heartbeat.ack`의 `serverTime`) + 에이전트 단조 경과 + 이 값으로 계산한다. 서버 시각을 모르면 '일정 밖'과 같다(ARCHITECTURE 7절).
-  - `minIdleMinutes`(기본 10), `maxGpuTempC`(기본 80), `downloadWindow`(`startMinute`~`endMinute`, 지역 시각 분, start > end면 자정을 넘는다. 기본 120~600 = 02:00~10:00), `modelAllowlist`(빈 배열 = 서버 레지스트리 전체), `transparencyMode`(`off`·`notice`), `maxConcurrentJobs`(기본 1, 최대 4).
+  - `minIdleMinutes`(기본 10), `maxGpuTempC`(기본 80), `downloadWindow`(`startMinute` 이상 `endMinute` 미만, 지역 시각 분. start > end면 자정을 넘는다. start = end는 하루 전체(빈 창은 모델을 영영 못 받으므로 뜻을 두지 않는다), `endMinute` 1440 = 자정. 기본 120~600 = 02:00~10:00), `modelAllowlist`(빈 배열 = 서버 레지스트리 전체), `transparencyMode`(`off`·`notice`), `maxConcurrentJobs`(기본 1, 최대 4).
 - **표시용 문자열** `displayText`(GPU·CPU 이름): 영숫자, 공백, `()._,:/+#@[]-`만, 1~128자. 따옴표·`<`·`>`·`&` 없음(THREAT_MODEL WEB-03). 에이전트는 `SanitizeDisplayText`로 맞춰 보낸다. 버전류는 `token`(`[A-Za-z0-9._+-]`, 64자).
 - **서명된 매니페스트** `signedManifest`: `{manifest: <정규화 JSON 문자열>, signature: <hex 128>, keyId}` (9.3절).
 
