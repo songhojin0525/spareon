@@ -38,7 +38,7 @@ writeFileSync(
   JSON.stringify(
     {
       description:
-        'S04 development identity (SKELETON(S10)); TS dev-identity.ts and Go internal/devauth must agree.',
+        'S04 development identity (a stand-in until S10 enrollment); TS dev-identity.ts and Go internal/devauth must agree.',
       cases,
       models,
       invalidNames,

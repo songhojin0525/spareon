@@ -13,7 +13,7 @@ export interface AgentSession {
   readonly sessionId: string;
   readonly nodeId: string;
   readonly storeId: string;
-  /** Monotonic connection order: "first waiting node" means lowest order (SKELETON(S12) matching). */
+  /** Monotonic connection order: "first waiting node" means lowest order (S04 matching; S12 replaces it). */
   readonly order: number;
   /** Models the agent reported in capabilities: protocol model id → sha256. */
   models: ReadonlyMap<string, string>;

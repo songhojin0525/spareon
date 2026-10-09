@@ -92,7 +92,7 @@ export async function ensureSkeletonWorld(
     await tx.insert(priceVersions).values({
       id: priceVersionId,
       version: (maxVersion?.v ?? 0) + 1,
-      notes: 'S04 skeleton: fixed price per request (SKELETON(S08))',
+      notes: 'S04 skeleton: fixed price per request until S08',
       effectiveAt: now,
       createdBy: operatorId,
       createdAt: now,

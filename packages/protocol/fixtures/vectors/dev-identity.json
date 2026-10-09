@@ -1,5 +1,5 @@
 {
-  "description": "S04 development identity (SKELETON(S10)); TS dev-identity.ts and Go internal/devauth must agree.",
+  "description": "S04 development identity (a stand-in until S10 enrollment); TS dev-identity.ts and Go internal/devauth must agree.",
   "cases": [
     {
       "secret": "dev-agent-secret-0123456789abcdef",

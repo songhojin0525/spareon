@@ -58,11 +58,11 @@ export interface GatewayDeps {
   readonly ids: Ids;
   readonly sessions: SessionRegistry;
   readonly sink: AgentJobSink;
-  /** The development store new nodes join (SKELETON(S10)). */
+  /** The development store new nodes join (a stand-in until S10 enrollment). */
   readonly storeId: string;
   /** Undefined: no agent can authenticate (production until S10/S11). */
   readonly devAgentSecret: string | undefined;
-  /** Called for every model an agent reports (SKELETON(S09) auto-registration). */
+  /** Called for every model an agent reports (development auto-registration until the S09 registry). */
   readonly onModelSeen: (modelId: string) => Promise<void>;
   readonly log: FastifyBaseLogger;
   readonly config: GatewayConfig;

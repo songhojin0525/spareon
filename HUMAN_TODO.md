@@ -23,9 +23,11 @@
 - [ ] (S03) 다음 push 뒤 GitHub Actions `ci`에 새로 생긴 `postgres` 잡(Postgres 16 서비스 컨테이너, `DATABASE_URL` 경로로 서버 DB 테스트)이 초록인지 확인한다. 왜: 로컬에서는 embedded-postgres를 별도 서버로 띄워 `DATABASE_URL` 경로를 확인했지만, 실제 `postgres:16` 이미지 서비스로는 CI에서만 돈다. 절차: Actions 탭 → 최신 `ci` 실행 → `linux (server tests on a Postgres service)` 잡. 결과: 실패하면 로그를 Claude에게 알리거나 `docs/stages/S03/REPORT.md` '막힌 것'에 붙인다.
 - [ ] (S03, 운영 DB를 고를 때 · S30 전) 쓰려는 관리형 Postgres(예: Supabase)의 관리 계정이 역할을 만들 수 있는지(`CREATEROLE`) 확인한다. 왜: 마이그레이션 `0002_app_role`이 최소 권한 역할 `binjari_app`을 만들고, 서버는 그 역할의 멤버로만 접속해야 원장 보호 트리거를 끌 수 없다(docs/DB.md 5절). 권한이 없으면 마이그레이션이 실패한다. 절차: 관리 계정으로 접속해 `SELECT rolcreaterole FROM pg_roles WHERE rolname = current_user;` → `t`인지 확인. `f`면 제공사 콘솔에서 `CREATE ROLE binjari_app NOLOGIN;`을 먼저 실행할 수 있는지 확인. 결과: S30 진행 전에 Claude에게 알려 준다(런북에 반영).
 
+## S04에서 추가
+- [ ] (S04, 선택) 친구 PC 2~3대로 0단계 데모를 해 본다. 왜: "남의 PC가 질문에 답하고 장부에 남는다"(로드맵 0단계)를 실제 네트워크·실제 Ollama로 처음 확인한다. 자동 데모(`pnpm demo`)는 가짜 런타임으로만 돌았다. 절차: `docs/DEMO_0.md` 3절(혼자 `pnpm demo`) → 4절(서버 `pnpm dev:server --lan`) → 5절(친구 PC에 에이전트·Ollama, `ollama ps`로 GPU/CPU 확인) → 6절(대시보드 `/dev`에서 확인) → 8절(끄기, 터널·방화벽 규칙 정리). 결과: DEMO_0.md 9절의 항목(붙은 PC 수, 완료 수, PC별 GPU와 `ollama ps`의 `PROCESSOR` 값, 막힌 곳)을 Claude에게 알려 주면 S04 REPORT와 `docs/KNOWN_UNKNOWNS.md` K17에 반영한다. 친구 PC가 없으면 내 PC(AMD RX 5700 XT) 한 대로 서버와 에이전트를 같이 띄워도 된다(`--lan` 없이, 서버 주소 `ws://127.0.0.1:8080/agent/v1/ws`).
+
 ## 나중에 (차수가 진행되면 각 차수가 구체적인 절차를 추가한다)
 - [ ] Windows PC + GPU에서 실기 확인 (S18~S22, `docs/manual-tests/`). 지금은 AMD RX 5700 XT 1대로 Vulkan 경로를 확인한다(ADR 0019). CUDA 경로(세션 0 CUDA K1, nvidia-smi 전력 K8)는 NVIDIA PC가 생기면 확인한다. 보고할 때 GPU·백엔드를 함께 적는다.
-- [ ] 친구 PC 2~3대로 0단계 데모 (S04, `docs/DEMO_0.md`)
 - [ ] 오픈소스 모델 후보 확정과 라이선스 확인 (S09, `docs/MODEL_CANDIDATES.md`)
 - [ ] 실제 GPU에서 모델별 처리량(tokens/s)·전력 측정 → 경제 시뮬레이터 갱신 (S19 → S07)
 - [ ] (선택) Anthropic API 키로 실제 환전 연동 1회 확인 — 비용이 들 수 있음 (S16)

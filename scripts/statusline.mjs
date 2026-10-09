@@ -88,7 +88,7 @@ function currentStage() {
 }
 
 async function main() {
-  let input = {};
+  let input;
   try {
     input = JSON.parse((await readStdin()) || '{}');
   } catch {

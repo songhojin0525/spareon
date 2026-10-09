@@ -26,6 +26,16 @@ export {
   type VerdictCode,
 } from './codec.js';
 export { isSupportedProtocolHash, SUPPORTED_PROTOCOL_HASHES } from './compat.js';
+export {
+  DEV_NODE_ID_EPOCH_MS,
+  DEV_NODE_NAME_RE,
+  type DevAgentIdentity,
+  devAgentIdentity,
+  DevIdentityError,
+  devModelSha256,
+  devNodePublicKey,
+  devNodeSeed,
+} from './dev-identity.js';
 export { capabilitiesDigest } from './digest.js';
 export * from './generated/protocol.js';
 export {
@@ -47,13 +57,3 @@ export {
 } from './sign.js';
 export { canonicalizeJsonText, canonicalJson, CanonicalJsonError } from './wire/canonical-json.js';
 export { parseStrictJson, type StrictJsonResult } from './wire/strict-json.js';
-export {
-  DEV_NODE_ID_EPOCH_MS,
-  DEV_NODE_NAME_RE,
-  type DevAgentIdentity,
-  devAgentIdentity,
-  DevIdentityError,
-  devModelSha256,
-  devNodePublicKey,
-  devNodeSeed,
-} from './dev-identity.js';
