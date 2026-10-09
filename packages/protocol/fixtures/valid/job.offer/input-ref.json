@@ -1,0 +1,31 @@
+{
+  "v": 1,
+  "type": "job.offer",
+  "id": "01920000-0000-7000-8000-000000000130",
+  "ts": "2026-10-09T04:36:00.000Z",
+  "payload": {
+    "attemptId": "01920000-0000-7000-8000-000000000042",
+    "jobKind": "chat",
+    "model": {
+      "id": "qwen2.5-7b-instruct-q4_k_m",
+      "sha256": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1"
+    },
+    "params": {
+      "maxTokens": 1,
+      "temperatureMilli": 2000,
+      "topPMilli": 1,
+      "stop": [],
+      "seed": 0,
+      "greedy": false
+    },
+    "inputRef": {
+      "url": "https://api.binjari.example/v1/agent/inputs/01920000-0000-7000-8000-000000000042",
+      "token": "eyJhbGciOiJFZERTQSJ9.eyJhIjoxfQ.c2ln",
+      "sha256": "d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4",
+      "bytes": 300000
+    },
+    "stream": true,
+    "timeLimitMs": 600000,
+    "leaseTtlMs": 15000
+  }
+}

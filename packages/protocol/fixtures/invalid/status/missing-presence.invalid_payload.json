@@ -1,0 +1,21 @@
+{
+  "v": 1,
+  "type": "status",
+  "id": "01920000-0000-7000-8000-000000000120",
+  "ts": "2026-10-09T04:36:00.000Z",
+  "payload": {
+    "state": "eligible",
+    "eligible": true,
+    "gpus": [
+      {
+        "index": 0,
+        "tempC": 45,
+        "utilPct": 0,
+        "powerW": 20,
+        "vramUsedMb": 300
+      }
+    ],
+    "runningAttemptIds": [],
+    "measuredAt": "2026-10-09T04:36:00.000Z"
+  }
+}

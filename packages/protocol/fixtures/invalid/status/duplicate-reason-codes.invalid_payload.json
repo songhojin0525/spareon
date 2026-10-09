@@ -1,0 +1,21 @@
+{
+  "v": 1,
+  "type": "status",
+  "id": "01920000-0000-7000-8000-000000000123",
+  "ts": "2026-10-09T04:36:00.000Z",
+  "payload": {
+    "state": "ready",
+    "eligible": false,
+    "presence": {
+      "idleForMs": 0,
+      "customerPresent": true,
+      "reasonCodes": [
+        "customer_input",
+        "customer_input"
+      ]
+    },
+    "gpus": [],
+    "runningAttemptIds": [],
+    "measuredAt": "2026-10-09T04:36:00.000Z"
+  }
+}

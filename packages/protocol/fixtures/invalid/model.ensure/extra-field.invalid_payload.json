@@ -1,0 +1,14 @@
+{
+  "v": 1,
+  "type": "model.ensure",
+  "id": "01920000-0000-7000-8000-000000000158",
+  "ts": "2026-10-09T04:36:00.000Z",
+  "payload": {
+    "manifest": {
+      "manifest": "{\"artifact\":{\"bytes\":4683073536,\"sha256\":\"e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1\",\"url\":\"https://models.example.com/qwen2.5-7b/q4_k_m.gguf\"},\"contextLength\":32768,\"format\":\"gguf\",\"license\":\"Apache-2.0\",\"modelId\":\"qwen2.5-7b-instruct-q4_k_m\",\"revision\":1,\"runtime\":{\"minVersion\":\"b4567\",\"name\":\"llamacpp\"},\"schema\":\"binjari.model-manifest/1\"}",
+      "signature": "c40db697a2f2802c353950870f985c1b6a102260e225075856a1ffb2a6c820aa1cb598d4c9b330be3f32f1802a80955c4bb375eae4326771a8283124e83cfb09",
+      "keyId": "release-2026a"
+    },
+    "unexpected": true
+  }
+}

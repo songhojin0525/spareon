@@ -1,0 +1,26 @@
+{
+  "v": 1,
+  "type": "job.complete",
+  "id": "01920000-0000-7000-8000-000000000141",
+  "ts": "2026-10-09T04:36:00.000Z",
+  "payload": {
+    "attemptId": "01920000-0000-7000-8000-000000000040",
+    "outputRef": {
+      "kind": "chunks",
+      "chunkCount": 12
+    },
+    "finishReason": "stop",
+    "reportedTokensIn": 30,
+    "reportedTokensOut": 120,
+    "timings": {
+      "loadMs": 1200,
+      "promptMs": 40,
+      "genMs": 2400
+    },
+    "outputSha256": "a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7",
+    "runtime": {
+      "name": "llamacpp",
+      "version": "b4567"
+    }
+  }
+}

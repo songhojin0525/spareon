@@ -1,0 +1,32 @@
+{
+  "v": 1,
+  "type": "capabilities",
+  "id": "01920000-0000-7000-8000-000000000117",
+  "ts": "2026-10-09T04:36:00.000Z",
+  "payload": {
+    "gpus": [
+      {
+        "index": 0,
+        "name": "<script>alert(1)</script>",
+        "uuidHash": "5555555555555555555555555555555555555555555555555555555555555555",
+        "vramTotalMb": 8188,
+        "vramFreeMb": 7900,
+        "driverVersion": "560.94",
+        "computeCapability": "8.9"
+      }
+    ],
+    "cpu": {
+      "model": "x",
+      "cores": 6,
+      "threads": 12
+    },
+    "ramMb": 16384,
+    "cacheDiskFreeMb": 200000,
+    "runtime": {
+      "name": "llamacpp",
+      "version": "b4567"
+    },
+    "cachedModels": [],
+    "osBuild": "10.0.22631.4317"
+  }
+}

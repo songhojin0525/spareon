@@ -1,0 +1,22 @@
+{
+  "v": 1,
+  "type": "capabilities",
+  "id": "01920000-0000-7000-8000-000000000116",
+  "ts": "2026-10-09T04:36:00.000Z",
+  "payload": {
+    "gpus": [],
+    "cpu": {
+      "model": "AMD Ryzen 7 5800X 8-Core Processor",
+      "cores": 8,
+      "threads": 16
+    },
+    "ramMb": 32768,
+    "cacheDiskFreeMb": 0,
+    "runtime": {
+      "name": "fake",
+      "version": "0.0.0"
+    },
+    "cachedModels": [],
+    "osBuild": "6.8.0-45-generic"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "v": 1,
+  "type": "capabilities",
+  "id": "01920000-0000-7000-8000-000000000119",
+  "ts": "2026-10-09T04:36:00.000Z",
+  "payload": {
+    "gpus": [],
+    "cpu": {
+      "model": "x",
+      "cores": 6,
+      "threads": 12
+    },
+    "ramMb": 16384,
+    "cacheDiskFreeMb": 200000,
+    "runtime": {
+      "name": "llamacpp",
+      "version": "b4567"
+    },
+    "cachedModels": [
+      {
+        "id": "../../windows",
+        "sha256": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1"
+      }
+    ],
+    "osBuild": "10.0.22631.4317"
+  }
+}

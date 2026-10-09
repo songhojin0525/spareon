@@ -1,0 +1,30 @@
+{
+  "v": 1,
+  "type": "status",
+  "id": "01920000-0000-7000-8000-000000000121",
+  "ts": "2026-10-09T04:36:00.000Z",
+  "payload": {
+    "state": "ready",
+    "eligible": false,
+    "presence": {
+      "idleForMs": 0,
+      "customerPresent": true,
+      "reasonCodes": [
+        "customer_input",
+        "fullscreen_app",
+        "gpu_3d_busy"
+      ]
+    },
+    "gpus": [
+      {
+        "index": 0,
+        "tempC": -5,
+        "utilPct": 100,
+        "powerW": 250,
+        "vramUsedMb": 7000
+      }
+    ],
+    "runningAttemptIds": [],
+    "measuredAt": "2026-10-09T04:36:00.000Z"
+  }
+}

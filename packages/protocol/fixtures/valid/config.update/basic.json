@@ -1,0 +1,30 @@
+{
+  "v": 1,
+  "type": "config.update",
+  "id": "01920000-0000-7000-8000-000000000153",
+  "ts": "2026-10-09T04:36:00.000Z",
+  "payload": {
+    "version": 4,
+    "policy": {
+      "weeklySchedule": [
+        "ffffffffffff",
+        "ffffffffffff",
+        "ffffffffffff",
+        "ffffffffffff",
+        "ffffffffffff",
+        "ffffffffffff",
+        "ffffffffffff"
+      ],
+      "utcOffsetMinutes": 540,
+      "minIdleMinutes": 10,
+      "maxGpuTempC": 80,
+      "downloadWindow": {
+        "startMinute": 120,
+        "endMinute": 600
+      },
+      "modelAllowlist": [],
+      "transparencyMode": "notice",
+      "maxConcurrentJobs": 1
+    }
+  }
+}

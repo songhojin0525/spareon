@@ -1,0 +1,11 @@
+{
+  "v": 1,
+  "type": "auth.fail",
+  "id": "01920000-0000-7000-8000-000000000112",
+  "ts": "2026-10-09T04:36:00.000Z",
+  "payload": {
+    "code": "protocol_unsupported",
+    "minAgentVersion": "0.2.0",
+    "retryAfterMs": 86400001
+  }
+}

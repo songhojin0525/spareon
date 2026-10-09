@@ -1,0 +1,37 @@
+{
+  "v": 1,
+  "type": "job.offer",
+  "id": "01920000-0000-7000-8000-000000000128",
+  "ts": "2026-10-09T04:36:00.000Z",
+  "payload": {
+    "attemptId": "01920000-0000-7000-8000-0000000000400",
+    "jobKind": "chat",
+    "model": {
+      "id": "qwen2.5-7b-instruct-q4_k_m",
+      "sha256": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1"
+    },
+    "params": {
+      "maxTokens": 256,
+      "temperatureMilli": 700,
+      "topPMilli": 950,
+      "stop": [],
+      "seed": 123456789,
+      "greedy": false
+    },
+    "input": {
+      "messages": [
+        {
+          "role": "system",
+          "content": "You are a helpful assistant."
+        },
+        {
+          "role": "user",
+          "content": "안녕하세요 😀 \"quotes\" \\ backslash\nnewline"
+        }
+      ]
+    },
+    "stream": true,
+    "timeLimitMs": 600000,
+    "leaseTtlMs": 15000
+  }
+}

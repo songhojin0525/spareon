@@ -1,0 +1,32 @@
+{
+  "v": 1,
+  "type": "job.offer",
+  "id": "01920000-0000-7000-8000-000000000129",
+  "ts": "2026-10-09T04:36:00.000Z",
+  "payload": {
+    "attemptId": "01920000-0000-7000-8000-000000000041",
+    "jobKind": "completion",
+    "model": {
+      "id": "qwen2.5-7b-instruct-q4_k_m",
+      "sha256": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1"
+    },
+    "params": {
+      "maxTokens": 131072,
+      "temperatureMilli": 0,
+      "topPMilli": 1000,
+      "stop": [
+        "\n\n",
+        "</s>"
+      ],
+      "seed": 4294967295,
+      "greedy": true
+    },
+    "input": {
+      "prompt": "Once upon a time",
+      "continuationPrefix": ", there was"
+    },
+    "stream": false,
+    "timeLimitMs": 86400000,
+    "leaseTtlMs": 15000
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "v": 1,
+  "type": "config.update",
+  "id": "01920000-0000-7000-8000-000000000154",
+  "ts": "2026-10-09T04:36:00.000Z",
+  "payload": {
+    "version": 2147483647,
+    "policy": {
+      "weeklySchedule": [
+        "fffff0000000",
+        "fffff0000000",
+        "fffff0000000",
+        "fffff0000000",
+        "fffff0000000",
+        "fffff0000000",
+        "fffff0000000"
+      ],
+      "utcOffsetMinutes": -720,
+      "minIdleMinutes": 10,
+      "maxGpuTempC": 80,
+      "downloadWindow": {
+        "startMinute": 1380,
+        "endMinute": 360
+      },
+      "modelAllowlist": [
+        "qwen2.5-7b-instruct-q4_k_m",
+        "llama-3.1-8b-instruct-q4_k_m"
+      ],
+      "transparencyMode": "off",
+      "maxConcurrentJobs": 4
+    }
+  }
+}

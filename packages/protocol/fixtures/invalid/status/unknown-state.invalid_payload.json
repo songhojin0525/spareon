@@ -1,0 +1,18 @@
+{
+  "v": 1,
+  "type": "status",
+  "id": "01920000-0000-7000-8000-000000000124",
+  "ts": "2026-10-09T04:36:00.000Z",
+  "payload": {
+    "state": "Eligible",
+    "eligible": true,
+    "presence": {
+      "idleForMs": 0,
+      "customerPresent": false,
+      "reasonCodes": []
+    },
+    "gpus": [],
+    "runningAttemptIds": [],
+    "measuredAt": "2026-10-09T04:36:00.000Z"
+  }
+}

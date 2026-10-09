@@ -1,0 +1,13 @@
+{
+  "v": 1,
+  "type": "job.chunk",
+  "id": "01920000-0000-7000-8000-000000000135",
+  "ts": "2026-10-09T04:36:00.000Z",
+  "payload": {
+    "attemptId": "01920000-0000-7000-8000-000000000040",
+    "seq": 0,
+    "textDelta": "Hello",
+    "tokensSoFar": 1,
+    "unexpected": true
+  }
+}

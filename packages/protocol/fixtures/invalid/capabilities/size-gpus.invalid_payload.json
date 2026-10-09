@@ -1,0 +1,109 @@
+{
+  "v": 1,
+  "type": "capabilities",
+  "id": "01920000-0000-7000-8000-000000000115",
+  "ts": "2026-10-09T04:36:00.000Z",
+  "payload": {
+    "gpus": [
+      {
+        "index": 0,
+        "name": "GPU",
+        "uuidHash": "5555555555555555555555555555555555555555555555555555555555555555",
+        "vramTotalMb": 1,
+        "vramFreeMb": 1,
+        "driverVersion": "1",
+        "computeCapability": "8.9"
+      },
+      {
+        "index": 1,
+        "name": "GPU",
+        "uuidHash": "5555555555555555555555555555555555555555555555555555555555555555",
+        "vramTotalMb": 1,
+        "vramFreeMb": 1,
+        "driverVersion": "1",
+        "computeCapability": "8.9"
+      },
+      {
+        "index": 2,
+        "name": "GPU",
+        "uuidHash": "5555555555555555555555555555555555555555555555555555555555555555",
+        "vramTotalMb": 1,
+        "vramFreeMb": 1,
+        "driverVersion": "1",
+        "computeCapability": "8.9"
+      },
+      {
+        "index": 3,
+        "name": "GPU",
+        "uuidHash": "5555555555555555555555555555555555555555555555555555555555555555",
+        "vramTotalMb": 1,
+        "vramFreeMb": 1,
+        "driverVersion": "1",
+        "computeCapability": "8.9"
+      },
+      {
+        "index": 4,
+        "name": "GPU",
+        "uuidHash": "5555555555555555555555555555555555555555555555555555555555555555",
+        "vramTotalMb": 1,
+        "vramFreeMb": 1,
+        "driverVersion": "1",
+        "computeCapability": "8.9"
+      },
+      {
+        "index": 5,
+        "name": "GPU",
+        "uuidHash": "5555555555555555555555555555555555555555555555555555555555555555",
+        "vramTotalMb": 1,
+        "vramFreeMb": 1,
+        "driverVersion": "1",
+        "computeCapability": "8.9"
+      },
+      {
+        "index": 6,
+        "name": "GPU",
+        "uuidHash": "5555555555555555555555555555555555555555555555555555555555555555",
+        "vramTotalMb": 1,
+        "vramFreeMb": 1,
+        "driverVersion": "1",
+        "computeCapability": "8.9"
+      },
+      {
+        "index": 7,
+        "name": "GPU",
+        "uuidHash": "5555555555555555555555555555555555555555555555555555555555555555",
+        "vramTotalMb": 1,
+        "vramFreeMb": 1,
+        "driverVersion": "1",
+        "computeCapability": "8.9"
+      },
+      {
+        "index": 8,
+        "name": "GPU",
+        "uuidHash": "5555555555555555555555555555555555555555555555555555555555555555",
+        "vramTotalMb": 1,
+        "vramFreeMb": 1,
+        "driverVersion": "1",
+        "computeCapability": "8.9"
+      }
+    ],
+    "cpu": {
+      "model": "Intel(R) Core(TM) i5-12400F",
+      "cores": 6,
+      "threads": 12
+    },
+    "ramMb": 16384,
+    "cacheDiskFreeMb": 200000,
+    "runtime": {
+      "name": "llamacpp",
+      "version": "b4567"
+    },
+    "cachedModels": [
+      {
+        "id": "qwen2.5-7b-instruct-q4_k_m",
+        "sha256": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1"
+      }
+    ],
+    "osBuild": "10.0.22631.4317"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "v": 1,
+  "type": "enroll.start.request",
+  "id": "01920000-0000-7000-8000-000000000174",
+  "ts": "2026-10-09T04:36:00.000Z",
+  "payload": {
+    "code": "K7M2Q9TX",
+    "agentVersion": "0.1.0",
+    "protocolHash": "abababababababababababababababababababababababababababababababab"
+  }
+}

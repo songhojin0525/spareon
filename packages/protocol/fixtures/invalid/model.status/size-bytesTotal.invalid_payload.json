@@ -1,0 +1,13 @@
+{
+  "v": 1,
+  "type": "model.status",
+  "id": "01920000-0000-7000-8000-000000000161",
+  "ts": "2026-10-09T04:36:00.000Z",
+  "payload": {
+    "modelId": "qwen2.5-7b-instruct-q4_k_m",
+    "sha256": "e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1",
+    "state": "downloading",
+    "bytesDone": 1000,
+    "bytesTotal": 1125899906842625
+  }
+}

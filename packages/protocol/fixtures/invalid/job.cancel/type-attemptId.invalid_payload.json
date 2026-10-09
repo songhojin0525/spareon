@@ -1,0 +1,10 @@
+{
+  "v": 1,
+  "type": "job.cancel",
+  "id": "01920000-0000-7000-8000-000000000147",
+  "ts": "2026-10-09T04:36:00.000Z",
+  "payload": {
+    "attemptId": 40,
+    "reason": "buyerCanceled"
+  }
+}

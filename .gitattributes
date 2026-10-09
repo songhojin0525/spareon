@@ -26,3 +26,6 @@
 *.woff binary
 *.woff2 binary
 *.ttf binary
+
+# Protocol fixtures are byte-exact contracts (some deliberately contain a BOM or invalid UTF-8).
+packages/protocol/fixtures/** -text

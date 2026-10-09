@@ -1,0 +1,23 @@
+{
+  "v": 1,
+  "type": "job.complete",
+  "id": "01920000-0000-7000-8000-000000000142",
+  "ts": "2026-10-09T04:36:00.000Z",
+  "payload": {
+    "attemptId": "01920000-0000-7000-8000-000000000041",
+    "outputText": "The answer is 42.",
+    "finishReason": "length",
+    "reportedTokensIn": 0,
+    "reportedTokensOut": 0,
+    "timings": {
+      "loadMs": 0,
+      "promptMs": 0,
+      "genMs": 0
+    },
+    "outputSha256": "a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8a8",
+    "runtime": {
+      "name": "ollama",
+      "version": "0.5.7"
+    }
+  }
+}

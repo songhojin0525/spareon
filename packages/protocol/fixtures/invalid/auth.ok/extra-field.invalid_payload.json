@@ -1,0 +1,20 @@
+{
+  "v": 1,
+  "type": "auth.ok",
+  "id": "01920000-0000-7000-8000-000000000107",
+  "ts": "2026-10-09T04:36:00.000Z",
+  "corr": "01920000-0000-7000-8000-000000000001",
+  "payload": {
+    "sessionId": "01920000-0000-7000-8000-000000000030",
+    "resumeToken": "4444444444444444444444444444444444444444444444444444444444444444",
+    "resumed": false,
+    "configVersion": 3,
+    "serverTime": "2026-10-09T04:36:00.000Z",
+    "heartbeatIntervalMs": 5000,
+    "control": {
+      "mode": "active"
+    },
+    "needCapabilities": true,
+    "unexpected": true
+  }
+}

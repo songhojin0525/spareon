@@ -1,0 +1,11 @@
+{
+  "v": 1,
+  "type": "error",
+  "id": "01920000-0000-7000-8000-000000000172",
+  "ts": "2026-10-09T04:36:00.000Z",
+  "payload": {
+    "code": "internal_error",
+    "message": "<img src=x onerror=alert(1)>",
+    "fatal": false
+  }
+}

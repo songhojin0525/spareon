@@ -1,0 +1,13 @@
+{
+  "v": 1,
+  "type": "auth.challenge",
+  "id": "01920000-0000-7000-8000-000000000105",
+  "ts": "2026-10-09T04:36:00.000Z",
+  "corr": "01920000-0000-7000-8000-000000000001",
+  "payload": {
+    "nonce": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
+    "serverTime": "2026-10-09T04:36:00.000Z",
+    "expiresInMs": 5000,
+    "unexpected": true
+  }
+}
