@@ -610,8 +610,10 @@ const agLabel = (id) => (id === 'orc' ? 'orc' : id.endsWith(':review') ? `${id.s
 const AG_SPIN = ASCII ? ['-', '\\', '|', '/'] : ['·', '✢', '✳', '✶', '✻', '✽', '✻', '✶', '✳', '✢'];
 const AG_VERB = { wait: 'Waiting…', standby: 'Idle ·', alert: 'No response ·', blocked: 'Blocked ·', done: 'Done ·' };
 const AG_ACTIVE = { orc: 'Orchestrating…', stage: 'Building…', review: 'Reviewing…' };
-const PKT_MS = 1300;
-const FLASH_MS = 1000;
+const PKT_MS = 2600; // 메시지 하나가 선을 따라 이동하는 시간
+const FLASH_MS = 1800; // 받은 쪽이 'Received'로 빛나는 시간
+const HEAVY = { '│': '┃', '─': '━', '┌': '┏', '┐': '┓', '└': '┗', '┘': '┛', '├': '┣', '┤': '┫', '┬': '┳', '┴': '┻', '┼': '╋' };
+const DOTTED = { '│': '┆', '─': '┄' };
 // 연결선 방향 비트: 위 1, 아래 2, 왼쪽 4, 오른쪽 8
 const BOXCH = ASCII
   ? { 3: '|', 1: '|', 2: '|', 12: '-', 4: '-', 8: '-', default: '+' }
@@ -696,6 +698,14 @@ function agUnit(cv, id, u, x, y, w, sub, view) {
   if (right) cv.text(x + w - 2 - width(right), y + 1, right, gray);
   let row = y + 2;
   if (sub) cv.text(x + 2, row++, fit(sub, w - 4), gray, w - 4);
+  const sending = view.anim && view.anim.m.from === id && view.now - view.anim.start < PKT_MS;
+  const received = flashing && view.flash.m;
+  if (sending || received) {
+    const m = sending ? view.anim.m : view.flash.m;
+    const vx = cv.text(x + 2, row, sending ? `Sending → ${agLabel(m.to)}` : `Received ${ASCII ? 'v' : '✓'}`, (t) => bold(AGC.orc(t)), w - 4);
+    cv.text(vx + 1, row, m.text, null, x + w - 2 - (vx + 1));
+    return h;
+  }
   const verb = u.state === 'active' ? AG_ACTIVE[kind] : AG_VERB[u.state] || u.state;
   const vx = cv.text(x + 2, row, verb, u.state === 'done' ? dim : kc, w - 4);
   if (u.text) cv.text(vx + 1, row, u.text, u.state === 'done' ? gray : null, x + w - 2 - (vx + 1));
@@ -790,18 +800,35 @@ function renderAgents(st, cols, rows, view) {
       joint(sx._c, ry, true);
     }
   }
-  // 날아가는 메시지
+  // 전송 중인 메시지: 지나온 길은 굵은 선, 남은 길은 점선, 그 사이를 ● 가 움직인다
   const a = view.anim;
   if (a && now - a.start < PKT_MS) {
+    const k = (now - a.start) / PKT_MS;
     const child = a.m.from === 'orc' ? a.m.to : a.m.to === 'orc' ? a.m.from : a.m.from.endsWith(':review') ? a.m.from : a.m.to;
     const parent = child.endsWith(':review') ? child.slice(0, 3) : 'orc';
     let pts = paths[`${parent}>${child}`];
+    const pc = AGC[agKind(a.m.from)];
     if (pts) {
       if (a.m.from === child) pts = [...pts].reverse();
-      const idx = Math.min(pts.length - 1, Math.floor(((now - a.start) / PKT_MS) * pts.length));
+      const idx = Math.min(pts.length - 1, Math.floor(k * pts.length));
+      pts.forEach(([px, py], j) => {
+        const cur = cv.cells[py]?.[px]?.ch ?? ' ';
+        if (j < idx) cv.put(px, py, ASCII ? '#' : HEAVY[cur] ?? cur, (t) => bold(pc(t)));
+        else if (j > idx) cv.put(px, py, ASCII ? ':' : DOTTED[cur] ?? cur, pc);
+      });
       const [px, py] = pts[idx];
-      cv.put(px, py, ASCII ? 'o' : '●', (t) => bold(AGC[agKind(a.m.from)](t)));
+      cv.put(px, py, ASCII ? '@' : '●', (t) => bold(pc(t)));
     }
+    // 맨 윗줄: 전송 표시줄
+    const track = 18;
+    const pos = Math.min(track - 1, Math.floor(k * track));
+    let bar = '';
+    for (let j = 0; j < track; j++) bar += j < pos ? (ASCII ? '=' : '━') : j === pos ? (ASCII ? '@' : '●') : ASCII ? '.' : '┄';
+    let bx = cv.text(1, 0, ASCII ? '>> ' : '⇢ ', (t) => bold(AGC.orc(t)));
+    bx = cv.text(bx, 0, agLabel(a.m.from), (t) => bold(pc(t)));
+    bx = cv.text(bx + 1, 0, bar, pc);
+    bx = cv.text(bx + 1, 0, agLabel(a.m.to), (t) => bold(AGC[agKind(a.m.to)](t)));
+    cv.text(bx + 2, 0, `"${a.m.text}"`, null, W - bx - 4);
   }
   if (!n) cv.text(2, oy + 6, 'no subagents yet', gray);
   L.push(...cv.lines());
@@ -887,9 +914,10 @@ function runTerminal() {
     if (!st) refresh();
     view.now = Date.now();
     if (view.anim && view.now - view.anim.start >= PKT_MS) {
-      view.flash = { id: view.anim.m.to, until: view.now + FLASH_MS };
+      view.flash = { id: view.anim.m.to, until: view.now + FLASH_MS, m: view.anim.m };
       view.anim = null;
     }
+    if (queue.length > 4) queue.splice(0, queue.length - 4); // 밀린 메시지는 최근 4개만 보여 준다
     if (!view.anim && queue.length) view.anim = { m: queue.shift(), start: view.now };
     let frame;
     try {
@@ -1109,7 +1137,17 @@ body{
 .agents svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
 .agents .link{stroke:var(--line2);stroke-width:1.5;stroke-dasharray:3 5;fill:none;transition:stroke .4s}
 .agents .link.hot{stroke:var(--acc);stroke-dasharray:none}
-.agents .pkt{fill:var(--acc)}
+.agents .pkt{fill:var(--acc);filter:drop-shadow(0 0 6px var(--acc))}
+.agents .link.flow{stroke:var(--acc);stroke-width:2.5;stroke-dasharray:7 6;animation:march .5s linear infinite;opacity:1}
+.agents .link.flow.rev{animation-name:march-rev}
+@keyframes march{to{stroke-dashoffset:-13}} @keyframes march-rev{to{stroke-dashoffset:13}}
+.bubble{position:absolute;z-index:3;transform:translate(-50%,-135%);max-width:min(80%,340px);padding:4px 10px;border:1px solid var(--acc);border-radius:8px;background:var(--panel-solid);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;box-shadow:0 4px 18px rgba(0,0,0,.35)}
+.bubble b{color:var(--acc)}
+.flowbar{display:flex;align-items:center;gap:8px;min-height:22px;margin:-4px 0 10px;font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden}
+.flowbar .trk{flex:none;width:120px;height:4px;border-radius:2px;background:var(--track);position:relative;overflow:hidden}
+.flowbar .trk i{position:absolute;inset:0 auto 0 0;background:var(--acc);border-radius:2px}
+.flowbar .who{font-weight:700} .flowbar .ftx{overflow:hidden;text-overflow:ellipsis;color:var(--text)}
+.unit .ut .send{color:var(--acc);font-weight:700}
 .arow{display:grid;grid-template-columns:repeat(var(--n,1),minmax(0,1fr));gap:14px;position:relative;z-index:1}
 .arow.root{grid-template-columns:minmax(0,320px);justify-content:center}
 .slot{min-width:0}
@@ -1256,6 +1294,7 @@ body{
 
   <section class="panel">
     <div class="phead"><span class="cap">agents · orc ↔ subagents</span><span class="cap ko" id="agSub"></span></div>
+    <div class="flowbar ko" id="flowbar"></div>
     <div class="agents" id="agents">
       <svg id="agSvg" aria-hidden="true"></svg>
       <div class="arow root" id="rowOrc"></div>
@@ -1380,22 +1419,52 @@ body{
       var l = document.createElementNS(SVGNS, 'line');
       l.setAttribute('x1', a.x); l.setAttribute('y1', a.y); l.setAttribute('x2', b.x); l.setAttribute('y2', b.y);
       var hot = agState.messages.some(function(m){ return ((m.from === pr[0] && m.to === pr[1]) || (m.from === pr[1] && m.to === pr[0])) && now - Date.parse(m.t) < 15 * 60000; });
-      l.setAttribute('class', 'link' + (hot ? ' hot' : ''));
+      var fl = flight && ((flight.m.from === pr[0] && flight.m.to === pr[1]) ? ' flow' : (flight.m.from === pr[1] && flight.m.to === pr[0]) ? ' flow rev' : '');
+      l.setAttribute('class', 'link' + (hot ? ' hot' : '') + (fl || ''));
       svg.appendChild(l);
     });
     keep.forEach(function(k){ svg.appendChild(k); });
+  }
+  var flight = null, received = null, PKT = 2400, RECV = 1800;
+  function setUnitStatus(id, html){ var n = nodeEl(id); if (!n) return; var ut = n.querySelector('.ut'); if (!ut) return; clear(ut); html.forEach(function(x){ ut.appendChild(x); }); }
+  function applyFlightStatus(){
+    if (flight) { var s = el('span', 'send', 'Sending → ' + label(flight.m.to)); setUnitStatus(flight.m.from, [s, document.createTextNode(' ' + flight.m.text)]); }
+    if (received && Date.now() < received.until) { var r = el('span', 'send', 'Received ✓'); setUnitStatus(received.m.to, [r, document.createTextNode(' ' + received.m.text)]); }
   }
   function sendPacket(m, delay){
     setTimeout(function(){
       var a = center(m.from), b = center(m.to); if (!a || !b) return;
       var svg = $('agSvg');
-      var c = document.createElementNS(SVGNS, 'circle'); c.setAttribute('r', '5'); c.setAttribute('class', 'pkt'); c.setAttribute('cx', a.x); c.setAttribute('cy', a.y); svg.appendChild(c);
-      var t0 = null, D = 1100;
+      var lines = svg.querySelectorAll('line'), line = null;
+      Array.prototype.forEach.call(lines, function(l){
+        var fx = +l.getAttribute('x1'), fy = +l.getAttribute('y1'), tx = +l.getAttribute('x2'), ty = +l.getAttribute('y2');
+        if (Math.abs(fx - a.x) < 1 && Math.abs(fy - a.y) < 1 && Math.abs(tx - b.x) < 1 && Math.abs(ty - b.y) < 1) { line = l; l.classList.add('flow'); }
+        else if (Math.abs(fx - b.x) < 1 && Math.abs(fy - b.y) < 1 && Math.abs(tx - a.x) < 1 && Math.abs(ty - a.y) < 1) { line = l; l.classList.add('flow', 'rev'); }
+      });
+      var c = document.createElementNS(SVGNS, 'circle'); c.setAttribute('r', '6'); c.setAttribute('class', 'pkt'); c.setAttribute('cx', a.x); c.setAttribute('cy', a.y); svg.appendChild(c);
+      var bub = el('div', 'bubble ko'); bub.appendChild(el('b', null, '✉ ')); bub.appendChild(document.createTextNode(m.text)); $('agents').appendChild(bub);
+      var fb = $('flowbar'); clear(fb);
+      fb.appendChild(el('span', null, '⇢'));
+      var w1 = el('span', 'who k-' + kindOf(m.from), label(m.from)); w1.style.color = 'var(--uc)'; fb.appendChild(w1);
+      var trk = el('span', 'trk'); var fill = el('i'); trk.appendChild(fill); fb.appendChild(trk);
+      var w2 = el('span', 'who k-' + kindOf(m.to), label(m.to)); w2.style.color = 'var(--uc)'; fb.appendChild(w2);
+      fb.appendChild(el('span', 'ftx', '"' + m.text + '"'));
+      flight = { m: m }; applyFlightStatus();
+      var t0 = null;
       function step(ts){
-        if (t0 === null) t0 = ts; var k = Math.min(1, (ts - t0) / D); var e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
-        c.setAttribute('cx', a.x + (b.x - a.x) * e); c.setAttribute('cy', a.y + (b.y - a.y) * e);
-        if (k < 1) requestAnimationFrame(step);
-        else { if (c.parentNode) c.parentNode.removeChild(c); var u = nodeEl(m.to); if (u) { u.classList.remove('flash'); void u.offsetWidth; u.classList.add('flash'); } }
+        if (t0 === null) t0 = ts; var k = Math.min(1, (ts - t0) / PKT); var e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+        var x = a.x + (b.x - a.x) * e, y = a.y + (b.y - a.y) * e;
+        c.setAttribute('cx', x); c.setAttribute('cy', y);
+        bub.style.left = x + 'px'; bub.style.top = y + 'px';
+        fill.style.width = Math.round(k * 100) + '%';
+        if (k < 1) { requestAnimationFrame(step); return; }
+        if (c.parentNode) c.parentNode.removeChild(c);
+        if (bub.parentNode) bub.parentNode.removeChild(bub);
+        if (line) line.classList.remove('flow', 'rev');
+        flight = null; received = { m: m, until: Date.now() + RECV };
+        var u = nodeEl(m.to); if (u) { u.classList.remove('flash'); void u.offsetWidth; u.classList.add('flash'); }
+        applyFlightStatus();
+        setTimeout(function(){ if (!flight) clear($('flowbar')); if (agState) renderAgents({ agents: agState, _redraw: true }); }, RECV);
       }
       requestAnimationFrame(step);
     }, delay);
@@ -1434,8 +1503,11 @@ body{
       tx.appendChild(d);
     });
     drawLinks();
+    applyFlightStatus();
+    if (st._redraw) return;
     if (seenT === null && ag.messages[0]) fresh = [ag.messages[0]];
-    fresh.reverse().forEach(function(m, i){ sendPacket(m, 250 + i * 650); });
+    fresh = fresh.reverse().slice(-4);
+    fresh.forEach(function(m, i){ sendPacket(m, 300 + i * (PKT + 600)); });
     if (ag.messages[0]) seenT = Math.max(seenT || 0, Date.parse(ag.messages[0].t));
   }
   setInterval(function(){
