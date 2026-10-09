@@ -408,7 +408,7 @@ function buildAgents(rows, events, runnerState) {
       text = r.activity || r.phaseLabel || '';
     }
     if (lr && r.status === 'IN_PROGRESS' && state === 'active' && !ls) state = 'wait';
-    return { id, name: r.name, state, text, reviewer, now: ls || null };
+    return { id, name: r.name, state, text, reviewer, now: ls || null, pct: r.percent, startedAt: r.startedAt, finishedAt: r.finishedAt, status: r.status };
   });
   const run = rows.find((r) => r.status === 'IN_PROGRESS') || null;
   let orc;
@@ -418,7 +418,8 @@ function buildAgents(rows, events, runnerState) {
   else orc = { state: 'standby', text: '다음 차수 고르는 중' };
   orc.now = live.orc;
   if (live.orc && live.orc.kind === 'tool' && orc.state !== 'alert') orc.state = 'active';
-  return { orc, stages, messages: msgs.slice(-40).reverse() };
+  const done = rows.filter((r) => r.status === 'DONE' || r.status === 'DONE_NEEDS_HUMAN').length;
+  return { orc, stages, messages: msgs.slice(-40).reverse(), summary: { done, total: rows.length, run: run ? { id: run.id, pct: run.percent } : null } };
 }
 
 function loadTodos() {
@@ -859,17 +860,28 @@ function agUnit(cv, id, u, x, y, w, sub, view) {
     const tail = age ? ` · ${age}` : '';
     const ex = cv.text(nx, y + h - 2, u.now.label, u.now.kind === 'tool' ? (t) => bold(t) : gray, x + w - 2 - nx - width(tail));
     if (tail) cv.text(ex, y + h - 2, tail, gray);
-  } else if (u.state !== 'done') cv.text(x + 2, y + h - 2, ASCII ? 'L -' : '⎿ —', gray);
+  } else if (u.state === 'done' && u.startedAt && u.finishedAt) {
+    cv.text(x + 2, y + h - 2, `${ASCII ? 'L v' : '⎿ ✓'} ${dur(u.startedAt, u.finishedAt)} 걸림`, gray);
+  } else cv.text(x + 2, y + h - 2, u.state === 'done' ? (ASCII ? 'L v' : '⎿ ✓') : ASCII ? 'L -' : '⎿ —', gray);
+  // 진행 중인 차수: 아래 테두리가 진행률 막대
+  if (u.pct != null && u.status === 'IN_PROGRESS') {
+    const inner = w - 2;
+    const fill = Math.round((inner * Math.max(0, Math.min(100, u.pct))) / 100);
+    for (let i = 0; i < fill; i++) cv.put(x + 1 + i, y + h - 1, ASCII ? '=' : '━', kc);
+    const tag = ` ${u.pct}% `;
+    if (inner > width(tag) + 4) cv.text(x + w - 2 - width(tag), y + h - 1, tag, (t) => bold(kc(t)));
+  }
   const glyph = u.state === 'active' ? AG_SPIN[view.spin % AG_SPIN.length] : u.state === 'done' ? (ASCII ? 'v' : '✓') : u.state === 'alert' || u.state === 'blocked' ? '!' : 'o';
   const glyphCol = u.state === 'done' ? green : u.state === 'alert' ? yellow : u.state === 'blocked' ? red : kc;
   cv.text(x + 2, y + 1, glyph, glyphCol);
   const label = agLabel(id);
-  const right = width(label) + width(u.state) + 7 <= w ? u.state : ''; // 좁으면 이름을 살리고 상태 글자는 뺀다
+  const elapsed = u.state === 'active' && u.startedAt ? ` · ${dur(u.startedAt)}` : '';
+  const want = u.state + elapsed;
+  const right = width(label) + width(want) + 7 <= w ? want : width(label) + width(u.state) + 7 <= w ? u.state : ''; // 좁으면 이름을 살린다
   cv.text(x + 4, y + 1, label, u.state === 'done' ? dim : (t) => bold(kc(t)), w - 6);
   if (right) cv.text(x + w - 2 - width(right), y + 1, right, gray);
   let row = y + 2;
   if (sub) cv.text(x + 2, row++, fit(sub, w - 4), gray, w - 4);
-  if (u.state === 'done') cv.text(x + 2, y + h - 2, '', null);
   const sending = view.anim && view.anim.m.from === id && view.now - view.anim.start < PKT_MS;
   const received = flashing && view.flash.m;
   if (sending || received) {
@@ -1001,6 +1013,17 @@ function renderAgents(st, cols, rows, view) {
     bx = cv.text(bx + 1, 0, bar, pc);
     bx = cv.text(bx + 1, 0, agLabel(a.m.to), (t) => bold(AGC[agKind(a.m.to)](t)));
     cv.text(bx + 2, 0, `"${a.m.text}"`, null, W - bx - 4);
+  }
+  if (!(a && now - a.start < PKT_MS) && ag.summary) {
+    const sm = ag.summary;
+    const pct = sm.total ? Math.round((100 * sm.done) / sm.total) : 0;
+    let bx = cv.text(1, 0, ASCII ? '* ' : '✻ ', AGC.orc);
+    bx = cv.text(bx, 0, `done ${sm.done}/${sm.total} `, gray);
+    const track = 14;
+    const f = Math.round((track * pct) / 100);
+    bx = cv.text(bx, 0, (ASCII ? '=' : '━').repeat(f), green);
+    bx = cv.text(bx, 0, (ASCII ? '.' : '┄').repeat(track - f), gray);
+    if (sm.run) cv.text(bx + 2, 0, `${sm.run.id} ${sm.run.pct}% 진행 중`, AGC.stage);
   }
   if (!n) cv.text(2, oy + 7, 'no subagents yet', gray);
   L.push(...cv.lines());
@@ -1307,13 +1330,13 @@ body{
 /* agents — orc and subagents, Claude Code style */
 .agents{position:relative;display:flex;flex-direction:column;gap:44px;padding:4px 0}
 .agents svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
-.agents .link{stroke:var(--line2);stroke-width:1.5;stroke-dasharray:3 5;fill:none;transition:stroke .4s}
+.agents .link{stroke:var(--line2);stroke-width:1.5;stroke-dasharray:3 5;fill:none;stroke-linejoin:round;transition:stroke .4s}
 .agents .link.hot{stroke:var(--acc);stroke-dasharray:none}
 .agents .pkt{fill:var(--acc);filter:drop-shadow(0 0 6px var(--acc))}
 .agents .link.flow{stroke:var(--acc);stroke-width:2.5;stroke-dasharray:7 6;animation:march .5s linear infinite;opacity:1}
 .agents .link.flow.rev{animation-name:march-rev}
 @keyframes march{to{stroke-dashoffset:-13}} @keyframes march-rev{to{stroke-dashoffset:13}}
-.bubble{position:absolute;z-index:3;transform:translate(-50%,-135%);max-width:min(80%,340px);padding:4px 10px;border:1px solid var(--acc);border-radius:8px;background:var(--panel-solid);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;box-shadow:0 4px 18px rgba(0,0,0,.35)}
+.bubble{position:absolute;z-index:3;opacity:0;transition:opacity .25s;transform:translate(14px,-50%);max-width:min(80%,340px);padding:4px 10px;border:1px solid var(--acc);border-radius:8px;background:var(--panel-solid);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;box-shadow:0 4px 18px rgba(0,0,0,.35)}
 .bubble b{color:var(--acc)}
 .flowbar{display:flex;align-items:center;gap:8px;min-height:22px;margin:-4px 0 10px;font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden}
 .flowbar .trk{flex:none;width:120px;height:4px;border-radius:2px;background:var(--track);position:relative;overflow:hidden}
@@ -1323,6 +1346,14 @@ body{
 .unit .now{display:flex;gap:6px;align-items:baseline;margin-top:6px;padding-top:6px;border-top:1px dashed var(--line);font-size:12px;color:var(--muted);min-width:0}
 .unit .now .el{color:var(--faint);flex:none} .unit .now .nl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .unit .now.tool .nl{color:var(--text);font-weight:600} .unit .now .age{margin-left:auto;color:var(--faint);flex:none;font-variant-numeric:tabular-nums}
+.unit{position:relative;overflow:hidden;cursor:pointer;transition:border-color .2s,box-shadow .2s}
+.unit:hover{border-color:var(--muted)}
+.unit.sel{outline:2px solid var(--uc);outline-offset:2px}
+.unit .prog{position:absolute;left:0;bottom:0;height:3px;background:var(--uc);border-radius:0 2px 0 0;transition:width .6s}
+.unit .prog::after{content:'';position:absolute;right:0;top:-2px;width:6px;height:7px;border-radius:50%;background:var(--uc);box-shadow:0 0 8px var(--uc)}
+.unit .ur .el2{color:var(--faint);margin-left:4px}
+.fchip{display:none;align-items:center;gap:6px;margin:12px 0 0;padding:3px 10px;border:1px solid var(--line2);border-radius:999px;font-size:12px;color:var(--muted);cursor:pointer;width:max-content}
+.fchip.on{display:inline-flex} .fchip b{color:var(--text)}
 .unit .now.idle{color:var(--faint)} .unit .now .mk{flex:none;color:var(--faint)} .unit .now.tool .mk{color:var(--acc)}
 .arow{display:grid;grid-template-columns:repeat(var(--n,1),minmax(0,1fr));gap:14px;position:relative;z-index:1}
 .arow.root{grid-template-columns:minmax(0,320px);justify-content:center}
@@ -1477,6 +1508,7 @@ body{
       <div class="arow" id="rowStage"></div>
       <div class="arow" id="rowReview"></div>
     </div>
+    <div class="fchip ko" id="fchip" role="button" tabindex="0"></div>
     <div class="tx" id="tx"></div>
   </section>
 
@@ -1563,21 +1595,40 @@ body{
   }
   function tile(n, label, color, ko){ var t = el('div', 'tile'); t.style.setProperty('--c', color); t.appendChild(el('div', 'n', String(n))); t.appendChild(el('div', 'l' + (ko ? ' ko' : ''), label)); return t; }
 
-  // ── agents: orc ↔ subagents ──
+  // ── agents: orchestrator ↔ subagents ──
   var VERB = { active: { orc: 'Orchestrating', stage: 'Building', review: 'Reviewing' }, wait: 'Waiting', standby: 'Idle', alert: 'No response', blocked: 'Blocked', done: 'Done' };
-  var SPIN = ['·', '✢', '✳', '✶', '✻', '✽', '✻', '✶', '✳', '✢'], spinI = 0, seenT = null, agState = null;
+  var SPIN = ['·', '✢', '✳', '✶', '✻', '✽', '✻', '✶', '✳', '✢'], spinI = 0, seenT = null, agState = null, focusId = null;
   var SVGNS = 'http://www.w3.org/2000/svg';
+  try { focusId = sessionStorage.getItem('board.focus') || null; } catch (e) {}
   function kindOf(id){ return id === 'orc' ? 'orc' : /:review$/.test(id) ? 'review' : 'stage'; }
   function label(id){ return id === 'orc' ? 'orchestrator' : /:review$/.test(id) ? id.slice(0, 3) + ' reviewer' : id + ' subagent'; }
   function nodeEl(id){ return document.querySelector('[data-agent="' + id + '"]'); }
-  function center(id){ var n = nodeEl(id); if (!n) return null; var box = $('agents').getBoundingClientRect(), r = n.getBoundingClientRect(); return { x: r.left - box.left + r.width / 2, y: r.top - box.top + r.height / 2 }; }
+  function anchor(id, side){
+    var n = nodeEl(id); if (!n) return null; var box = $('agents').getBoundingClientRect(), r = n.getBoundingClientRect();
+    return { x: r.left - box.left + r.width / 2, y: side === 'top' ? r.top - box.top : side === 'bottom' ? r.bottom - box.top : r.top - box.top + r.height / 2 };
+  }
+  // parent bottom → down → across → down → child top, with rounded corners
+  function elbow(a, b){
+    var my = Math.round((a.y + b.y) / 2), dx = b.x - a.x, r = Math.min(10, Math.abs(dx) / 2, Math.abs(my - a.y));
+    if (Math.abs(dx) < 1) return 'M' + a.x + ' ' + a.y + ' L' + b.x + ' ' + b.y;
+    var sx = dx > 0 ? 1 : -1;
+    return 'M' + a.x + ' ' + a.y + ' L' + a.x + ' ' + (my - r) + ' Q' + a.x + ' ' + my + ' ' + (a.x + sx * r) + ' ' + my +
+      ' L' + (b.x - sx * r) + ' ' + my + ' Q' + b.x + ' ' + my + ' ' + b.x + ' ' + (my + r) + ' L' + b.x + ' ' + b.y;
+  }
+  function pairOf(m){
+    var child = m.from === 'orc' ? m.to : m.to === 'orc' ? m.from : /:review$/.test(m.from) ? m.from : m.to;
+    return { parent: /:review$/.test(child) ? child.slice(0, 3) : 'orc', child: child };
+  }
   function unit(id, u, role){
     var k = kindOf(id);
-    var box = el('div', 'unit k-' + k + ' st-' + u.state); box.setAttribute('data-agent', id);
+    var box = el('div', 'unit k-' + k + ' st-' + u.state + (focusId === id ? ' sel' : '')); box.setAttribute('data-agent', id);
+    box.title = '클릭하면 이 에이전트의 메시지만 봅니다';
     var h = el('div', 'uh');
     h.appendChild(el('span', 'glyph', u.state === 'active' ? SPIN[spinI % SPIN.length] : u.state === 'done' ? '✓' : u.state === 'alert' || u.state === 'blocked' ? '!' : '○'));
     h.appendChild(el('span', 'un', label(id)));
-    h.appendChild(el('span', 'ur', u.state));
+    var ur = el('span', 'ur', u.state);
+    if (u.state === 'active' && u.startedAt) { var e2 = el('span', 'el2', '· ' + dur(u.startedAt)); e2.setAttribute('data-from', u.startedAt); ur.appendChild(e2); }
+    h.appendChild(ur);
     box.appendChild(h);
     if (role) box.appendChild(el('div', 'role ko', role));
     var p = el('div', 'ut ko'); p.appendChild(el('span', 'verb', (u.state === 'active' ? VERB.active[k] + '…' : (VERB[u.state] || u.state) + (u.state === 'wait' ? '…' : ' ·'))));
@@ -1591,42 +1642,49 @@ body{
       nw.appendChild(el('span', 'nl ko', u.now.label));
       if (u.now.since) { var ag = el('span', 'age', ago(u.now.since)); ag.setAttribute('data-since', u.now.since); nw.appendChild(ag); }
       box.appendChild(nw);
-    } else if (u.state !== 'done') box.appendChild(el('div', 'now idle', '⎿ —'));
+    } else if (u.state === 'done' && u.startedAt && u.finishedAt) box.appendChild(el('div', 'now idle ko', '⎿ ✓ ' + dur(u.startedAt, u.finishedAt) + ' 걸림'));
+    else box.appendChild(el('div', 'now idle', u.state === 'done' ? '⎿ ✓' : '⎿ —'));
+    if (u.pct != null && u.status === 'IN_PROGRESS') { var pg = el('div', 'prog'); pg.style.width = Math.max(2, Math.min(100, u.pct)) + '%'; pg.title = u.pct + '%'; box.appendChild(pg); }
+    box.addEventListener('click', function(){ setFocus(focusId === id ? null : id); });
     return box;
   }
+  function setFocus(id){
+    focusId = id; try { if (id) sessionStorage.setItem('board.focus', id); else sessionStorage.removeItem('board.focus'); } catch (e) {}
+    if (agState) renderAgents({ agents: agState, _redraw: true });
+  }
+  $('fchip').addEventListener('click', function(){ setFocus(null); });
+  $('fchip').addEventListener('keydown', function(e){ if (e.key === 'Enter' || e.key === ' ') setFocus(null); });
+  var paths = {};
   function drawLinks(){
     if (!agState) return;
-    var svg = $('agSvg'); var keep = Array.prototype.slice.call(svg.querySelectorAll('.pkt')); clear(svg);
+    var svg = $('agSvg'); var keep = Array.prototype.slice.call(svg.querySelectorAll('.pkt')); clear(svg); paths = {};
     var now = Date.now(), pairs = [];
     agState.stages.forEach(function(s){ pairs.push(['orc', s.id]); if (s.reviewer) pairs.push([s.id, s.id + ':review']); });
     pairs.forEach(function(pr){
-      var a = center(pr[0]), b = center(pr[1]); if (!a || !b) return;
-      var l = document.createElementNS(SVGNS, 'line');
-      l.setAttribute('x1', a.x); l.setAttribute('y1', a.y); l.setAttribute('x2', b.x); l.setAttribute('y2', b.y);
+      var a = anchor(pr[0], 'bottom'), b = anchor(pr[1], 'top'); if (!a || !b) return;
+      var pa = document.createElementNS(SVGNS, 'path');
+      pa.setAttribute('d', elbow(a, b));
       var hot = agState.messages.some(function(m){ return ((m.from === pr[0] && m.to === pr[1]) || (m.from === pr[1] && m.to === pr[0])) && now - Date.parse(m.t) < 15 * 60000; });
-      var fl = flight && ((flight.m.from === pr[0] && flight.m.to === pr[1]) ? ' flow' : (flight.m.from === pr[1] && flight.m.to === pr[0]) ? ' flow rev' : '');
-      l.setAttribute('class', 'link' + (hot ? ' hot' : '') + (fl || ''));
-      svg.appendChild(l);
+      var fl = flight ? (flight.m.from === pr[0] && flight.m.to === pr[1] ? ' flow' : flight.m.from === pr[1] && flight.m.to === pr[0] ? ' flow rev' : '') : '';
+      pa.setAttribute('class', 'link' + (hot ? ' hot' : '') + fl);
+      svg.appendChild(pa);
+      paths[pr[0] + '>' + pr[1]] = pa;
     });
     keep.forEach(function(k){ svg.appendChild(k); });
   }
   var flight = null, received = null, PKT = 2400, RECV = 1800;
-  function setUnitStatus(id, html){ var n = nodeEl(id); if (!n) return; var ut = n.querySelector('.ut'); if (!ut) return; clear(ut); html.forEach(function(x){ ut.appendChild(x); }); }
+  function setUnitStatus(id, nodes){ var n = nodeEl(id); if (!n) return; var ut = n.querySelector('.ut'); if (!ut) return; clear(ut); nodes.forEach(function(x){ ut.appendChild(x); }); }
   function applyFlightStatus(){
-    if (flight) { var s = el('span', 'send', 'Sending → ' + label(flight.m.to)); setUnitStatus(flight.m.from, [s, document.createTextNode(' ' + flight.m.text)]); }
-    if (received && Date.now() < received.until) { var r = el('span', 'send', 'Received ✓'); setUnitStatus(received.m.to, [r, document.createTextNode(' ' + received.m.text)]); }
+    if (flight) setUnitStatus(flight.m.from, [el('span', 'send', 'Sending → ' + label(flight.m.to)), document.createTextNode(' ' + flight.m.text)]);
+    if (received && Date.now() < received.until) setUnitStatus(received.m.to, [el('span', 'send', 'Received ✓'), document.createTextNode(' ' + received.m.text)]);
   }
   function sendPacket(m, delay){
     setTimeout(function(){
-      var a = center(m.from), b = center(m.to); if (!a || !b) return;
+      var pr = pairOf(m), pa = paths[pr.parent + '>' + pr.child]; if (!pa) return;
+      var len = pa.getTotalLength(), rev = m.from === pr.child;
+      pa.classList.add('flow'); if (rev) pa.classList.add('rev');
       var svg = $('agSvg');
-      var lines = svg.querySelectorAll('line'), line = null;
-      Array.prototype.forEach.call(lines, function(l){
-        var fx = +l.getAttribute('x1'), fy = +l.getAttribute('y1'), tx = +l.getAttribute('x2'), ty = +l.getAttribute('y2');
-        if (Math.abs(fx - a.x) < 1 && Math.abs(fy - a.y) < 1 && Math.abs(tx - b.x) < 1 && Math.abs(ty - b.y) < 1) { line = l; l.classList.add('flow'); }
-        else if (Math.abs(fx - b.x) < 1 && Math.abs(fy - b.y) < 1 && Math.abs(tx - a.x) < 1 && Math.abs(ty - a.y) < 1) { line = l; l.classList.add('flow', 'rev'); }
-      });
-      var c = document.createElementNS(SVGNS, 'circle'); c.setAttribute('r', '6'); c.setAttribute('class', 'pkt'); c.setAttribute('cx', a.x); c.setAttribute('cy', a.y); svg.appendChild(c);
+      var c = document.createElementNS(SVGNS, 'circle'); c.setAttribute('r', '6'); c.setAttribute('class', 'pkt'); svg.appendChild(c);
       var bub = el('div', 'bubble ko'); bub.appendChild(el('b', null, '✉ ')); bub.appendChild(document.createTextNode(m.text)); $('agents').appendChild(bub);
       var fb = $('flowbar'); clear(fb);
       fb.appendChild(el('span', null, '⇢'));
@@ -1638,15 +1696,17 @@ body{
       var t0 = null;
       function step(ts){
         if (t0 === null) t0 = ts; var k = Math.min(1, (ts - t0) / PKT); var e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
-        var x = a.x + (b.x - a.x) * e, y = a.y + (b.y - a.y) * e;
-        c.setAttribute('cx', x); c.setAttribute('cy', y);
-        bub.style.left = x + 'px'; bub.style.top = y + 'px';
+        var cur = paths[pr.parent + '>' + pr.child] || pa; var L = cur.getTotalLength();
+        var pt = cur.getPointAtLength((rev ? 1 - e : e) * L);
+        c.setAttribute('cx', pt.x); c.setAttribute('cy', pt.y);
+        bub.style.left = pt.x + 'px'; bub.style.top = pt.y + 'px';
+        bub.style.opacity = k > .1 && k < .9 ? '1' : '0';
         fill.style.width = Math.round(k * 100) + '%';
         if (k < 1) { requestAnimationFrame(step); return; }
         if (c.parentNode) c.parentNode.removeChild(c);
         if (bub.parentNode) bub.parentNode.removeChild(bub);
-        if (line) line.classList.remove('flow', 'rev');
         flight = null; received = { m: m, until: Date.now() + RECV };
+        drawLinks();
         var u = nodeEl(m.to); if (u) { u.classList.remove('flash'); void u.offsetWidth; u.classList.add('flash'); }
         applyFlightStatus();
         setTimeout(function(){ if (!flight) clear($('flowbar')); if (agState) renderAgents({ agents: agState, _redraw: true }); }, RECV);
@@ -1659,21 +1719,27 @@ body{
     var ro = $('rowOrc'); clear(ro); ro.appendChild(unit('orc', ag.orc, '지휘자 · 차수를 맡기고 결과를 확인'));
     var rs = $('rowStage'), rr = $('rowReview'); clear(rs); clear(rr);
     var n = Math.max(1, ag.stages.length); rs.style.setProperty('--n', n); rr.style.setProperty('--n', n);
-    var anyReview = false;
+    var anyReview = false, ids = ['orc'];
     ag.stages.forEach(function(s){
+      ids.push(s.id);
       var a = el('div', 'slot'); a.appendChild(unit(s.id, s, s.name)); rs.appendChild(a);
-      var b = el('div', 'slot'); if (s.reviewer) { anyReview = true; b.appendChild(unit(s.id + ':review', s.reviewer, 'adversarial-reviewer')); } rr.appendChild(b);
+      var b = el('div', 'slot'); if (s.reviewer) { anyReview = true; ids.push(s.id + ':review'); b.appendChild(unit(s.id + ':review', s.reviewer, 'adversarial-reviewer')); } rr.appendChild(b);
     });
     rr.style.display = anyReview ? '' : 'none';
     if (!ag.stages.length) rs.appendChild(el('div', 'empty', 'no subagents yet'));
+    if (focusId && ids.indexOf(focusId) < 0) focusId = null;
     $('agSub').textContent = ag.messages.length ? '상태 기록에서 재구성 · ' + ag.messages.length + '건' : '';
+    var chip = $('fchip'); clear(chip);
+    if (focusId) { chip.appendChild(el('b', null, label(focusId))); chip.appendChild(document.createTextNode(' 메시지만 보는 중 · 모두 보기 ✕')); chip.className = 'fchip ko on'; }
+    else chip.className = 'fchip ko';
 
     var tx = $('tx'); clear(tx);
-    if (!ag.messages.length) tx.appendChild(el('div', 'empty', 'no messages yet'));
+    var list = focusId ? ag.messages.filter(function(m){ return m.from === focusId || m.to === focusId; }) : ag.messages;
+    if (!list.length) tx.appendChild(el('div', 'empty', focusId ? 'no messages for this agent' : 'no messages yet'));
     var fresh = [];
-    ag.messages.slice(0, 24).forEach(function(m){
+    ag.messages.forEach(function(m){ if (seenT !== null && Date.parse(m.t) > seenT) fresh.push(m); });
+    list.slice(0, 24).forEach(function(m){
       var isNew = seenT !== null && Date.parse(m.t) > seenT;
-      if (isNew) fresh.push(m);
       var d = el('div', 'msg k-' + kindOf(m.from) + (isNew ? ' new' : ''));
       var h = el('div', 'mh');
       h.appendChild(el('span', 'bul', '⏺'));
@@ -1699,6 +1765,10 @@ body{
     spinI++;
     Array.prototype.forEach.call(document.querySelectorAll('.unit.st-active .glyph'), function(g){ g.textContent = SPIN[spinI % SPIN.length]; });
   }, 130);
+  setInterval(function(){
+    Array.prototype.forEach.call(document.querySelectorAll('.unit [data-since]'), function(n){ n.textContent = ago(n.getAttribute('data-since')); });
+    Array.prototype.forEach.call(document.querySelectorAll('.unit [data-from]'), function(n){ n.textContent = '· ' + dur(n.getAttribute('data-from')); });
+  }, 1000);
   window.addEventListener('resize', drawLinks);
 
   function render(st){
