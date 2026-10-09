@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.binjari.invalid/protocol/messages/job.accept.json",
+  "$ref": "../envelope.json",
+  "properties": {
+    "type": {
+      "const": "job.accept"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attemptId"],
+      "properties": {
+        "attemptId": {
+          "$ref": "../defs/common.json#/$defs/attemptId"
+        }
+      }
+    }
+  },
+  "required": ["corr"]
+}

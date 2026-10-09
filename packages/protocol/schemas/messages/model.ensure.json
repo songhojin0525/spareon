@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.binjari.invalid/protocol/messages/model.ensure.json",
+  "$ref": "../envelope.json",
+  "properties": {
+    "type": {
+      "const": "model.ensure"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manifest"],
+      "properties": {
+        "manifest": {
+          "$ref": "../defs/common.json#/$defs/signedManifest"
+        }
+      }
+    }
+  },
+  "not": {
+    "required": ["corr"]
+  }
+}

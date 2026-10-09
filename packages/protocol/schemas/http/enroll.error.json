@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.binjari.invalid/protocol/http/enroll.error.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["code"],
+  "properties": {
+    "code": {
+      "$ref": "../defs/common.json#/$defs/errorCode"
+    },
+    "retryAfterMs": {
+      "$ref": "../defs/common.json#/$defs/durationMs"
+    }
+  }
+}

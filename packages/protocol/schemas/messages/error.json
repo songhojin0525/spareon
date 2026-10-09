@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.binjari.invalid/protocol/messages/error.json",
+  "$ref": "../envelope.json",
+  "properties": {
+    "type": {
+      "const": "error"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message", "fatal"],
+      "properties": {
+        "code": {
+          "$ref": "../defs/common.json#/$defs/errorCode"
+        },
+        "message": {
+          "$ref": "../defs/common.json#/$defs/diagnosticText"
+        },
+        "fatal": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

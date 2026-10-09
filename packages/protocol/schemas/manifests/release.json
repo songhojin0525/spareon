@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.binjari.invalid/protocol/manifests/release.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "platform", "files", "issuedAt"],
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "binjari.release-manifest/1"
+    },
+    "version": {
+      "$ref": "../defs/common.json#/$defs/semver"
+    },
+    "platform": {
+      "type": "string",
+      "enum": ["windows-amd64"]
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256", "bytes", "url"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "maxLength": 324,
+            "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._-]{0,63}(/[A-Za-z0-9_-][A-Za-z0-9._-]{0,63}){0,4}$"
+          },
+          "sha256": {
+            "$ref": "../defs/common.json#/$defs/sha256"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4294967296
+          },
+          "url": {
+            "$ref": "../defs/common.json#/$defs/httpsUrl"
+          }
+        }
+      },
+      "maxItems": 64,
+      "minItems": 1
+    },
+    "minServerVersion": {
+      "$ref": "../defs/common.json#/$defs/semver"
+    },
+    "rollbackOf": {
+      "$ref": "../defs/common.json#/$defs/semver"
+    },
+    "issuedAt": {
+      "$ref": "../defs/common.json#/$defs/timestamp"
+    }
+  }
+}

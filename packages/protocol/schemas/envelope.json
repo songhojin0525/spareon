@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.binjari.invalid/protocol/envelope.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["v", "type", "id", "ts", "payload"],
+  "properties": {
+    "v": {
+      "type": "integer",
+      "const": 1
+    },
+    "type": {
+      "type": "string",
+      "maxLength": 32,
+      "pattern": "^[a-z][a-z0-9]{0,15}(\\.[a-z][a-z0-9]{0,15}){0,2}$"
+    },
+    "id": {
+      "$ref": "defs/common.json#/$defs/uuidv7"
+    },
+    "ts": {
+      "$ref": "defs/common.json#/$defs/timestamp"
+    },
+    "corr": {
+      "$ref": "defs/common.json#/$defs/uuidv7"
+    },
+    "payload": {
+      "type": "object"
+    }
+  }
+}

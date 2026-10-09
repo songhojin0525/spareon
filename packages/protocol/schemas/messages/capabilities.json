@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.binjari.invalid/protocol/messages/capabilities.json",
+  "$ref": "../envelope.json",
+  "properties": {
+    "type": {
+      "const": "capabilities"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gpus", "cpu", "ramMb", "cacheDiskFreeMb", "runtime", "cachedModels", "osBuild"],
+      "properties": {
+        "gpus": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "index",
+              "name",
+              "uuidHash",
+              "vramTotalMb",
+              "vramFreeMb",
+              "driverVersion",
+              "computeCapability"
+            ],
+            "properties": {
+              "index": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 15
+              },
+              "name": {
+                "$ref": "../defs/common.json#/$defs/displayText"
+              },
+              "uuidHash": {
+                "$ref": "../defs/common.json#/$defs/sha256"
+              },
+              "vramTotalMb": {
+                "$ref": "../defs/common.json#/$defs/mebibytes"
+              },
+              "vramFreeMb": {
+                "$ref": "../defs/common.json#/$defs/mebibytes"
+              },
+              "driverVersion": {
+                "$ref": "../defs/common.json#/$defs/token"
+              },
+              "computeCapability": {
+                "type": "string",
+                "maxLength": 5,
+                "pattern": "^[0-9]{1,2}\\.[0-9]{1,2}$"
+              }
+            }
+          },
+          "maxItems": 8
+        },
+        "cpu": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["model", "cores", "threads"],
+          "properties": {
+            "model": {
+              "$ref": "../defs/common.json#/$defs/displayText"
+            },
+            "cores": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1024
+            },
+            "threads": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4096
+            }
+          }
+        },
+        "ramMb": {
+          "$ref": "../defs/common.json#/$defs/mebibytes"
+        },
+        "cacheDiskFreeMb": {
+          "$ref": "../defs/common.json#/$defs/mebibytes"
+        },
+        "runtime": {
+          "$ref": "../defs/common.json#/$defs/runtimeInfo"
+        },
+        "cachedModels": {
+          "type": "array",
+          "items": {
+            "$ref": "../defs/common.json#/$defs/modelRef"
+          },
+          "maxItems": 64
+        },
+        "osBuild": {
+          "$ref": "../defs/common.json#/$defs/token"
+        }
+      }
+    }
+  }
+}

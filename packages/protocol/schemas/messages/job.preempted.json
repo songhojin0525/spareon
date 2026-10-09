@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.binjari.invalid/protocol/messages/job.preempted.json",
+  "$ref": "../envelope.json",
+  "properties": {
+    "type": {
+      "const": "job.preempted"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attemptId", "reason", "lastSeq"],
+      "properties": {
+        "attemptId": {
+          "$ref": "../defs/common.json#/$defs/attemptId"
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "customerInput",
+            "customerSignal",
+            "gpuBusy",
+            "thermal",
+            "schedule",
+            "pause",
+            "kill",
+            "deadman",
+            "shutdown"
+          ]
+        },
+        "lastSeq": {
+          "type": "integer",
+          "minimum": -1,
+          "maximum": 1000000
+        }
+      }
+    }
+  },
+  "not": {
+    "required": ["corr"]
+  }
+}

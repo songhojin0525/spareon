@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.binjari.invalid/protocol/messages/auth.challenge.json",
+  "$ref": "../envelope.json",
+  "properties": {
+    "type": {
+      "const": "auth.challenge"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nonce", "serverTime", "expiresInMs"],
+      "properties": {
+        "nonce": {
+          "$ref": "../defs/common.json#/$defs/bytes32"
+        },
+        "serverTime": {
+          "$ref": "../defs/common.json#/$defs/timestamp"
+        },
+        "expiresInMs": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 30000
+        }
+      }
+    }
+  },
+  "required": ["corr"]
+}

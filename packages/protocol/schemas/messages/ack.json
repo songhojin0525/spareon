@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.binjari.invalid/protocol/messages/ack.json",
+  "$ref": "../envelope.json",
+  "properties": {
+    "type": {
+      "const": "ack"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result"],
+      "properties": {
+        "result": {
+          "type": "string",
+          "enum": ["ok", "rejected"]
+        },
+        "code": {
+          "$ref": "../defs/common.json#/$defs/errorCode"
+        }
+      },
+      "if": {
+        "properties": {
+          "result": {
+            "const": "rejected"
+          }
+        }
+      },
+      "then": {
+        "required": ["code"]
+      },
+      "else": {
+        "not": {
+          "required": ["code"]
+        }
+      }
+    }
+  },
+  "required": ["corr"]
+}

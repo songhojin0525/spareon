@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.binjari.invalid/protocol/messages/status.json",
+  "$ref": "../envelope.json",
+  "properties": {
+    "type": {
+      "const": "status"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "eligible", "presence", "gpus", "runningAttemptIds", "measuredAt"],
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": [
+            "ready",
+            "eligible",
+            "running",
+            "preempting",
+            "paused",
+            "faulted",
+            "updating",
+            "shuttingDown"
+          ]
+        },
+        "eligible": {
+          "type": "boolean"
+        },
+        "presence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["idleForMs", "customerPresent", "reasonCodes"],
+          "properties": {
+            "idleForMs": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 31536000000
+            },
+            "customerPresent": {
+              "type": "boolean"
+            },
+            "reasonCodes": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "customer_input",
+                  "fullscreen_app",
+                  "gpu_3d_busy",
+                  "audio_playing",
+                  "video_decode",
+                  "blocked_window",
+                  "helper_missing",
+                  "min_idle_not_met",
+                  "outside_schedule",
+                  "server_time_unknown",
+                  "gpu_too_hot",
+                  "gpu_read_failed",
+                  "insufficient_vram",
+                  "runtime_fault",
+                  "policy_missing",
+                  "paused",
+                  "updating",
+                  "shutting_down"
+                ]
+              },
+              "maxItems": 18,
+              "uniqueItems": true
+            }
+          }
+        },
+        "gpus": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["index", "tempC", "utilPct", "powerW", "vramUsedMb"],
+            "properties": {
+              "index": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 15
+              },
+              "tempC": {
+                "type": "integer",
+                "minimum": -50,
+                "maximum": 150
+              },
+              "utilPct": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              },
+              "powerW": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2000
+              },
+              "vramUsedMb": {
+                "$ref": "../defs/common.json#/$defs/mebibytes"
+              }
+            }
+          },
+          "maxItems": 8
+        },
+        "runningAttemptIds": {
+          "type": "array",
+          "items": {
+            "$ref": "../defs/common.json#/$defs/attemptId"
+          },
+          "maxItems": 4,
+          "uniqueItems": true
+        },
+        "measuredAt": {
+          "$ref": "../defs/common.json#/$defs/timestamp"
+        }
+      }
+    }
+  }
+}

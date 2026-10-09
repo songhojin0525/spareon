@@ -1,0 +1,277 @@
+{
+  "codes": {
+    "message_too_large": {
+      "from": "any",
+      "retryable": false,
+      "fatal": true,
+      "agentAction": "closeConnection",
+      "meaning": "message exceeds the byte limit"
+    },
+    "malformed_json": {
+      "from": "any",
+      "retryable": false,
+      "fatal": false,
+      "agentAction": "dropMessage",
+      "meaning": "not strict JSON (see PROTOCOL.md)"
+    },
+    "invalid_envelope": {
+      "from": "any",
+      "retryable": false,
+      "fatal": false,
+      "agentAction": "dropMessage",
+      "meaning": "envelope does not match envelope.json"
+    },
+    "unknown_type": {
+      "from": "any",
+      "retryable": false,
+      "fatal": false,
+      "agentAction": "dropMessage",
+      "meaning": "message type is not in the registry"
+    },
+    "wrong_direction": {
+      "from": "any",
+      "retryable": false,
+      "fatal": false,
+      "agentAction": "dropMessage",
+      "meaning": "message type is not sent by this side"
+    },
+    "invalid_payload": {
+      "from": "any",
+      "retryable": false,
+      "fatal": false,
+      "agentAction": "dropMessage",
+      "meaning": "message does not match its type schema"
+    },
+    "not_authenticated": {
+      "from": "server",
+      "retryable": true,
+      "fatal": true,
+      "agentAction": "reconnectBackoff",
+      "meaning": "message other than hello/auth.prove before auth.ok"
+    },
+    "protocol_unsupported": {
+      "from": "server",
+      "retryable": false,
+      "fatal": true,
+      "agentAction": "waitForUpdate",
+      "meaning": "server does not support this protocolHash"
+    },
+    "agent_too_old": {
+      "from": "server",
+      "retryable": false,
+      "fatal": true,
+      "agentAction": "waitForUpdate",
+      "meaning": "agent version below the server minimum"
+    },
+    "auth_invalid_signature": {
+      "from": "server",
+      "retryable": true,
+      "fatal": true,
+      "agentAction": "reconnectBackoff",
+      "meaning": "auth.prove signature does not verify"
+    },
+    "auth_nonce_expired": {
+      "from": "server",
+      "retryable": true,
+      "fatal": true,
+      "agentAction": "reconnectBackoff",
+      "meaning": "challenge nonce expired or already used"
+    },
+    "auth_timeout": {
+      "from": "server",
+      "retryable": true,
+      "fatal": true,
+      "agentAction": "reconnectBackoff",
+      "meaning": "authentication did not finish in time"
+    },
+    "node_unknown": {
+      "from": "server",
+      "retryable": false,
+      "fatal": true,
+      "agentAction": "reenroll",
+      "meaning": "nodeId is not registered"
+    },
+    "node_pending": {
+      "from": "server",
+      "retryable": true,
+      "fatal": true,
+      "agentAction": "stopAndWait",
+      "meaning": "node awaits owner approval"
+    },
+    "node_disabled": {
+      "from": "server",
+      "retryable": true,
+      "fatal": true,
+      "agentAction": "stopAndWait",
+      "meaning": "node disabled by owner or operator"
+    },
+    "node_quarantined": {
+      "from": "server",
+      "retryable": false,
+      "fatal": true,
+      "agentAction": "stopAndWait",
+      "meaning": "node quarantined"
+    },
+    "node_excluded": {
+      "from": "server",
+      "retryable": false,
+      "fatal": true,
+      "agentAction": "stopAndWait",
+      "meaning": "node permanently excluded by an operator"
+    },
+    "clone_suspected": {
+      "from": "server",
+      "retryable": false,
+      "fatal": true,
+      "agentAction": "stopAndWait",
+      "meaning": "same identity seen with another fingerprint or connection"
+    },
+    "session_replaced": {
+      "from": "server",
+      "retryable": true,
+      "fatal": true,
+      "agentAction": "reconnectBackoff",
+      "meaning": "a newer connection resumed this session"
+    },
+    "rate_limited": {
+      "from": "server",
+      "retryable": true,
+      "fatal": false,
+      "agentAction": "reconnectBackoff",
+      "meaning": "too many messages or connections"
+    },
+    "server_draining": {
+      "from": "server",
+      "retryable": true,
+      "fatal": true,
+      "agentAction": "reconnectBackoff",
+      "meaning": "server instance is shutting down"
+    },
+    "internal_error": {
+      "from": "any",
+      "retryable": true,
+      "fatal": false,
+      "agentAction": "reconnectBackoff",
+      "meaning": "unexpected failure on the sender side"
+    },
+    "enroll_code_invalid": {
+      "from": "server",
+      "retryable": false,
+      "fatal": false,
+      "agentAction": "stopAndWait",
+      "meaning": "enrollment code unknown, expired, revoked or locked"
+    },
+    "enroll_expired": {
+      "from": "server",
+      "retryable": true,
+      "fatal": false,
+      "agentAction": "retryLater",
+      "meaning": "enrollment session expired; start again"
+    },
+    "attempt_unknown": {
+      "from": "agent",
+      "retryable": false,
+      "fatal": false,
+      "agentAction": "none",
+      "meaning": "referenced attemptId is not running here"
+    },
+    "runtime_start_failed": {
+      "from": "agent",
+      "retryable": true,
+      "fatal": false,
+      "agentAction": "none",
+      "meaning": "inference runtime failed to start"
+    },
+    "runtime_crash": {
+      "from": "agent",
+      "retryable": true,
+      "fatal": false,
+      "agentAction": "none",
+      "meaning": "inference runtime exited during the attempt"
+    },
+    "model_load_failed": {
+      "from": "agent",
+      "retryable": true,
+      "fatal": false,
+      "agentAction": "none",
+      "meaning": "model could not be loaded"
+    },
+    "out_of_vram": {
+      "from": "agent",
+      "retryable": true,
+      "fatal": false,
+      "agentAction": "none",
+      "meaning": "GPU memory exhausted"
+    },
+    "input_fetch_failed": {
+      "from": "agent",
+      "retryable": true,
+      "fatal": false,
+      "agentAction": "none",
+      "meaning": "inputRef could not be fetched"
+    },
+    "input_invalid": {
+      "from": "agent",
+      "retryable": false,
+      "fatal": false,
+      "agentAction": "none",
+      "meaning": "fetched input failed hash or schema checks"
+    },
+    "output_too_large": {
+      "from": "agent",
+      "retryable": false,
+      "fatal": false,
+      "agentAction": "none",
+      "meaning": "output exceeds what the protocol can carry"
+    },
+    "manifest_signature_invalid": {
+      "from": "agent",
+      "retryable": false,
+      "fatal": false,
+      "agentAction": "none",
+      "meaning": "manifest signature or key id rejected"
+    },
+    "manifest_invalid": {
+      "from": "agent",
+      "retryable": false,
+      "fatal": false,
+      "agentAction": "none",
+      "meaning": "manifest is not canonical or fails its schema"
+    },
+    "manifest_downgrade": {
+      "from": "agent",
+      "retryable": false,
+      "fatal": false,
+      "agentAction": "none",
+      "meaning": "release version is not newer and not a signed rollback"
+    },
+    "policy_invalid": {
+      "from": "agent",
+      "retryable": false,
+      "fatal": false,
+      "agentAction": "none",
+      "meaning": "config.update policy rejected; old policy kept"
+    },
+    "download_failed": {
+      "from": "agent",
+      "retryable": true,
+      "fatal": false,
+      "agentAction": "none",
+      "meaning": "artifact download failed"
+    },
+    "hash_mismatch": {
+      "from": "agent",
+      "retryable": true,
+      "fatal": false,
+      "agentAction": "none",
+      "meaning": "downloaded artifact hash does not match the manifest"
+    },
+    "disk_full": {
+      "from": "agent",
+      "retryable": true,
+      "fatal": false,
+      "agentAction": "none",
+      "meaning": "not enough cache disk space"
+    }
+  }
+}

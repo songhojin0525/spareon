@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.binjari.invalid/protocol/messages/model.status.json",
+  "$ref": "../envelope.json",
+  "properties": {
+    "type": {
+      "const": "model.status"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["modelId", "sha256", "state", "bytesDone", "bytesTotal"],
+      "properties": {
+        "modelId": {
+          "$ref": "../defs/common.json#/$defs/modelId"
+        },
+        "sha256": {
+          "$ref": "../defs/common.json#/$defs/sha256"
+        },
+        "state": {
+          "type": "string",
+          "enum": ["queued", "waiting", "downloading", "verifying", "ready", "failed", "evicted"]
+        },
+        "bytesDone": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1125899906842624
+        },
+        "bytesTotal": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1125899906842624
+        },
+        "code": {
+          "$ref": "../defs/common.json#/$defs/errorCode"
+        }
+      },
+      "if": {
+        "properties": {
+          "state": {
+            "const": "failed"
+          }
+        }
+      },
+      "then": {
+        "required": ["code"]
+      },
+      "else": {
+        "not": {
+          "required": ["code"]
+        }
+      }
+    }
+  }
+}

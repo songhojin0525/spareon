@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.binjari.invalid/protocol/messages/update.available.json",
+  "$ref": "../envelope.json",
+  "properties": {
+    "type": {
+      "const": "update.available"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manifest"],
+      "properties": {
+        "manifest": {
+          "$ref": "../defs/common.json#/$defs/signedManifest"
+        }
+      }
+    }
+  },
+  "not": {
+    "required": ["corr"]
+  }
+}

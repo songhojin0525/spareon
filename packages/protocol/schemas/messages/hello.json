@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.binjari.invalid/protocol/messages/hello.json",
+  "$ref": "../envelope.json",
+  "properties": {
+    "type": {
+      "const": "hello"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocolHash",
+        "agentVersion",
+        "nodeId",
+        "capabilitiesDigest",
+        "fpStore",
+        "fpGlobal"
+      ],
+      "properties": {
+        "protocolHash": {
+          "$ref": "../defs/common.json#/$defs/sha256"
+        },
+        "agentVersion": {
+          "$ref": "../defs/common.json#/$defs/semver"
+        },
+        "nodeId": {
+          "$ref": "../defs/common.json#/$defs/uuidv7"
+        },
+        "capabilitiesDigest": {
+          "$ref": "../defs/common.json#/$defs/sha256"
+        },
+        "fpStore": {
+          "$ref": "../defs/common.json#/$defs/sha256"
+        },
+        "fpGlobal": {
+          "$ref": "../defs/common.json#/$defs/sha256"
+        },
+        "resume": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sessionId", "resumeToken"],
+          "properties": {
+            "sessionId": {
+              "$ref": "../defs/common.json#/$defs/uuidv7"
+            },
+            "resumeToken": {
+              "$ref": "../defs/common.json#/$defs/bytes32"
+            }
+          }
+        }
+      }
+    }
+  },
+  "not": {
+    "required": ["corr"]
+  }
+}

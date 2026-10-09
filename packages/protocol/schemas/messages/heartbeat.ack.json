@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.binjari.invalid/protocol/messages/heartbeat.ack.json",
+  "$ref": "../envelope.json",
+  "properties": {
+    "type": {
+      "const": "heartbeat.ack"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["serverTime"],
+      "properties": {
+        "serverTime": {
+          "$ref": "../defs/common.json#/$defs/timestamp"
+        }
+      }
+    }
+  },
+  "required": ["corr"]
+}

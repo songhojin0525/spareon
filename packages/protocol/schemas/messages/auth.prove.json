@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.binjari.invalid/protocol/messages/auth.prove.json",
+  "$ref": "../envelope.json",
+  "properties": {
+    "type": {
+      "const": "auth.prove"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["signature"],
+      "properties": {
+        "signature": {
+          "$ref": "../defs/common.json#/$defs/ed25519Signature"
+        }
+      }
+    }
+  },
+  "required": ["corr"]
+}

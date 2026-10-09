@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.binjari.invalid/protocol/messages/config.update.json",
+  "$ref": "../envelope.json",
+  "properties": {
+    "type": {
+      "const": "config.update"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "policy"],
+      "properties": {
+        "version": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        },
+        "policy": {
+          "$ref": "../defs/policy.json"
+        }
+      }
+    }
+  },
+  "not": {
+    "required": ["corr"]
+  }
+}

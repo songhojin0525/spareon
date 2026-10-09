@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.binjari.invalid/protocol/messages/auth.fail.json",
+  "$ref": "../envelope.json",
+  "properties": {
+    "type": {
+      "const": "auth.fail"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code"],
+      "properties": {
+        "code": {
+          "$ref": "../defs/common.json#/$defs/errorCode"
+        },
+        "minAgentVersion": {
+          "$ref": "../defs/common.json#/$defs/semver"
+        },
+        "retryAfterMs": {
+          "$ref": "../defs/common.json#/$defs/durationMs"
+        }
+      }
+    }
+  }
+}

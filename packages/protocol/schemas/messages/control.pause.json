@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.binjari.invalid/protocol/messages/control.pause.json",
+  "$ref": "../envelope.json",
+  "properties": {
+    "type": {
+      "const": "control.pause"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scope", "reason"],
+      "properties": {
+        "scope": {
+          "$ref": "../defs/common.json#/$defs/controlScope"
+        },
+        "reason": {
+          "$ref": "../defs/common.json#/$defs/controlReason"
+        }
+      }
+    }
+  },
+  "not": {
+    "required": ["corr"]
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.binjari.invalid/protocol/http/enroll.complete.request.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["enrollId", "publicKey", "fpStore", "fpGlobal", "signature"],
+  "properties": {
+    "enrollId": {
+      "$ref": "../defs/common.json#/$defs/uuidv7"
+    },
+    "publicKey": {
+      "$ref": "../defs/common.json#/$defs/ed25519PublicKey"
+    },
+    "fpStore": {
+      "$ref": "../defs/common.json#/$defs/sha256"
+    },
+    "fpGlobal": {
+      "$ref": "../defs/common.json#/$defs/sha256"
+    },
+    "signature": {
+      "$ref": "../defs/common.json#/$defs/ed25519Signature"
+    }
+  }
+}

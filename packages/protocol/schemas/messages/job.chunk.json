@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.binjari.invalid/protocol/messages/job.chunk.json",
+  "$ref": "../envelope.json",
+  "properties": {
+    "type": {
+      "const": "job.chunk"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attemptId", "seq", "textDelta", "tokensSoFar"],
+      "properties": {
+        "attemptId": {
+          "$ref": "../defs/common.json#/$defs/attemptId"
+        },
+        "seq": {
+          "$ref": "../defs/common.json#/$defs/seq"
+        },
+        "textDelta": {
+          "type": "string",
+          "maxLength": 16384
+        },
+        "tokensSoFar": {
+          "$ref": "../defs/common.json#/$defs/tokenCount"
+        }
+      }
+    }
+  },
+  "not": {
+    "required": ["corr"]
+  }
+}

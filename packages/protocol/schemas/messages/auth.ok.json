@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.binjari.invalid/protocol/messages/auth.ok.json",
+  "$ref": "../envelope.json",
+  "properties": {
+    "type": {
+      "const": "auth.ok"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sessionId",
+        "resumeToken",
+        "resumed",
+        "configVersion",
+        "serverTime",
+        "heartbeatIntervalMs",
+        "control",
+        "needCapabilities"
+      ],
+      "properties": {
+        "sessionId": {
+          "$ref": "../defs/common.json#/$defs/uuidv7"
+        },
+        "resumeToken": {
+          "$ref": "../defs/common.json#/$defs/bytes32"
+        },
+        "resumed": {
+          "type": "boolean"
+        },
+        "configVersion": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "serverTime": {
+          "$ref": "../defs/common.json#/$defs/timestamp"
+        },
+        "heartbeatIntervalMs": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 60000
+        },
+        "control": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode"],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": ["active", "paused", "killed"]
+            },
+            "scope": {
+              "$ref": "../defs/common.json#/$defs/controlScope"
+            },
+            "reason": {
+              "$ref": "../defs/common.json#/$defs/controlReason"
+            }
+          },
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "active"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": ["scope"]
+                },
+                {
+                  "required": ["reason"]
+                }
+              ]
+            }
+          },
+          "else": {
+            "required": ["scope", "reason"]
+          }
+        },
+        "needCapabilities": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "required": ["corr"]
+}

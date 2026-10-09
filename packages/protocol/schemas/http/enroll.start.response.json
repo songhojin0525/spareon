@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.binjari.invalid/protocol/http/enroll.start.response.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["enrollId", "nonce", "storeSalt", "globalSalt", "expiresInMs"],
+  "properties": {
+    "enrollId": {
+      "$ref": "../defs/common.json#/$defs/uuidv7"
+    },
+    "nonce": {
+      "$ref": "../defs/common.json#/$defs/bytes32"
+    },
+    "storeSalt": {
+      "$ref": "../defs/common.json#/$defs/bytes32"
+    },
+    "globalSalt": {
+      "$ref": "../defs/common.json#/$defs/bytes32"
+    },
+    "expiresInMs": {
+      "type": "integer",
+      "minimum": 1000,
+      "maximum": 600000
+    }
+  }
+}

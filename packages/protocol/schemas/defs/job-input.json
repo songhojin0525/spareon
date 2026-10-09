@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.binjari.invalid/protocol/defs/job-input.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [],
+  "properties": {
+    "messages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["role", "content"],
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": ["system", "user", "assistant"]
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 262144
+          }
+        }
+      },
+      "maxItems": 256,
+      "minItems": 1
+    },
+    "prompt": {
+      "type": "string",
+      "maxLength": 262144
+    },
+    "continuationPrefix": {
+      "type": "string",
+      "maxLength": 262144
+    }
+  },
+  "oneOf": [
+    {
+      "required": ["messages"],
+      "not": {
+        "required": ["prompt"]
+      }
+    },
+    {
+      "required": ["prompt"],
+      "not": {
+        "required": ["messages"]
+      }
+    }
+  ]
+}

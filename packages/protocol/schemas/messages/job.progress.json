@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.binjari.invalid/protocol/messages/job.progress.json",
+  "$ref": "../envelope.json",
+  "properties": {
+    "type": {
+      "const": "job.progress"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attemptId", "tokensSoFar"],
+      "properties": {
+        "attemptId": {
+          "$ref": "../defs/common.json#/$defs/attemptId"
+        },
+        "tokensSoFar": {
+          "$ref": "../defs/common.json#/$defs/tokenCount"
+        }
+      }
+    }
+  },
+  "not": {
+    "required": ["corr"]
+  }
+}

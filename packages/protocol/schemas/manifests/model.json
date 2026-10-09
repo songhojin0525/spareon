@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.binjari.invalid/protocol/manifests/model.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "modelId",
+    "revision",
+    "format",
+    "artifact",
+    "runtime",
+    "contextLength",
+    "license"
+  ],
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "binjari.model-manifest/1"
+    },
+    "modelId": {
+      "$ref": "../defs/common.json#/$defs/modelId"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2147483647
+    },
+    "format": {
+      "type": "string",
+      "enum": ["gguf"]
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url", "sha256", "bytes"],
+      "properties": {
+        "url": {
+          "$ref": "../defs/common.json#/$defs/httpsUrl"
+        },
+        "sha256": {
+          "$ref": "../defs/common.json#/$defs/sha256"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 35184372088832
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "minVersion"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "enum": ["llamacpp"]
+        },
+        "minVersion": {
+          "$ref": "../defs/common.json#/$defs/token"
+        }
+      }
+    },
+    "contextLength": {
+      "type": "integer",
+      "minimum": 256,
+      "maximum": 1048576
+    },
+    "license": {
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9.+-]{1,64}$"
+    },
+    "chatTemplateSha256": {
+      "$ref": "../defs/common.json#/$defs/sha256"
+    }
+  }
+}

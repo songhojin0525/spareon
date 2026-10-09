@@ -1,0 +1,194 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.binjari.invalid/protocol/defs/common.json",
+  "$defs": {
+    "uuidv7": {
+      "type": "string",
+      "maxLength": 36,
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "timestamp": {
+      "type": "string",
+      "maxLength": 24,
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"
+    },
+    "sha256": {
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "bytes32": {
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "ed25519PublicKey": {
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "ed25519Signature": {
+      "type": "string",
+      "maxLength": 128,
+      "pattern": "^[0-9a-f]{128}$"
+    },
+    "semver": {
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^(0|[1-9][0-9]{0,4})\\.(0|[1-9][0-9]{0,4})\\.(0|[1-9][0-9]{0,4})(-[0-9A-Za-z][0-9A-Za-z.-]{0,31})?$"
+    },
+    "token": {
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9._+-]{1,64}$"
+    },
+    "modelId": {
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+    },
+    "displayText": {
+      "type": "string",
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9 ()._,:/+#@\\[\\]-]{1,128}$"
+    },
+    "diagnosticText": {
+      "type": "string",
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9 ()._,:/+#@=\\[\\]-]{0,256}$"
+    },
+    "httpsUrl": {
+      "type": "string",
+      "maxLength": 800,
+      "pattern": "^https://[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?){0,8}(:[0-9]{1,5})?(/[A-Za-z0-9_~-][A-Za-z0-9._~-]{0,127}){1,8}$"
+    },
+    "keyId": {
+      "type": "string",
+      "maxLength": 32,
+      "pattern": "^[a-z0-9][a-z0-9-]{0,31}$"
+    },
+    "errorCode": {
+      "type": "string",
+      "enum": [
+        "message_too_large",
+        "malformed_json",
+        "invalid_envelope",
+        "unknown_type",
+        "wrong_direction",
+        "invalid_payload",
+        "not_authenticated",
+        "protocol_unsupported",
+        "agent_too_old",
+        "auth_invalid_signature",
+        "auth_nonce_expired",
+        "auth_timeout",
+        "node_unknown",
+        "node_pending",
+        "node_disabled",
+        "node_quarantined",
+        "node_excluded",
+        "clone_suspected",
+        "session_replaced",
+        "rate_limited",
+        "server_draining",
+        "internal_error",
+        "enroll_code_invalid",
+        "enroll_expired",
+        "attempt_unknown",
+        "runtime_start_failed",
+        "runtime_crash",
+        "model_load_failed",
+        "out_of_vram",
+        "input_fetch_failed",
+        "input_invalid",
+        "output_too_large",
+        "manifest_signature_invalid",
+        "manifest_invalid",
+        "manifest_downgrade",
+        "policy_invalid",
+        "download_failed",
+        "hash_mismatch",
+        "disk_full"
+      ]
+    },
+    "controlScope": {
+      "type": "string",
+      "enum": ["node", "store", "global"]
+    },
+    "controlReason": {
+      "type": "string",
+      "enum": ["ownerRequest", "operatorRequest", "killSwitch", "maintenance"]
+    },
+    "durationMs": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 86400000
+    },
+    "mebibytes": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 16777216
+    },
+    "runtimeName": {
+      "type": "string",
+      "enum": ["llamacpp", "ollama", "fake"]
+    },
+    "runtimeInfo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/runtimeName"
+        },
+        "version": {
+          "$ref": "#/$defs/token"
+        }
+      }
+    },
+    "modelRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "sha256"],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/modelId"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "signedManifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manifest", "signature", "keyId"],
+      "properties": {
+        "manifest": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 65536
+        },
+        "signature": {
+          "$ref": "#/$defs/ed25519Signature"
+        },
+        "keyId": {
+          "$ref": "#/$defs/keyId"
+        }
+      }
+    },
+    "attemptId": {
+      "$ref": "#/$defs/uuidv7"
+    },
+    "seq": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "tokenCount": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    }
+  }
+}

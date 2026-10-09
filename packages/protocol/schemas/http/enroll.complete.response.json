@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.binjari.invalid/protocol/http/enroll.complete.response.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["nodeId", "state", "reattached"],
+  "properties": {
+    "nodeId": {
+      "$ref": "../defs/common.json#/$defs/uuidv7"
+    },
+    "state": {
+      "type": "string",
+      "enum": ["offline", "pending"]
+    },
+    "reattached": {
+      "type": "boolean"
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.binjari.invalid/protocol/messages/job.fail.json",
+  "$ref": "../envelope.json",
+  "properties": {
+    "type": {
+      "const": "job.fail"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attemptId", "code", "retryable"],
+      "properties": {
+        "attemptId": {
+          "$ref": "../defs/common.json#/$defs/attemptId"
+        },
+        "code": {
+          "$ref": "../defs/common.json#/$defs/errorCode"
+        },
+        "retryable": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "not": {
+    "required": ["corr"]
+  }
+}

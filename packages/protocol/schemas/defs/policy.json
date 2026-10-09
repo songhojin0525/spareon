@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.binjari.invalid/protocol/defs/policy.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "weeklySchedule",
+    "utcOffsetMinutes",
+    "minIdleMinutes",
+    "maxGpuTempC",
+    "downloadWindow",
+    "modelAllowlist",
+    "transparencyMode",
+    "maxConcurrentJobs"
+  ],
+  "properties": {
+    "weeklySchedule": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "maxLength": 12,
+        "pattern": "^[0-9a-f]{12}$"
+      },
+      "maxItems": 7,
+      "minItems": 7
+    },
+    "utcOffsetMinutes": {
+      "type": "integer",
+      "minimum": -720,
+      "maximum": 840
+    },
+    "minIdleMinutes": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1440
+    },
+    "maxGpuTempC": {
+      "type": "integer",
+      "minimum": 40,
+      "maximum": 100
+    },
+    "downloadWindow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["startMinute", "endMinute"],
+      "properties": {
+        "startMinute": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1439
+        },
+        "endMinute": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1440
+        }
+      }
+    },
+    "modelAllowlist": {
+      "type": "array",
+      "items": {
+        "$ref": "common.json#/$defs/modelId"
+      },
+      "maxItems": 64,
+      "uniqueItems": true
+    },
+    "transparencyMode": {
+      "type": "string",
+      "enum": ["off", "notice"]
+    },
+    "maxConcurrentJobs": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4
+    }
+  }
+}

@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.binjari.invalid/protocol/messages/job.offer.json",
+  "$ref": "../envelope.json",
+  "properties": {
+    "type": {
+      "const": "job.offer"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attemptId",
+        "jobKind",
+        "model",
+        "params",
+        "stream",
+        "timeLimitMs",
+        "leaseTtlMs"
+      ],
+      "properties": {
+        "attemptId": {
+          "$ref": "../defs/common.json#/$defs/attemptId"
+        },
+        "jobKind": {
+          "type": "string",
+          "enum": ["chat", "completion"]
+        },
+        "model": {
+          "$ref": "../defs/common.json#/$defs/modelRef"
+        },
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["maxTokens", "temperatureMilli", "topPMilli", "stop", "seed", "greedy"],
+          "properties": {
+            "maxTokens": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 131072
+            },
+            "temperatureMilli": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2000
+            },
+            "topPMilli": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            },
+            "stop": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 64,
+                "minLength": 1
+              },
+              "maxItems": 8
+            },
+            "seed": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "greedy": {
+              "type": "boolean"
+            }
+          }
+        },
+        "input": {
+          "$ref": "../defs/job-input.json"
+        },
+        "inputRef": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["url", "token", "sha256", "bytes"],
+          "properties": {
+            "url": {
+              "$ref": "../defs/common.json#/$defs/httpsUrl"
+            },
+            "token": {
+              "type": "string",
+              "maxLength": 512,
+              "pattern": "^[A-Za-z0-9._~-]{16,512}$"
+            },
+            "sha256": {
+              "$ref": "../defs/common.json#/$defs/sha256"
+            },
+            "bytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16777216
+            }
+          }
+        },
+        "stream": {
+          "type": "boolean"
+        },
+        "timeLimitMs": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 86400000
+        },
+        "leaseTtlMs": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 600000
+        }
+      },
+      "oneOf": [
+        {
+          "required": ["input"],
+          "not": {
+            "required": ["inputRef"]
+          }
+        },
+        {
+          "required": ["inputRef"],
+          "not": {
+            "required": ["input"]
+          }
+        }
+      ],
+      "if": {
+        "properties": {
+          "jobKind": {
+            "const": "chat"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "input": {
+            "required": ["messages"]
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "input": {
+            "required": ["prompt"]
+          }
+        }
+      }
+    }
+  },
+  "not": {
+    "required": ["corr"]
+  }
+}

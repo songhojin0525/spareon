@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.binjari.invalid/protocol/messages/job.reject.json",
+  "$ref": "../envelope.json",
+  "properties": {
+    "type": {
+      "const": "job.reject"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["attemptId", "reason"],
+      "properties": {
+        "attemptId": {
+          "$ref": "../defs/common.json#/$defs/attemptId"
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "notIdle",
+            "modelMissing",
+            "insufficientVram",
+            "busy",
+            "policy",
+            "thermal",
+            "shuttingDown"
+          ]
+        }
+      }
+    }
+  },
+  "required": ["corr"]
+}

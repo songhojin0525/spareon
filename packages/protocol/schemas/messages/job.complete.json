@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.binjari.invalid/protocol/messages/job.complete.json",
+  "$ref": "../envelope.json",
+  "properties": {
+    "type": {
+      "const": "job.complete"
+    },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attemptId",
+        "finishReason",
+        "reportedTokensIn",
+        "reportedTokensOut",
+        "timings",
+        "outputSha256",
+        "runtime"
+      ],
+      "properties": {
+        "attemptId": {
+          "$ref": "../defs/common.json#/$defs/attemptId"
+        },
+        "outputText": {
+          "type": "string",
+          "maxLength": 262144
+        },
+        "outputRef": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "chunkCount"],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": ["chunks"]
+            },
+            "chunkCount": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1000001
+            }
+          }
+        },
+        "finishReason": {
+          "type": "string",
+          "enum": ["stop", "length"]
+        },
+        "reportedTokensIn": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000000
+        },
+        "reportedTokensOut": {
+          "$ref": "../defs/common.json#/$defs/tokenCount"
+        },
+        "timings": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["loadMs", "promptMs", "genMs"],
+          "properties": {
+            "loadMs": {
+              "$ref": "../defs/common.json#/$defs/durationMs"
+            },
+            "promptMs": {
+              "$ref": "../defs/common.json#/$defs/durationMs"
+            },
+            "genMs": {
+              "$ref": "../defs/common.json#/$defs/durationMs"
+            }
+          }
+        },
+        "outputSha256": {
+          "$ref": "../defs/common.json#/$defs/sha256"
+        },
+        "runtime": {
+          "$ref": "../defs/common.json#/$defs/runtimeInfo"
+        }
+      },
+      "oneOf": [
+        {
+          "required": ["outputText"],
+          "not": {
+            "required": ["outputRef"]
+          }
+        },
+        {
+          "required": ["outputRef"],
+          "not": {
+            "required": ["outputText"]
+          }
+        }
+      ]
+    }
+  },
+  "not": {
+    "required": ["corr"]
+  }
+}

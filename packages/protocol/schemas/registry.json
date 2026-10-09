@@ -1,0 +1,156 @@
+{
+  "messages": {
+    "hello": {
+      "from": "agent",
+      "replies": ["auth.challenge", "auth.fail"],
+      "timeoutMs": 5000
+    },
+    "auth.challenge": {
+      "from": "server",
+      "replies": ["auth.prove"],
+      "timeoutMs": 5000
+    },
+    "auth.prove": {
+      "from": "agent",
+      "replies": ["auth.ok", "auth.fail"],
+      "timeoutMs": 5000
+    },
+    "auth.ok": {
+      "from": "server",
+      "replies": []
+    },
+    "auth.fail": {
+      "from": "server",
+      "replies": []
+    },
+    "capabilities": {
+      "from": "agent",
+      "replies": []
+    },
+    "status": {
+      "from": "agent",
+      "replies": []
+    },
+    "heartbeat": {
+      "from": "agent",
+      "replies": ["heartbeat.ack"],
+      "timeoutMs": 10000
+    },
+    "heartbeat.ack": {
+      "from": "server",
+      "replies": []
+    },
+    "job.offer": {
+      "from": "server",
+      "replies": ["job.accept", "job.reject"],
+      "timeoutMs": 2000
+    },
+    "job.accept": {
+      "from": "agent",
+      "replies": []
+    },
+    "job.reject": {
+      "from": "agent",
+      "replies": []
+    },
+    "job.chunk": {
+      "from": "agent",
+      "replies": []
+    },
+    "job.progress": {
+      "from": "agent",
+      "replies": []
+    },
+    "job.complete": {
+      "from": "agent",
+      "replies": []
+    },
+    "job.fail": {
+      "from": "agent",
+      "replies": []
+    },
+    "job.preempted": {
+      "from": "agent",
+      "replies": []
+    },
+    "job.cancel": {
+      "from": "server",
+      "replies": ["ack"],
+      "timeoutMs": 1000
+    },
+    "control.pause": {
+      "from": "server",
+      "replies": ["ack"],
+      "timeoutMs": 1000
+    },
+    "control.resume": {
+      "from": "server",
+      "replies": ["ack"],
+      "timeoutMs": 1000
+    },
+    "control.kill": {
+      "from": "server",
+      "replies": ["ack"],
+      "timeoutMs": 1000
+    },
+    "config.update": {
+      "from": "server",
+      "replies": ["ack"],
+      "timeoutMs": 1000
+    },
+    "model.ensure": {
+      "from": "server",
+      "replies": ["ack"],
+      "timeoutMs": 1000
+    },
+    "model.status": {
+      "from": "agent",
+      "replies": []
+    },
+    "update.available": {
+      "from": "server",
+      "replies": ["ack"],
+      "timeoutMs": 1000
+    },
+    "ack": {
+      "from": "agent",
+      "replies": []
+    },
+    "error": {
+      "from": "both",
+      "replies": []
+    }
+  },
+  "http": {
+    "enroll.start.request": {
+      "from": "agent",
+      "method": "POST",
+      "path": "/api/agent/enroll/start",
+      "replies": ["enroll.start.response", "enroll.error"]
+    },
+    "enroll.start.response": {
+      "from": "server",
+      "method": "POST",
+      "path": "/api/agent/enroll/start",
+      "replies": []
+    },
+    "enroll.complete.request": {
+      "from": "agent",
+      "method": "POST",
+      "path": "/api/agent/enroll/complete",
+      "replies": ["enroll.complete.response", "enroll.error"]
+    },
+    "enroll.complete.response": {
+      "from": "server",
+      "method": "POST",
+      "path": "/api/agent/enroll/complete",
+      "replies": []
+    },
+    "enroll.error": {
+      "from": "server",
+      "method": "POST",
+      "path": "/api/agent/enroll/*",
+      "replies": []
+    }
+  }
+}
