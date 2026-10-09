@@ -26,6 +26,7 @@ export {
   type VerdictCode,
 } from './codec.js';
 export { isSupportedProtocolHash, SUPPORTED_PROTOCOL_HASHES } from './compat.js';
+export { capabilitiesDigest } from './digest.js';
 export * from './generated/protocol.js';
 export {
   AUTH_DOMAIN,

@@ -293,8 +293,10 @@ describe('check-docs: required files', () => {
     ]);
   });
 
-  it('lists every S01 design document', () => {
+  it('lists every S01/S02 design document', () => {
     expect(REQUIRED_FILES).toContain('docs/THREAT_MODEL.md');
-    expect(REQUIRED_FILES.filter((f) => f.startsWith('docs/adr/'))).toHaveLength(15);
+    expect(REQUIRED_FILES).toContain('docs/PROTOCOL.md');
+    expect(REQUIRED_FILES).toContain('docs/adr/0017-*.md');
+    expect(REQUIRED_FILES.filter((f) => f.startsWith('docs/adr/'))).toHaveLength(16);
   });
 });

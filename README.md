@@ -22,8 +22,9 @@ pnpm verify --only=go    # Go 단계만 (--only=ts 는 TS·문서 단계만)
 |---|---|
 | `apps/server` | Fastify 서버 (현재 `GET /healthz`만) |
 | `apps/web` | 웹 자리표시 (Next.js는 S23) |
-| `apps/agent` | Go 에이전트 `binjari/agent` (`go run ./cmd/binjari-agent version`) |
-| `packages/shared` · `packages/protocol` | 공용 유틸 · 프로토콜 스키마 (자리표시) |
+| `apps/agent` | Go 에이전트 `binjari/agent` (`go run ./cmd/binjari-agent version`). `internal/protocol`은 같은 스키마로 검증하는 Go 쪽 계약 |
+| `packages/shared` | 공용 유틸(UUIDv7, 전송 시각 형식). 돈 유틸은 S06 |
+| `packages/protocol` | 에이전트⇄서버 프로토콜: JSON Schema 원천, 생성 TS 타입·검증기, fixture, 서명 벡터([docs/PROTOCOL.md](docs/PROTOCOL.md)). 스키마를 고치면 `pnpm --filter @binjari/protocol gen` |
 | `packages/testkit` | 테스트 DB(`startTestDatabase`, `createIsolatedDatabase`)와 공용 Vitest 설정 |
 | `tools/repo-checks` | 저장소 규칙 테스트(린트 금지 규칙 증명, verify 판정, 문서 검사, CI 설정) |
 | `scripts/` | `verify.mjs`, `check-docs.mjs`, 진행 보드(`board.mjs`, `status.mjs`) |

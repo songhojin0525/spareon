@@ -2,6 +2,8 @@ package protocol
 
 import (
 	"bytes"
+	"encoding/json"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -119,5 +121,28 @@ func TestInlineTextLimitBoundary(t *testing.T) {
 	}
 	if _, err := c.EncodeMessage(offer(atLimit+"a"), SideServer); err == nil {
 		t.Fatal("one byte over the limit accepted")
+	}
+}
+
+func TestCapabilitiesDigestVectors(t *testing.T) {
+	var v struct {
+		Cases []struct {
+			Fixture string `json:"fixture"`
+			Digest  string `json:"digest"`
+		} `json:"cases"`
+	}
+	if err := json.Unmarshal(readFile(t, filepath.Join(fixtureDir, "vectors", "digests.json")), &v); err != nil {
+		t.Fatal(err)
+	}
+	c := mustCodec(t)
+	for _, tc := range v.Cases {
+		m, derr := c.DecodeMessage(readFile(t, filepath.Join(fixtureDir, filepath.FromSlash(tc.Fixture))), SideServer, DecodeOptions{})
+		if derr != nil {
+			t.Fatal(derr)
+		}
+		got, err := CapabilitiesDigest(m.Payload.(*CapabilitiesPayload))
+		if err != nil || got != tc.Digest {
+			t.Fatalf("%s: digest %s, want %s (%v)", tc.Fixture, got, tc.Digest, err)
+		}
 	}
 }

@@ -1,0 +1,13 @@
+{
+  "description": "hello.capabilitiesDigest = SHA-256 of the canonical JSON of the capabilities payload. TS and Go must match.",
+  "cases": [
+    {
+      "fixture": "valid/capabilities/basic.json",
+      "digest": "0cdc226f30e26bf54d847fbc9fa78b476817fa5aa13687d9aa63a32261cf50b9"
+    },
+    {
+      "fixture": "valid/capabilities/no-gpu.json",
+      "digest": "70cb636d5646898337f1c663e1cf6df6c2b51c5ae4efca3b11e5ee257ef424ac"
+    }
+  ]
+}

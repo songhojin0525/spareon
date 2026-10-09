@@ -1064,6 +1064,12 @@ BUSINESS_CONTEXT의 사업 결정은 뒤집지 않았다. 아래는 차수 명�
 | D21 | 외부 호출 재시도·끊김 규칙 미정(S16) | 처리 전 실패가 확실할 때만 재시도. 구매자 끊김은 제공사 usage 기준 과금. Mock은 KRW 기입 없음, CR 과금 0. 요청 상한 T37 | 이중 청구, 비스트리밍 외부 요청을 끊어 공짜로 쓰는 경로, Mock 응답에 실제 자금을 쓰는 경로 차단(THREAT_MODEL EXT-07, EXT-08) | S16 |
 | D22 | 검증 작업 비용은 '음수 허용' 계정에서(S06) | 플랫폼 매출에서 예약해 지급. 미확인 매장 카나리아는 TCR | 음수 허용 계정이 무에서 CR을 만드는 통로가 되고, 미확인 가짜 매장이 카나리아만으로 정산 대상 CR을 번다 | S06, S13 |
 | D23 | 정산 기록 뒤의 원장 처리 없음(S06) | `PAYOUT_SETTLED`로 정산 처리 중을 없애고 준비금을 줄인다. 정산 기록은 수익 건별 연결 | 준비금이 실제 은행 잔고보다 계속 커서 준비금 가드가 거짓 여유를 본다 | S06, S26 |
+| D24 | `job.offer.params`의 `temperature`·`topP`(S02) | 프로토콜 숫자는 정수만: `temperatureMilli`(0~2000)·`topPMilli`(1~1000). 구매자 API의 실수 값은 서버 경계(S14)에서 한 번 바꾼다 | JS는 `5.0000000000000001`을 정수 5로, Go는 정수 아님으로 읽는다. 정수만 쓰면 TS·Go 판정이 언제나 같다(ADR 0017) | S02, S12, S14, S17 |
+| D25 | `job.offer`의 `deadline`(S02) | 절대 시각 대신 `timeLimitMs`(받은 순간부터의 상대 시간) | 에이전트는 서버 시계와 자기 시계를 비교하지 않는다(7절). 마감 판정은 서버 시계로 서버가 한다 | S02, S12, S17 |
+| D26 | 진행 보고 메시지 없음(S02) | `job.progress`(attemptId, tokensSoFar) 추가. 청크를 보내지 않는 동안 10초마다 | 비스트리밍 작업에도 T35(진행 없음 제한)를 적용하려면 생성 중이라는 신호가 필요하다(D16) | S02, S12, S17 |
+| D27 | 명령 확인 메시지 없음(S02, 4.9 `확인(ack)`) | `ack`(result, code?) 추가. `job.cancel`·`control.*`·`config.update`·`model.ensure`·`update.available`에 `corr`로 1초(T15) 안에 응답 | ack 없이 명령을 성공 처리하면 킬스위치가 전달됐다고 착각한다(S11 검토 포인트) | S02, S11, S17 |
+| D28 | `job.complete`의 `outputRef`는 정의 없음(S02) | `outputRef = {kind: "chunks", chunkCount}` = "출력은 `job.chunk` 0..N−1을 이어붙인 것". 256 KiB 넘는 출력은 청크로 보낸다. 별도 업로드 경로 없음 | 업로드 엔드포인트·토큰 없이 큰 출력을 처리하고, 서버가 받은 청크만 근거로 쓴다(ADR 0009) | S02, S12, S17 |
+| D29 | `hello`에 지문 없음(S02) | `hello`에 `fpStore`·`fpGlobal`(D3), `auth.ok`에 `control`(현재 제어 상태)·`needCapabilities`, `heartbeat.ack`·`auth.ok`에 `serverTime` | 인증 때마다 '같은 키 + 다른 지문' 복제 탐지(ADR 0008), 재연결 즉시 Paused(4.9), 서버 시각 기반 일정(7절) | S02, S10, S11, S17 |
 
 사업 쪽에 남기는 관찰(결정은 사람 몫, HUMAN_TODO 후보):
 - 사장님 수익은 원장에서 CR이고 지급은 원화다. 어느 시점 환율로 바꿀지(지급 기록 시점 권장)와 세금 처리는 미정이다.

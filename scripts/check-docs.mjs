@@ -33,14 +33,15 @@ export const ADR_SECTIONS = ['맥락', '결정', '검토한 대안', '결과와 
 export const STAGE_STATUSES = ['TODO', 'IN_PROGRESS', 'DONE', 'DONE_NEEDS_HUMAN', 'BLOCKED'];
 const REPORT_STATUSES = ['DONE', 'DONE_NEEDS_HUMAN', 'BLOCKED', 'IN_PROGRESS'];
 
-/** Design documents later stages rely on (S01). Checked by the CLI run, not by checkDocs() defaults. */
+/** Design documents later stages rely on (S01; S02 adds PROTOCOL.md and ADR 0017). Checked by the CLI run, not by checkDocs() defaults. */
 export const REQUIRED_FILES = [
   'docs/ARCHITECTURE.md',
   'docs/THREAT_MODEL.md',
   'docs/MVP.md',
   'docs/GLOSSARY.md',
   'docs/KNOWN_UNKNOWNS.md',
-  ...Array.from({ length: 15 }, (_, i) => `docs/adr/${String(i + 2).padStart(4, '0')}-*.md`),
+  'docs/PROTOCOL.md',
+  ...Array.from({ length: 16 }, (_, i) => `docs/adr/${String(i + 2).padStart(4, '0')}-*.md`),
 ];
 
 /** Who may trigger a state transition (ARCHITECTURE.md state machines). */

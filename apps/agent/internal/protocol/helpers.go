@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -101,4 +102,19 @@ func SanitizeDiagnostic(s string) string {
 	return sanitize(s, 256, func(r rune) bool {
 		return isAlnum(r) || strings.ContainsRune(" ()._,:/+#@=[]-", r)
 	}, "")
+}
+
+// CapabilitiesDigest is hello.capabilitiesDigest: SHA-256 of the canonical JSON of the capabilities
+// payload (TS twin: capabilitiesDigest).
+func CapabilitiesDigest(p *CapabilitiesPayload) (string, error) {
+	raw, err := marshal(p)
+	if err != nil {
+		return "", fmt.Errorf("capabilities digest: %w", err)
+	}
+	canonical, err := CanonicalizeJSONText(raw)
+	if err != nil {
+		return "", fmt.Errorf("capabilities digest: %w", err)
+	}
+	sum := sha256.Sum256(canonical)
+	return hex.EncodeToString(sum[:]), nil
 }
