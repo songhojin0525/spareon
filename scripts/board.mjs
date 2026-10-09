@@ -11,7 +11,8 @@
 // 옵션: --port 4545  --interval 2  --ascii (막대·표시가 깨져 보이면)  --no-color  --rows 40 --cols 100 (--once 크기)
 //
 // 읽는 것: prompts/STAGES.md(차수 목록·의존), PROGRESS.md(공식 상태), .runner/board/*.json(실시간 진행률),
-//          .runner/events.jsonl(활동 기록), .runner/STATUS, HUMAN_TODO.md, git log
+//          .runner/events.jsonl(활동 기록), .runner/STATUS, HUMAN_TODO.md, git log,
+//          .runner/usage.json(Claude 사용량: scripts/statusline.mjs가 Claude Code 상태줄에서 기록)
 // 웹 보드의 agents 패널: orchestrator(지휘자) ↔ 차수 서브에이전트 ↔ 검토 서브에이전트 사이의 메시지를 활동 기록에서 재구성한다
 //          (status.mjs msg로 남긴 메시지는 그대로, 나머지는 start·checkpoint·phase·finish 기록에서 추정)
 
@@ -422,6 +423,18 @@ function buildAgents(rows, events, runnerState) {
   return { orc, stages, messages: msgs.slice(-40).reverse(), summary: { done, total: rows.length, run: run ? { id: run.id, pct: run.percent } : null } };
 }
 
+// Claude 사용 한도(5시간 세션·주간). scripts/statusline.mjs가 Claude Code 상태줄 입력에서 받아 적어 둔 값이다.
+function loadUsage() {
+  try {
+    const u = JSON.parse(readText(P('.runner', 'usage.json')));
+    if (!u || !u.at) return null;
+    const ok = (w) => (w && Number.isFinite(w.usedPct) ? { usedPct: w.usedPct, resetsAt: w.resetsAt ?? null } : null);
+    return { at: u.at, fiveHour: ok(u.fiveHour), sevenDay: ok(u.sevenDay), model: u.model ?? null };
+  } catch {
+    return null;
+  }
+}
+
 function loadTodos() {
   const md = readText(P('HUMAN_TODO.md'));
   if (!md) return { open: [], done: 0 };
@@ -567,6 +580,7 @@ function buildState() {
     events: events.reverse(),
     todos: { open: todos.open.slice(0, 12), openCount: todos.open.length, done: todos.done },
     commits: loadCommits(),
+    usage: loadUsage(),
     agents: buildAgents(rows, agentEvents, runner.state),
     hasStages: rows.length > 0,
   };
@@ -709,6 +723,8 @@ function renderTerminal(st, cols, rows) {
   L.push(` overall ${bar(st.overall, 24, green)} ${bold(st.overall + '%')}  ${green('done ' + (c.DONE + c.DONE_NEEDS_HUMAN) + '/' + st.total)}${c.DONE_NEEDS_HUMAN ? yellow(` (확인필요 ${c.DONE_NEEDS_HUMAN})`) : ''} · ${cyan('running ' + c.IN_PROGRESS)} · ${c.BLOCKED ? red('blocked ' + c.BLOCKED) : 'blocked 0'} · left ${c.TODO}`);
   const rc = st.runner.state === 'working' ? cyan : st.runner.state === 'stalled' ? yellow : st.runner.state === 'finished' ? green : gray;
   L.push(` orchestrator ${rc((ASCII ? '* ' : '● ') + st.runner.label)}${st.runner.lastActivity ? gray(' · last activity ' + agoEn(st.runner.lastActivity)) : ''}`);
+  const ub = usageBits(st.usage, { bars: true });
+  L.push(' claude       ' + (ub.length ? ub.join(gray('  ·  ')) : gray('사용량 정보 없음 — Claude Code 상태줄이 아직 기록하지 않았어요 (scripts/statusline.mjs)')));
   if (st.workers.length) {
     L.push(' workers      ' + st.workers.map((w) => `${w.worker}${gray(' › ')}${cyan(w.stage)} ${w.percent}%${w.stale ? yellow(' (멈춘 듯)') : ''}`).join(gray('  |  ')));
   }
@@ -760,6 +776,31 @@ function renderTerminal(st, cols, rows) {
     for (const t of st.todos.open.slice(0, todoN)) L.push(`  ${yellow(ASCII ? '[ ]' : '□')} ${fit(t, cols - 7)}`);
   }
   return L.slice(0, Math.max(10, rows || L.length)).map((l) => l.replace(/\s+$/, '')).join('\n');
+}
+
+// 사용 한도 한 조각: '5시간 77% 남음 ↻2h10m'
+function untilShort(iso) {
+  if (!iso) return '';
+  const ms = Date.parse(iso) - Date.now();
+  if (!(ms > 0)) return '곧';
+  const m = Math.round(ms / 60_000);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  return h < 24 ? `${h}h${pad2(m % 60)}m` : `${Math.floor(h / 24)}d${h % 24}h`;
+}
+function usageBits(u, { bars = false } = {}) {
+  if (!u) return [];
+  const out = [];
+  for (const [label, w] of [['5시간', u.fiveHour], ['주간', u.sevenDay]]) {
+    if (!w) continue;
+    const left = 100 - w.usedPct;
+    const tone = w.usedPct >= 85 ? red : w.usedPct >= 60 ? yellow : green;
+    const b = bars ? ' ' + bar(left, 10, tone) : '';
+    out.push(`${gray(label)}${b} ${tone(`${left}% 남음`)}${w.resetsAt ? gray(` ↻${untilShort(w.resetsAt)}`) : ''}`);
+  }
+  const age = Date.now() - Date.parse(u.at);
+  if (out.length && age > 15 * 60_000) out.push(gray(`(${hhmm(u.at)} 기준)`));
+  return out;
 }
 
 // ───────────────────────── 터미널 에이전트 화면 ─────────────────────────
@@ -929,7 +970,8 @@ function renderAgents(st, cols, rows, view) {
   const ag = st.agents;
   const now = view.now;
   const head = ` ${AGC.orc((ASCII ? '* ' : '✻ ') + 'binjari')} ${bold('agents')} ${gray('· orchestrator ↔ subagents')}`;
-  const right = gray(`${hhmm(st.now)} · a board · q quit`);
+  const ub = usageBits(st.usage);
+  const right = (ub.length ? ub.join(gray(' · ')) + gray('   ') : '') + gray(`${hhmm(st.now)} · a board · q quit`);
   const L = [head + ' '.repeat(Math.max(1, W - width(head) - width(right) - 1)) + right];
   if (!ag) return L.join('\n');
 
@@ -1291,6 +1333,15 @@ body{
 .pulse{width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 0 0 var(--acc);animation:ping 1.8s infinite}
 .pulse.off{background:var(--bad);animation:none}
 @keyframes ping{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--acc) 70%,transparent)}80%{box-shadow:0 0 0 9px transparent}100%{box-shadow:0 0 0 0 transparent}}
+.usage{display:flex;align-items:center;gap:14px;font-size:12px;color:var(--muted);white-space:nowrap}
+.usage .um{display:flex;align-items:center;gap:6px}
+.usage .ut2{width:56px;height:5px;border-radius:3px;background:var(--track);overflow:hidden}
+.usage .ut2 i{display:block;height:100%;border-radius:3px;background:var(--uc,var(--done))}
+.usage .uv{color:var(--uc,var(--done));font-weight:700;font-variant-numeric:tabular-nums}
+.usage .ur2{color:var(--faint)}
+.usage.stale{opacity:.6}
+@media (max-width:900px){.usage .ut2,.usage .ur2{display:none}}
+@media (max-width:620px){.usage{display:none}}
 .iconbtn{font:inherit;font-size:12px;color:var(--muted);background:transparent;border:1px solid var(--line2);border-radius:8px;padding:3px 9px;cursor:pointer}
 .iconbtn:hover{color:var(--text);border-color:var(--muted)}
 
@@ -1482,6 +1533,7 @@ body{
 <div class="wrap">
   <div class="top">
     <div class="brand"><span class="logo" aria-hidden="true">✻</span><b>BINJARI</b><span class="cap" id="proj">mission control</span></div>
+    <div class="usage ko" id="usage" title="Claude 사용 한도 (Claude Code 상태줄에서 받은 값)"></div>
     <div class="live"><span class="pulse" id="pulse"></span><span id="clock">connecting…</span><button class="iconbtn" id="theme" type="button" title="Toggle theme">◐</button></div>
   </div>
   <div class="warn ko" id="warn"></div>
@@ -1771,10 +1823,29 @@ body{
   }, 1000);
   window.addEventListener('resize', drawLinks);
 
+  function untilShort(iso){ if (!iso) return ''; var ms = Date.parse(iso) - Date.now(); if (!(ms > 0)) return '곧'; var m = Math.round(ms / 60000); if (m < 60) return m + 'm'; var h = Math.floor(m / 60); return h < 24 ? h + 'h' + pad(m % 60) + 'm' : Math.floor(h / 24) + 'd' + (h % 24) + 'h'; }
+  function renderUsage(u){
+    var box = $('usage'); clear(box);
+    if (!u) { box.appendChild(el('span', 'ur2', '사용량 정보 없음')); box.title = 'Claude Code 상태줄(scripts/statusline.mjs)이 아직 사용량을 기록하지 않았어요'; return; }
+    box.className = 'usage ko' + (Date.now() - Date.parse(u.at) > 15 * 60000 ? ' stale' : '');
+    box.title = 'Claude 사용 한도 · ' + hhmm(u.at) + ' 기준' + (u.model ? ' · ' + u.model : '');
+    [['5시간', u.fiveHour], ['주간', u.sevenDay]].forEach(function(x){
+      var w = x[1]; if (!w) return;
+      var left = 100 - w.usedPct, col = w.usedPct >= 85 ? 'var(--bad)' : w.usedPct >= 60 ? 'var(--warn)' : 'var(--done)';
+      var m = el('span', 'um'); m.style.setProperty('--uc', col);
+      m.appendChild(el('span', null, x[0]));
+      var t = el('span', 'ut2'); var i = el('i'); i.style.width = left + '%'; t.appendChild(i); m.appendChild(t);
+      m.appendChild(el('span', 'uv', left + '% 남음'));
+      if (w.resetsAt) m.appendChild(el('span', 'ur2', '↻' + untilShort(w.resetsAt)));
+      box.appendChild(m);
+    });
+  }
+
   function render(st){
     $('pulse').className = 'pulse';
     $('clock').textContent = 'LIVE · ' + hhmm(st.now) + ' · ' + (POLL/1000) + 's';
     $('proj').textContent = 'mission control · ' + st.project;
+    renderUsage(st.usage);
     renderAgents(st);
     var w = $('warn'); w.className = 'warn ko'; w.textContent = '';
     if (!st.hasStages) { w.textContent = '⚠ prompts/STAGES.md를 찾지 못했습니다. 저장소 맨 위 폴더에서 보드를 실행하세요.'; w.className = 'warn ko on'; }

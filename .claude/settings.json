@@ -87,5 +87,10 @@
       "Read(./.env)",
       "Read(./.env.production)"
     ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "node scripts/statusline.mjs",
+    "refreshInterval": 60
   }
 }
