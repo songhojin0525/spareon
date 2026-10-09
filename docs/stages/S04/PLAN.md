@@ -49,7 +49,7 @@
 
 ### D-h. TS 가짜 에이전트 `FakeAgent`(testkit)
 - 같은 프로토콜(코덱·서명·개발용 신원)을 쓰는 TS 구현. Node 22 내장 `WebSocket`을 써서 의존성을 늘리지 않는다. 테스트용 행동 옵션: 수락 안 함, 수락 뒤 침묵, 완료 두 번 보내기, 재시도 가능 실패, 지연.
-- testkit이 `@binjari/protocol`에 의존하게 된다(protocol은 testkit을 devDependency로 vitest 설정에만 씀 → 개발 의존성 순환). pnpm이 허용하는지 확인하고, 문제가 되면 FakeAgent를 별도 하위 경로로 분리한다.
+- testkit이 `@binjari/protocol`을 import하면 순환이 생긴다(protocol이 vitest 설정 때문에 testkit을 devDependency로 씀). 확인해 보니 pnpm이 `pnpm -r run typecheck`를 `ERR_PNPM_TASK_CYCLE`로 거부한다. 그래서 FakeAgent는 프로토콜 함수(코덱·서명·개발용 신원)를 **주입받는다**(`new FakeAgent({ protocol })`, 호출하는 쪽이 `import * as protocol from '@binjari/protocol'`을 넘김). testkit은 프로토콜을 모르는 채로 남고 패키지 그래프에 순환이 없다. 메시지 모양은 encode 때 스키마가 검사한다.
 
 ### D-i. 서버 모듈 배치 (ARCHITECTURE 2.1 이름)
 `lib`(config·ids·crypto), `ledger/skeleton.ts`(돈 — 린트의 money 규칙 적용), `gateway/`(WS 세션·개발용 인증), `scheduler/`(배정·수명·청소), `buyerApi/`(chat completions), `fleet/`(노드 상태), `skeleton/bootstrap.ts`(개발용 매장·구매자·충전), `dev/dashboard.ts`. 각 단순화 지점에 `SKELETON(SNN)`.

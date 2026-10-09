@@ -1,0 +1,70 @@
+{
+  "description": "S04 development identity (SKELETON(S10)); TS dev-identity.ts and Go internal/devauth must agree.",
+  "cases": [
+    {
+      "secret": "dev-agent-secret-0123456789abcdef",
+      "name": "friend-pc-1",
+      "nodeId": "019b76da-a800-75fd-927b-f75287937db3",
+      "seedHex": "d3e9711d3e54bf56a2ff7d956f7062cd998537ee47d8056105f43ad5be1a8bb4",
+      "publicKey": "a392c8d616840dfb8dc3752c6c8542bf52288875f3d3a47ffc1c866000f3a201",
+      "fpStore": "f801d9319d6d1714f3d848a3448588fd069da5dabf42bdd7809941567010fda6",
+      "fpGlobal": "68a4beaf28945bf4f207dfe1ad77ddec22fd3d3162aa869793cb01d83fc8118d",
+      "authNonce": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+      "authProtocolHash": "c67e072c232742c69718f4e49fa18fdc44f2fc65f61a165e6277af3173e5c6ff",
+      "authSignature": "3ef92e72a91a16ed8bb481c8e0b05b5003eeff6fab0013cb4dc2d1fcb8507ad069113ea8ddc2123782f0f980290943b762627ab793f153fa0e4dda704567950b"
+    },
+    {
+      "secret": "dev-agent-secret-0123456789abcdef",
+      "name": "friend-pc-2",
+      "nodeId": "019b76da-a800-7994-ad71-492c0555c5be",
+      "seedHex": "aaa9020f162a819ea1e04fc12e0e507991ea8cfe66ccc33ba57a39f5814ca384",
+      "publicKey": "f4b4d0414e3693dfa819f69ed17fe40fc81e6e8426deb51c730505fc18eb4cde",
+      "fpStore": "3633c4cb29bcf7f43508a608949365b317cf49bfc9efb664d79cc521e1140e1f",
+      "fpGlobal": "d37de64ad331432c9046267f827388609943cbe34c0bd14aead114b1cfe13fcd",
+      "authNonce": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+      "authProtocolHash": "c67e072c232742c69718f4e49fa18fdc44f2fc65f61a165e6277af3173e5c6ff",
+      "authSignature": "9682fe6bac26a914e41bfbd23b0251970f6b7906fd48c7a7f99242fad40bb87bce04b78013d268e29878e3be4bf605c9f3c5ba6ec37b3446ab562fc34f82da0a"
+    },
+    {
+      "secret": "한글 비밀값도 UTF-8 바이트로 쓴다 0123456789",
+      "name": "A.b_c-9",
+      "nodeId": "019b76da-a800-7914-a872-6dc06a1e32ae",
+      "seedHex": "527c6afa1861cb52151b28d835e2e6f845462b4a9be27591ee84d8ea0995af69",
+      "publicKey": "daa525573c3e1aeff13ed5354ff42734ea0300ceae5cae28d0aa2ff340bb69ab",
+      "fpStore": "75cb7dd781876a63a2fb284e97fe185dc85d95a8b978165b2902d4593c953e14",
+      "fpGlobal": "b14bd9e9b3ff30d3626d28263d0cbf8c424dcb8e7a5dff8f74c931bffb38159f",
+      "authNonce": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+      "authProtocolHash": "c67e072c232742c69718f4e49fa18fdc44f2fc65f61a165e6277af3173e5c6ff",
+      "authSignature": "f5d8b734678d9d202344043d2d89e35d6bd54cda3430560d2f663a82552661ab33e1d9894333acff6501f033fcbafa5ec78143b05e3da343996463c169a46e0c"
+    },
+    {
+      "secret": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "name": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",
+      "nodeId": "019b76da-a800-7e62-85b1-954061f54a0e",
+      "seedHex": "1b49df93a8a6edfa52bf2941fe1c2becdda6c41962bdf8374d387236cbbaec87",
+      "publicKey": "97e1412144b843cf13f1fa74387e10816ea291ee10e7ddac9a9db5ef77612e6c",
+      "fpStore": "3775addfc7765b2242027133a4fcaab0ce03eaa799c6d94424ddeece175e0d0e",
+      "fpGlobal": "fe72369ddd5a4b45a08bdcf946efd61dd94f39c7c54ded403ae2eb757755a00d",
+      "authNonce": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+      "authProtocolHash": "c67e072c232742c69718f4e49fa18fdc44f2fc65f61a165e6277af3173e5c6ff",
+      "authSignature": "eabb4cd3f913e11316c9a6f8edd9cf391910a079c6600128a5565ce875466b7dcbb04813aa9ac34118b63098a4ebff1fa9666a094a83729d1c50c6ecac31c609"
+    }
+  ],
+  "models": [
+    {
+      "id": "fake-echo",
+      "sha256": "a47abb9f8a791dd9784163dbb3e41667220bc9707d27d8a81210fd9f40d5d1dd"
+    },
+    {
+      "id": "qwen2.5-0.5b",
+      "sha256": "9c7b6c432054a677d392e3708f4fbaee52bf24a3c51958705627eef75dff20e8"
+    }
+  ],
+  "invalidNames": [
+    "",
+    "has space",
+    "colon:name",
+    "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",
+    "한글"
+  ]
+}

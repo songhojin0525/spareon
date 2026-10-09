@@ -15,7 +15,9 @@
     "db:seed": "tsx src/bin/seed.ts"
   },
   "dependencies": {
+    "@binjari/protocol": "workspace:*",
     "@binjari/shared": "workspace:*",
+    "@fastify/websocket": "catalog:",
     "drizzle-orm": "catalog:",
     "fastify": "catalog:",
     "pg": "catalog:",

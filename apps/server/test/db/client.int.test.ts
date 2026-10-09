@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { withTransaction } from '../../src/db/client.js';
+import { createDb, withTransaction } from '../../src/db/client.js';
 import { DbError, sqlState, toDbError } from '../../src/db/errors.js';
 import { openTestDb, type TestDb } from '../support/db.js';
 
@@ -154,5 +154,35 @@ describe('withTransaction (real Postgres)', () => {
     expect(failed).toHaveLength(1);
     expect(sqlState(failed[0]?.reason)).toBe('40001');
     expect(await count()).toBe(1);
+  });
+});
+
+describe('createDb role option (the server always runs as binjari_app)', () => {
+  let db: TestDb;
+
+  beforeAll(async () => {
+    db = await openTestDb();
+  });
+  afterAll(async () => {
+    await db.cleanup();
+  });
+
+  it('starts every pooled session as the given role, which cannot disable the ledger triggers', async () => {
+    const app = createDb({ url: db.url, role: 'binjari_app', maxConnections: 2 });
+    try {
+      const who = await app.pool.query<{ u: string }>('SELECT current_user AS u');
+      expect(who.rows[0]?.u).toBe('binjari_app');
+      const err = await app.pool.query('ALTER TABLE ledger_postings DISABLE TRIGGER ALL').then(
+        () => undefined,
+        (e: unknown) => e,
+      );
+      expect(sqlState(err)).toBe('42501');
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('refuses a role that is not a plain identifier', () => {
+    expect(() => createDb({ url: db.url, role: 'x; DROP' })).toThrow(/plain lowercase/);
   });
 });
