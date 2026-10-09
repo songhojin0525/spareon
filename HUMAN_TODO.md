@@ -24,7 +24,7 @@
 - [ ] (S03, 운영 DB를 고를 때 · S30 전) 쓰려는 관리형 Postgres(예: Supabase)의 관리 계정이 역할을 만들 수 있는지(`CREATEROLE`) 확인한다. 왜: 마이그레이션 `0002_app_role`이 최소 권한 역할 `binjari_app`을 만들고, 서버는 그 역할의 멤버로만 접속해야 원장 보호 트리거를 끌 수 없다(docs/DB.md 5절). 권한이 없으면 마이그레이션이 실패한다. 절차: 관리 계정으로 접속해 `SELECT rolcreaterole FROM pg_roles WHERE rolname = current_user;` → `t`인지 확인. `f`면 제공사 콘솔에서 `CREATE ROLE binjari_app NOLOGIN;`을 먼저 실행할 수 있는지 확인. 결과: S30 진행 전에 Claude에게 알려 준다(런북에 반영).
 
 ## 나중에 (차수가 진행되면 각 차수가 구체적인 절차를 추가한다)
-- [ ] Windows PC + NVIDIA GPU에서 실기 확인 (S18~S22, `docs/manual-tests/`)
+- [ ] Windows PC + GPU에서 실기 확인 (S18~S22, `docs/manual-tests/`). 지금은 AMD RX 5700 XT 1대로 Vulkan 경로를 확인한다(ADR 0019). CUDA 경로(세션 0 CUDA K1, nvidia-smi 전력 K8)는 NVIDIA PC가 생기면 확인한다. 보고할 때 GPU·백엔드를 함께 적는다.
 - [ ] 친구 PC 2~3대로 0단계 데모 (S04, `docs/DEMO_0.md`)
 - [ ] 오픈소스 모델 후보 확정과 라이선스 확인 (S09, `docs/MODEL_CANDIDATES.md`)
 - [ ] 실제 GPU에서 모델별 처리량(tokens/s)·전력 측정 → 경제 시뮬레이터 갱신 (S19 → S07)

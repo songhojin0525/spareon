@@ -162,7 +162,7 @@ flowchart BT
 | `runtime` | `Runtime` 인터페이스 + `llamacpp`(운영) · `ollama`(개발) · `fake`(테스트), Job Object/프로세스 그룹 | S17, S19 |
 | `presence` | 헬퍼 실행·감시, 파이프 IPC, 전체 화면·GPU 3D 사용 감지 (`presence/windows`) | S18 |
 | `policy` | 적격 판정 순수 함수(진리표 테스트), 데드맨 스위치용 '적격 임대' | S18 |
-| `gpu` | nvidia-smi 질의·파서, 프로세스별 VRAM, 온도·전력 | S19 |
+| `gpu` | `nvidia`(nvidia-smi 질의·파서) · `windows`(제조사 무관: DXGI 어댑터, 성능 카운터 `GPU Process Memory`로 프로세스별 VRAM — AMD 시험 노드, ADR 0019), 온도·전력(AMD는 '모름') | S19 |
 | `cache` | 아티팩트 내려받기(이어받기·검증·LRU·대역폭), LAN 캐시 서버·클라이언트 | S19, S20 |
 | `update` | 업데이트 매니페스트 검증, `binjari-updater`와 협력(버전 폴더·포인터·롤백) | S21 |
 | `metrics` | 구조화 로그(콘텐츠 금지·회전), 지표(상태 체류, 선점 지연 3구간), `status`로 서버 보고 | S17 |

@@ -140,5 +140,5 @@
 | 목표 | 측정 전인 값. 측정값처럼 쓰지 않는다(절대 규칙 8) |
 | 가정 | 근거가 부족해 합리적으로 정한 것. PROGRESS.md 가정 기록에 남긴다 |
 | `SKELETON(SNN)` | 미완성 임시 구현 표시. v0.1 전에 0개 |
-| 실기 확인 | Windows + NVIDIA GPU 실제 PC에서 사람이 하는 확인(`docs/manual-tests/`) |
+| 실기 확인 | Windows + GPU 실제 PC에서 사람이 하는 확인(`docs/manual-tests/`). 기준 플랫폼은 NVIDIA(CUDA)이고, 지금 가진 시험 PC는 AMD RX 5700 XT(Vulkan, ADR 0019)라서 결과에 GPU·백엔드를 함께 적는다 |
 | 수용한 위험 | 완화하지 않기로 하고 이유를 적은 위협(THREAT_MODEL 7절) |
