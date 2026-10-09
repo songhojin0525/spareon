@@ -49,10 +49,22 @@ export type Decoded<T> =
       readonly detail: string;
       /** Envelope id when the envelope was valid, so an `error` reply can set `corr`. */
       readonly id?: string;
+      /** Envelope type when the envelope was valid (even if the type is unknown or misdirected). */
+      readonly type?: string;
+      /**
+       * Fail-safe for agents (PROTOCOL.md 4절): true when the receiver is the agent and the rejected
+       * message was a stop command (registry `onInvalid: "pause"`) or its type cannot be known
+       * (`message_too_large`, `malformed_json`, `invalid_envelope`). The agent then pauses as for
+       * control.pause. Always false for the server and for HTTP bodies.
+       */
+      readonly pause: boolean;
     };
 
 export interface DecodeOptions {
-  /** Overrides LIMITS.maxMessageBytes / LIMITS.maxHttpBodyBytes (configurable per deployment). */
+  /**
+   * Overrides LIMITS.maxMessageBytes / LIMITS.maxHttpBodyBytes (configurable per deployment). Zero or
+   * negative means the default, the same as Go's DecodeOptions.MaxBytes.
+   */
   readonly maxBytes?: number;
 }
 
@@ -67,7 +79,7 @@ export class ProtocolEncodeError extends Error {
 }
 
 interface Registries {
-  messages: Record<string, { from: string }>;
+  messages: Record<string, { from: string; onInvalid?: string }>;
   http: Record<string, { from: string }>;
 }
 type Limits = Record<string, number>;
@@ -135,6 +147,9 @@ export function createCodec(bundle: ProtocolBundle = defaultBundle()): ProtocolC
     return n;
   };
   const maxInline = limit('maxInlineTextBytes');
+  /** A positive maxBytes overrides the limit; absent, zero or negative means the protocol default (as in Go). */
+  const maxBytesOr = (opts: DecodeOptions, name: string): number =>
+    opts.maxBytes !== undefined && opts.maxBytes > 0 ? opts.maxBytes : limit(name);
 
   const sizeOf = (data: Uint8Array | string): number =>
     typeof data === 'string' ? utf8Length(data) : data.length;
@@ -144,36 +159,44 @@ export function createCodec(bundle: ProtocolBundle = defaultBundle()): ProtocolC
     receiver: Side,
     opts: DecodeOptions = {},
   ): Decoded<ProtocolMessage> {
-    const max = opts.maxBytes ?? limit('maxMessageBytes');
+    const max = maxBytesOr(opts, 'maxMessageBytes');
+    const toAgent = receiver === 'agent';
     const size = sizeOf(data);
-    if (size > max) return { ok: false, code: 'message_too_large', detail: `${size} > ${max}` };
+    if (size > max) {
+      return { ok: false, code: 'message_too_large', detail: `${size} > ${max}`, pause: toAgent };
+    }
     const parsed = parseStrictJson(data);
-    if (!parsed.ok) return { ok: false, code: 'malformed_json', detail: parsed.reason };
+    if (!parsed.ok) {
+      return { ok: false, code: 'malformed_json', detail: parsed.reason, pause: toAgent };
+    }
     const msg = parsed.value;
     if (!v.envelope(msg) || !isRecord(msg)) {
-      return { ok: false, code: 'invalid_envelope', detail: errorsText(v.envelope) };
+      return {
+        ok: false,
+        code: 'invalid_envelope',
+        detail: errorsText(v.envelope),
+        pause: toAgent,
+      };
     }
     const type = msg['type'] as string;
     const id = msg['id'] as string;
-    const info = registry.messages[type];
+    const info = Object.hasOwn(registry.messages, type) ? registry.messages[type] : undefined;
     const validate = v.messages.get(type);
     if (info === undefined || validate === undefined) {
-      return { ok: false, code: 'unknown_type', detail: type, id };
+      return { ok: false, code: 'unknown_type', detail: type, id, type, pause: false };
     }
     if (info.from !== 'both' && info.from === receiver) {
-      return { ok: false, code: 'wrong_direction', detail: `${type} is sent by ${info.from}`, id };
+      const detail = `${type} is sent by ${info.from}`;
+      return { ok: false, code: 'wrong_direction', detail, id, type, pause: false };
     }
+    const pause = toAgent && info.onInvalid === 'pause';
     if (!validate(msg)) {
-      return { ok: false, code: 'invalid_payload', detail: errorsText(validate), id };
+      return { ok: false, code: 'invalid_payload', detail: errorsText(validate), id, type, pause };
     }
     const inline = inlineTextBytes(type, msg['payload']);
     if (inline > maxInline) {
-      return {
-        ok: false,
-        code: 'invalid_payload',
-        detail: `inline text ${inline} > ${maxInline}`,
-        id,
-      };
+      const detail = `inline text ${inline} > ${maxInline}`;
+      return { ok: false, code: 'invalid_payload', detail, id, type, pause };
     }
     return { ok: true, value: msg as unknown as ProtocolMessage };
   }
@@ -185,13 +208,16 @@ export function createCodec(bundle: ProtocolBundle = defaultBundle()): ProtocolC
   ): Decoded<HttpBodyMap[N]> {
     const validate = v.http.get(name);
     if (validate === undefined) throw new Error(`unknown http body ${name}`);
-    const max = opts.maxBytes ?? limit('maxHttpBodyBytes');
+    const max = maxBytesOr(opts, 'maxHttpBodyBytes');
     const size = sizeOf(data);
-    if (size > max) return { ok: false, code: 'message_too_large', detail: `${size} > ${max}` };
+    if (size > max) {
+      return { ok: false, code: 'message_too_large', detail: `${size} > ${max}`, pause: false };
+    }
     const parsed = parseStrictJson(data);
-    if (!parsed.ok) return { ok: false, code: 'malformed_json', detail: parsed.reason };
+    if (!parsed.ok)
+      return { ok: false, code: 'malformed_json', detail: parsed.reason, pause: false };
     if (!validate(parsed.value)) {
-      return { ok: false, code: 'invalid_payload', detail: errorsText(validate) };
+      return { ok: false, code: 'invalid_payload', detail: errorsText(validate), pause: false };
     }
     return { ok: true, value: parsed.value as HttpBodyMap[N] };
   }

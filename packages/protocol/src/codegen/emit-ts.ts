@@ -87,7 +87,7 @@ export function emitTs(ir: ProtocolIR, protocolHash: string): string {
   out.push('export const MESSAGE_REGISTRY = {');
   for (const m of ir.messages) {
     out.push(
-      `  ${key(m.type)}: { from: ${q(m.from)}, corr: ${q(m.corr)}, replies: [${m.replies.map(q).join(', ')}], timeoutMs: ${m.timeoutMs === null ? 'null' : String(m.timeoutMs)} },`,
+      `  ${key(m.type)}: { from: ${q(m.from)}, corr: ${q(m.corr)}, replies: [${m.replies.map(q).join(', ')}], timeoutMs: ${m.timeoutMs === null ? 'null' : String(m.timeoutMs)}, onInvalid: ${q(m.onInvalid)} },`,
     );
   }
   out.push('} as const;', '');

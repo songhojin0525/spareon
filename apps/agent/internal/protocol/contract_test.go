@@ -146,6 +146,9 @@ func TestContractValidFixtures(t *testing.T) {
 			if !isHTTPBody(f.folder) {
 				receivers = c.Receivers(f.folder)
 			}
+			if len(receivers) == 0 {
+				t.Fatalf("folder %q is not a message type or http body", f.folder)
+			}
 			for _, r := range receivers {
 				v, derr := decodeFixture(c, f, r, 0)
 				if derr != nil {
@@ -192,6 +195,70 @@ func TestContractInvalidFixtures(t *testing.T) {
 				t.Fatalf("verdict %q, want %q", got, f.expect)
 			}
 		})
+	}
+}
+
+// TestAgentFailSafePause (same rule as the TS contract test): decoded by the agent, a rejection
+// pauses when the message's type cannot be known or it is a stop command (registry onInvalid
+// "pause"); the server never pauses. Type is reported whenever the envelope was valid.
+func TestAgentFailSafePause(t *testing.T) {
+	c := mustCodec(t)
+	untyped := map[string]bool{CodeMessageTooLarge: true, CodeMalformedJSON: true, CodeInvalidEnvelope: true}
+	pausing := 0
+	for _, f := range listFixtures(t, "invalid") {
+		if isHTTPBody(f.folder) {
+			continue
+		}
+		_, max := invalidReceiver(t, c, f)
+		for _, r := range []Side{SideAgent, SideServer} {
+			_, derr := c.DecodeMessage(f.data, r, DecodeOptions{MaxBytes: max})
+			if derr == nil {
+				continue // a misdirected fixture can be valid for the other side
+			}
+			want := false
+			if r == SideAgent {
+				want = untyped[derr.Code] ||
+					(derr.Code == CodeInvalidPayload && c.registry[derr.Type].OnInvalid == "pause")
+			}
+			if derr.Pause != want {
+				t.Errorf("%s as %s: %s pause %v, want %v", f.rel, r, derr.Code, derr.Pause, want)
+			}
+			if want && r == SideAgent && derr.Code == CodeInvalidPayload {
+				pausing++
+			}
+			if untyped[derr.Code] != (derr.Type == "") {
+				t.Errorf("%s as %s: %s with type %q", f.rel, r, derr.Code, derr.Type)
+			}
+		}
+	}
+	if pausing < 9 {
+		t.Fatalf("only %d stop-command fixtures pause; want >= 3 per stop command", pausing)
+	}
+	for _, typ := range []string{TypeControlPause, TypeControlKill, TypeJobCancel} {
+		if c.registry[typ].OnInvalid != "pause" {
+			t.Errorf("%s must pause when invalid", typ)
+		}
+	}
+	for _, typ := range []string{TypeControlResume, TypeJobOffer, TypeConfigUpdate} {
+		if c.registry[typ].OnInvalid != "drop" {
+			t.Errorf("%s must not pause when invalid", typ)
+		}
+	}
+}
+
+func TestDecodeDefaultLimit(t *testing.T) {
+	c := mustCodec(t)
+	big := make([]byte, LimitMaxMessageBytes+1)
+	for i := range big {
+		big[i] = ' '
+	}
+	for _, max := range []int{0, -1} {
+		if _, derr := c.DecodeMessage(big, SideServer, DecodeOptions{MaxBytes: max}); derr == nil || derr.Code != CodeMessageTooLarge {
+			t.Fatalf("MaxBytes %d: %v, want message_too_large at the default 1 MiB", max, derr)
+		}
+	}
+	if _, derr := c.DecodeMessage(big[:LimitMaxMessageBytes], SideServer, DecodeOptions{}); derr == nil || derr.Code != CodeMalformedJSON {
+		t.Fatalf("at the limit: %v, want malformed_json (size accepted)", derr)
 	}
 }
 

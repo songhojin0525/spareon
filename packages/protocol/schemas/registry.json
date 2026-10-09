@@ -76,12 +76,14 @@
     "job.cancel": {
       "from": "server",
       "replies": ["ack"],
-      "timeoutMs": 1000
+      "timeoutMs": 1000,
+      "onInvalid": "pause"
     },
     "control.pause": {
       "from": "server",
       "replies": ["ack"],
-      "timeoutMs": 1000
+      "timeoutMs": 1000,
+      "onInvalid": "pause"
     },
     "control.resume": {
       "from": "server",
@@ -91,7 +93,8 @@
     "control.kill": {
       "from": "server",
       "replies": ["ack"],
-      "timeoutMs": 1000
+      "timeoutMs": 1000,
+      "onInvalid": "pause"
     },
     "config.update": {
       "from": "server",

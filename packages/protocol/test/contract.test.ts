@@ -93,3 +93,45 @@ describe('invalid fixtures are rejected with the expected verdict', () => {
     expect(r.ok ? 'ok' : r.code).toBe(f.expect);
   });
 });
+
+describe('agent fail-safe pause (same rule as Go TestAgentFailSafePause)', () => {
+  const untyped = new Set(['message_too_large', 'malformed_json', 'invalid_envelope']);
+  const registry = MESSAGE_REGISTRY as Record<string, { onInvalid: string }>;
+
+  it('pauses the agent on rejected stop commands and untypeable messages, never the server', () => {
+    let pausing = 0;
+    for (const f of invalid.filter((x) => !isHttpBody(x.folder))) {
+      const { maxBytes } = invalidReceiver(f);
+      for (const receiver of ['agent', 'server'] as const) {
+        const r = decodeFixture(f, receiver, maxBytes);
+        if (r.ok) continue; // a misdirected fixture can be valid for the other side
+        const want =
+          receiver === 'agent' &&
+          (untyped.has(r.code) ||
+            (r.code === 'invalid_payload' && registry[r.type ?? '']?.onInvalid === 'pause'));
+        expect(r.pause, `${f.rel} as ${receiver}: ${r.code}`).toBe(want);
+        if (want && r.code === 'invalid_payload') pausing++;
+        expect(r.type === undefined, `${f.rel} type`).toBe(untyped.has(r.code));
+      }
+    }
+    expect(pausing).toBeGreaterThanOrEqual(9);
+  });
+
+  it('marks exactly the stop commands as pause-on-invalid', () => {
+    const pauses = Object.entries(registry)
+      .filter(([, info]) => info.onInvalid === 'pause')
+      .map(([type]) => type)
+      .sort();
+    expect(pauses).toEqual(['control.kill', 'control.pause', 'job.cancel']);
+  });
+});
+
+describe('maxBytes override', () => {
+  const big = ' '.repeat(codec.limits['maxMessageBytes'] ?? 0);
+  it.each([0, -1])('maxBytes %d means the protocol default (as in Go)', (maxBytes) => {
+    const over = codec.decodeMessage(`${big} `, 'server', { maxBytes });
+    expect(over.ok ? 'ok' : over.code).toBe('message_too_large');
+    const at = codec.decodeMessage(big, 'server', { maxBytes });
+    expect(at.ok ? 'ok' : at.code).toBe('malformed_json');
+  });
+});

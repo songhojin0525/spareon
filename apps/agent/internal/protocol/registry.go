@@ -28,6 +28,7 @@ type messageInfo struct {
 	Corr      string
 	Replies   []string
 	TimeoutMs int64
+	OnInvalid string // "pause" or "drop": see AgentPausesOn
 }
 
 type httpInfo struct {

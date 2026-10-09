@@ -3,7 +3,7 @@
 package protocol
 
 // ProtocolHash is the SHA-256 of the canonical schema bundle (bundle.json).
-const ProtocolHash = "a78e5e05788789b5cdac19041ba506011f791519a44943ac76f9e45f5d27f86f"
+const ProtocolHash = "143718a4f6ea898f4d4afc2fcb56f77c308e8dab28bd4c2f0c007c92c0590bf3"
 
 // Protocol limits (schemas/limits.json).
 const (
@@ -790,33 +790,33 @@ func (v ReleaseManifest) MarshalJSON() ([]byte, error) {
 }
 
 var messageRegistry = []messageInfo{
-	{Type: "ack", From: "agent", Corr: "required", Replies: []string{}, TimeoutMs: 0},
-	{Type: "auth.challenge", From: "server", Corr: "required", Replies: []string{"auth.prove"}, TimeoutMs: 5000},
-	{Type: "auth.fail", From: "server", Corr: "optional", Replies: []string{}, TimeoutMs: 0},
-	{Type: "auth.ok", From: "server", Corr: "required", Replies: []string{}, TimeoutMs: 0},
-	{Type: "auth.prove", From: "agent", Corr: "required", Replies: []string{"auth.ok", "auth.fail"}, TimeoutMs: 5000},
-	{Type: "capabilities", From: "agent", Corr: "optional", Replies: []string{}, TimeoutMs: 0},
-	{Type: "config.update", From: "server", Corr: "forbidden", Replies: []string{"ack"}, TimeoutMs: 1000},
-	{Type: "control.kill", From: "server", Corr: "forbidden", Replies: []string{"ack"}, TimeoutMs: 1000},
-	{Type: "control.pause", From: "server", Corr: "forbidden", Replies: []string{"ack"}, TimeoutMs: 1000},
-	{Type: "control.resume", From: "server", Corr: "forbidden", Replies: []string{"ack"}, TimeoutMs: 1000},
-	{Type: "error", From: "both", Corr: "optional", Replies: []string{}, TimeoutMs: 0},
-	{Type: "heartbeat", From: "agent", Corr: "forbidden", Replies: []string{"heartbeat.ack"}, TimeoutMs: 10000},
-	{Type: "heartbeat.ack", From: "server", Corr: "required", Replies: []string{}, TimeoutMs: 0},
-	{Type: "hello", From: "agent", Corr: "forbidden", Replies: []string{"auth.challenge", "auth.fail"}, TimeoutMs: 5000},
-	{Type: "job.accept", From: "agent", Corr: "required", Replies: []string{}, TimeoutMs: 0},
-	{Type: "job.cancel", From: "server", Corr: "forbidden", Replies: []string{"ack"}, TimeoutMs: 1000},
-	{Type: "job.chunk", From: "agent", Corr: "forbidden", Replies: []string{}, TimeoutMs: 0},
-	{Type: "job.complete", From: "agent", Corr: "forbidden", Replies: []string{}, TimeoutMs: 0},
-	{Type: "job.fail", From: "agent", Corr: "forbidden", Replies: []string{}, TimeoutMs: 0},
-	{Type: "job.offer", From: "server", Corr: "forbidden", Replies: []string{"job.accept", "job.reject"}, TimeoutMs: 2000},
-	{Type: "job.preempted", From: "agent", Corr: "forbidden", Replies: []string{}, TimeoutMs: 0},
-	{Type: "job.progress", From: "agent", Corr: "forbidden", Replies: []string{}, TimeoutMs: 0},
-	{Type: "job.reject", From: "agent", Corr: "required", Replies: []string{}, TimeoutMs: 0},
-	{Type: "model.ensure", From: "server", Corr: "forbidden", Replies: []string{"ack"}, TimeoutMs: 1000},
-	{Type: "model.status", From: "agent", Corr: "optional", Replies: []string{}, TimeoutMs: 0},
-	{Type: "status", From: "agent", Corr: "optional", Replies: []string{}, TimeoutMs: 0},
-	{Type: "update.available", From: "server", Corr: "forbidden", Replies: []string{"ack"}, TimeoutMs: 1000},
+	{Type: "ack", From: "agent", Corr: "required", Replies: []string{}, TimeoutMs: 0, OnInvalid: "drop"},
+	{Type: "auth.challenge", From: "server", Corr: "required", Replies: []string{"auth.prove"}, TimeoutMs: 5000, OnInvalid: "drop"},
+	{Type: "auth.fail", From: "server", Corr: "optional", Replies: []string{}, TimeoutMs: 0, OnInvalid: "drop"},
+	{Type: "auth.ok", From: "server", Corr: "required", Replies: []string{}, TimeoutMs: 0, OnInvalid: "drop"},
+	{Type: "auth.prove", From: "agent", Corr: "required", Replies: []string{"auth.ok", "auth.fail"}, TimeoutMs: 5000, OnInvalid: "drop"},
+	{Type: "capabilities", From: "agent", Corr: "optional", Replies: []string{}, TimeoutMs: 0, OnInvalid: "drop"},
+	{Type: "config.update", From: "server", Corr: "forbidden", Replies: []string{"ack"}, TimeoutMs: 1000, OnInvalid: "drop"},
+	{Type: "control.kill", From: "server", Corr: "forbidden", Replies: []string{"ack"}, TimeoutMs: 1000, OnInvalid: "pause"},
+	{Type: "control.pause", From: "server", Corr: "forbidden", Replies: []string{"ack"}, TimeoutMs: 1000, OnInvalid: "pause"},
+	{Type: "control.resume", From: "server", Corr: "forbidden", Replies: []string{"ack"}, TimeoutMs: 1000, OnInvalid: "drop"},
+	{Type: "error", From: "both", Corr: "optional", Replies: []string{}, TimeoutMs: 0, OnInvalid: "drop"},
+	{Type: "heartbeat", From: "agent", Corr: "forbidden", Replies: []string{"heartbeat.ack"}, TimeoutMs: 10000, OnInvalid: "drop"},
+	{Type: "heartbeat.ack", From: "server", Corr: "required", Replies: []string{}, TimeoutMs: 0, OnInvalid: "drop"},
+	{Type: "hello", From: "agent", Corr: "forbidden", Replies: []string{"auth.challenge", "auth.fail"}, TimeoutMs: 5000, OnInvalid: "drop"},
+	{Type: "job.accept", From: "agent", Corr: "required", Replies: []string{}, TimeoutMs: 0, OnInvalid: "drop"},
+	{Type: "job.cancel", From: "server", Corr: "forbidden", Replies: []string{"ack"}, TimeoutMs: 1000, OnInvalid: "pause"},
+	{Type: "job.chunk", From: "agent", Corr: "forbidden", Replies: []string{}, TimeoutMs: 0, OnInvalid: "drop"},
+	{Type: "job.complete", From: "agent", Corr: "forbidden", Replies: []string{}, TimeoutMs: 0, OnInvalid: "drop"},
+	{Type: "job.fail", From: "agent", Corr: "forbidden", Replies: []string{}, TimeoutMs: 0, OnInvalid: "drop"},
+	{Type: "job.offer", From: "server", Corr: "forbidden", Replies: []string{"job.accept", "job.reject"}, TimeoutMs: 2000, OnInvalid: "drop"},
+	{Type: "job.preempted", From: "agent", Corr: "forbidden", Replies: []string{}, TimeoutMs: 0, OnInvalid: "drop"},
+	{Type: "job.progress", From: "agent", Corr: "forbidden", Replies: []string{}, TimeoutMs: 0, OnInvalid: "drop"},
+	{Type: "job.reject", From: "agent", Corr: "required", Replies: []string{}, TimeoutMs: 0, OnInvalid: "drop"},
+	{Type: "model.ensure", From: "server", Corr: "forbidden", Replies: []string{"ack"}, TimeoutMs: 1000, OnInvalid: "drop"},
+	{Type: "model.status", From: "agent", Corr: "optional", Replies: []string{}, TimeoutMs: 0, OnInvalid: "drop"},
+	{Type: "status", From: "agent", Corr: "optional", Replies: []string{}, TimeoutMs: 0, OnInvalid: "drop"},
+	{Type: "update.available", From: "server", Corr: "forbidden", Replies: []string{"ack"}, TimeoutMs: 1000, OnInvalid: "drop"},
 }
 
 var httpRegistry = []httpInfo{

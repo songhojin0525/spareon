@@ -29,6 +29,8 @@ export interface MessageIR {
   readonly corr: 'required' | 'optional' | 'forbidden';
   readonly replies: readonly string[];
   readonly timeoutMs: number | null;
+  /** What an agent does when this server message is rejected: 'pause' for stop commands (fail-safe). */
+  readonly onInvalid: 'pause' | 'drop';
   readonly payload: string; // named object type
 }
 
@@ -210,7 +212,10 @@ export function buildIR(bundle: ProtocolBundle): ProtocolIR {
   };
 
   const registry = files['registry.json'] as {
-    messages: Record<string, { from: MessageIR['from']; replies: string[]; timeoutMs?: number }>;
+    messages: Record<
+      string,
+      { from: MessageIR['from']; replies: string[]; timeoutMs?: number; onInvalid?: string }
+    >;
     http: Record<string, { from: HttpIR['from']; method: string; path: string; replies: string[] }>;
   };
 
@@ -227,12 +232,16 @@ export function buildIR(bundle: ProtocolBundle): ProtocolIR {
         isObj(doc['not']) &&
         Array.isArray(doc['not']['required']) &&
         (doc['not']['required'] as string[]).includes('corr');
+      if (info.onInvalid !== undefined && (info.onInvalid !== 'pause' || info.from !== 'server')) {
+        throw new Error(`registry ${type}: onInvalid must be "pause" on a server message`);
+      }
       return {
         type,
         from: info.from,
         corr: req.includes('corr') ? 'required' : forbidden ? 'forbidden' : 'optional',
         replies: info.replies,
         timeoutMs: info.timeoutMs ?? null,
+        onInvalid: info.onInvalid === 'pause' ? 'pause' : 'drop',
         payload: payloadType.name,
       };
     });

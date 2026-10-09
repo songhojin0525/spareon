@@ -94,7 +94,7 @@ export function emitGo(ir: ProtocolIR, protocolHash: string): string {
   out.push('var messageRegistry = []messageInfo{');
   for (const m of ir.messages) {
     out.push(
-      `\t{Type: ${goStr(m.type)}, From: ${goStr(m.from)}, Corr: ${goStr(m.corr)}, Replies: ${list(m.replies)}, TimeoutMs: ${String(m.timeoutMs ?? 0)}},`,
+      `\t{Type: ${goStr(m.type)}, From: ${goStr(m.from)}, Corr: ${goStr(m.corr)}, Replies: ${list(m.replies)}, TimeoutMs: ${String(m.timeoutMs ?? 0)}, OnInvalid: ${goStr(m.onInvalid)}},`,
     );
   }
   out.push('}', '');

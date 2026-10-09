@@ -53,11 +53,18 @@ type DecodeError struct {
 	Detail string
 	// ID is the envelope id when the envelope was valid (for an error reply's corr).
 	ID string
+	// Type is the envelope type when the envelope was valid (even if unknown or misdirected).
+	Type string
+	// Pause is the agent fail-safe (PROTOCOL.md 4절): true when the receiver is the agent and the
+	// rejected message was a stop command (registry onInvalid "pause") or its type cannot be known
+	// (message_too_large, malformed_json, invalid_envelope). The agent then pauses as for
+	// control.pause. Always false for the server and for HTTP bodies.
+	Pause bool
 }
 
 func (e *DecodeError) Error() string { return e.Code + ": " + e.Detail }
 
-// DecodeOptions overrides the byte limit (0 = protocol default).
+// DecodeOptions overrides the byte limit (zero or negative = protocol default, as in TS).
 type DecodeOptions struct {
 	MaxBytes int
 }
@@ -212,40 +219,52 @@ func (c *Codec) DecodeMessage(data []byte, receiver Side, opts DecodeOptions) (*
 	if limit <= 0 {
 		limit = LimitMaxMessageBytes
 	}
+	toAgent := receiver == SideAgent
+	early := func(code, detail string) (*Message, *DecodeError) {
+		e := reject(code, detail, "")
+		e.Pause = toAgent
+		return nil, e
+	}
 	if len(data) > limit {
-		return nil, reject(CodeMessageTooLarge, fmt.Sprintf("%d > %d", len(data), limit), "")
+		return early(CodeMessageTooLarge, fmt.Sprintf("%d > %d", len(data), limit))
 	}
 	inst, err := ParseStrictJSON(data)
 	if err != nil {
-		return nil, reject(CodeMalformedJSON, err.Error(), "")
+		return early(CodeMalformedJSON, err.Error())
 	}
 	if err := c.envelope.Validate(inst); err != nil {
-		return nil, reject(CodeInvalidEnvelope, schemaDetail(err), "")
+		return early(CodeInvalidEnvelope, schemaDetail(err))
 	}
 	env, _ := inst.(map[string]any) // envelope.json guarantees an object
 	typ, _ := env["type"].(string)
 	id, _ := env["id"].(string)
 	info, known := c.registry[typ]
 	schema := c.messages[typ]
+	typed := func(code, detail string, pause bool) (*Message, *DecodeError) {
+		e := reject(code, detail, id)
+		e.Type, e.Pause = typ, pause
+		return nil, e
+	}
 	if !known || schema == nil {
-		return nil, reject(CodeUnknownType, typ, id)
+		return typed(CodeUnknownType, typ, false)
 	}
 	if info.From != FromBoth && info.From == string(receiver) {
-		return nil, reject(CodeWrongDirection, typ+" is sent by "+info.From, id)
+		return typed(CodeWrongDirection, typ+" is sent by "+info.From, false)
 	}
+	pause := toAgent && info.OnInvalid == "pause"
 	if err := schema.Validate(inst); err != nil {
-		return nil, reject(CodeInvalidPayload, schemaDetail(err), id)
+		return typed(CodeInvalidPayload, schemaDetail(err), pause)
 	}
 	payload := newPayload(typ)
 	var raw rawMessage
 	if err := json.Unmarshal(data, &raw); err != nil {
-		return nil, reject(CodeInvalidPayload, "typed decode failed", id)
+		return typed(CodeInvalidPayload, "typed decode failed", pause)
 	}
 	if err := decodeStrict(raw.Payload, payload); err != nil {
-		return nil, reject(CodeInvalidPayload, "typed decode failed", id)
+		return typed(CodeInvalidPayload, "typed decode failed", pause)
 	}
 	if n := InlineTextBytes(payload); n > LimitMaxInlineTextBytes {
-		return nil, reject(CodeInvalidPayload, fmt.Sprintf("inline text %d > %d", n, LimitMaxInlineTextBytes), id)
+		return typed(CodeInvalidPayload, fmt.Sprintf("inline text %d > %d", n, LimitMaxInlineTextBytes), pause)
 	}
 	msg := &Message{V: 1, Type: typ, ID: id, Payload: payload}
 	msg.TS, _ = env["ts"].(string)

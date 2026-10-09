@@ -12,7 +12,7 @@
 | 무엇 | 어디 |
 |---|---|
 | 스키마(원천) | `packages/protocol/schemas/` — `envelope.json`, `messages/<type>.json`, `http/<name>.json`, `manifests/{model,release}.json`, `defs/{common,policy,job-input}.json` |
-| 데이터(해시에 포함) | `registry.json`(타입·방향·기대 응답·시간 제한), `limits.json`(한도), `defs/error-codes.json`(오류 코드 레지스트리) |
+| 데이터(해시에 포함) | `registry.json`(타입·방향·기대 응답·시간 제한·잘못됐을 때 에이전트 멈춤 여부 `onInvalid`), `limits.json`(한도), `defs/error-codes.json`(오류 코드 레지스트리) |
 | 생성물 | `packages/protocol/src/generated/{protocol,bundle}.ts`, `apps/agent/internal/protocol/{zz_generated.go,bundle.json}` |
 | 생성 명령 | `pnpm --filter @binjari/protocol gen` (낡으면 `test/generated.test.ts` 실패) |
 | TS API | `@binjari/protocol`: `defaultCodec()`, `createCodec(bundle)`, `makeMessage`, `authSigningBytes`, `verifySignedManifest`, … |
@@ -61,8 +61,10 @@ WS 메시지(받는 쪽 = `server` 또는 `agent`):
 HTTPS 본문: 1(한도 64 KiB, `maxHttpBodyBytes`) → 2 → `http/<name>.json`·7 → `invalid_payload`.
 - 처음 실패한 검사가 코드를 정한다. TS·Go 둘 다 이 순서를 지키고, `fixtures/invalid/**/<case>.<code>.json` 파일 이름의 코드와 정확히 같은 코드를 내야 테스트가 통과한다.
 - 거부 사유 설명(`detail`)은 진단용이며 메시지 내용(프롬프트·출력)을 담지 않는다. 언어마다 문구가 달라도 된다.
-- 봉투가 유효했으면 `id`를 함께 돌려주므로 `error` 응답의 `corr`에 넣을 수 있다.
+- 봉투가 유효했으면 `id`와 `type`을 함께 돌려주므로 `error` 응답의 `corr`에 넣을 수 있다.
 - 받는 쪽의 대응(구현 S11·S17): 서버는 `error`(code, fatal) 응답 후 기준(S11: 분당 5회)을 넘으면 연결을 닫는다. `message_too_large`는 곧바로 닫는다. 에이전트는 서버가 보낸 잘못된 메시지를 버리고 기록하며, **선점·멈춤 경로는 이 판정과 무관하게 동작한다**(ADR 0016).
+- **에이전트 fail-safe(절대 규칙 1)**: 거부 결과의 `pause`(Go `Pause`)가 참이면 에이전트는 `control.pause`를 받은 것처럼 멈춘다(실행 중 시도 선점, GPU 메모리 해제, `Paused`). 참이 되는 경우는 받는 쪽이 에이전트이고 (a) 멈춤 명령(`registry.json`의 `onInvalid: "pause"` = `control.pause`·`control.kill`·`job.cancel`)이 `invalid_payload`로 거부됐거나 (b) 타입을 알 수 없는 거부(`message_too_large`·`malformed_json`·`invalid_envelope`)일 때다 — 그 메시지가 킬이었는지 모르므로 기본값은 멈춤이다. 풀림은 정상 `control.resume`으로만 한다. 에이전트는 다음 `status`에 `Paused`를 보고하므로, 서버(S11)는 자기가 보낸 적 없는 `Paused`를 보면 현재 제어 상태(정지 중이 아니면 `control.resume`)를 다시 보낸다. `control.resume`·`job.offer`·`config.update` 등이 잘못되면 버리기만 한다(멈춘 상태는 그대로, 정책은 이전 것 유지). 서버 쪽 거부에서는 언제나 거짓이다. 양쪽 계약 테스트가 모든 invalid fixture에 대해 이 규칙을 확인한다.
+- `maxBytes`/`MaxBytes`를 0 이하로 주면 기본 한도를 쓴다(양쪽 같음).
 - 보내는 쪽 보호: `encodeMessage`/`EncodeMessage`는 직렬화한 결과를 받는 쪽 파이프라인으로 다시 검사하고, 통과하지 못하면 보내지 않는다.
 
 ## 5. 메시지
