@@ -36,7 +36,7 @@ JSON 파서 차이(TS `JSON.parse`와 Go `encoding/json`)를 없애기 위해 �
 - 배열은 필수 필드이거나, 선택이면 `minItems ≥ 1`(Go `omitempty`가 값을 잃지 않게).
 - Go: 선택 스칼라·객체는 포인터 + `omitempty`, 필수는 값. 디코드 → 인코드 → 의미 비교가 양쪽에서 같아야 한다.
 
-### D-g. 명세에서 바꾸거나 더한 것 (ARCHITECTURE 12절에 D24~D28로 기록)
+### D-g. 명세에서 바꾸거나 더한 것 (ARCHITECTURE 12절에 D24~D29로 기록)
 - `job.offer`: `verification` 플래그 없음(D4, 금지 fixture로 증명), `seed` 필수, 마감은 절대 시각이 아닌 `timeLimitMs`(7절: 에이전트는 서버 시계와 비교하지 않는다), `temperatureMilli`·`topPMilli`.
 - `job.progress` 추가(T35: 비스트리밍 작업의 진행 보고).
 - `ack` 추가(명령 확인 T15: control.*, config.update, job.cancel, model.ensure, update.available).

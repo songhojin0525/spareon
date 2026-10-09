@@ -2,7 +2,7 @@
 
 > S02 산출물. 원천은 `packages/protocol/schemas/`의 JSON Schema(2020-12)이고, 이 문서는 그 설명이다. 문서와 스키마가 다르면 스키마가 맞다 — 다만 메시지 표·오류 코드 표는 `packages/protocol/test/protocol-doc.test.ts`가 스키마와 대조하므로 어긋나면 테스트가 실패한다.
 > 연결 처리(서버 S11, 에이전트 S17)는 아직 구현 전이다. 그 차수가 구현할 동작을 적은 문장에는 담당 차수를 괄호로 단다.
-> 결정 근거: [ADR 0003](adr/0003-agent-protocol-websocket-json-schema.md)(WebSocket + JSON Schema), [ADR 0008](adr/0008-device-identity.md)(신원·서명), [ADR 0017](adr/0017-protocol-wire-rules-and-codegen.md)(엄격 JSON·정수만·정규화·생성기), [ARCHITECTURE](ARCHITECTURE.md) 7절(시간 예산)·12절(이견 D3·D4·D16·D24~D28).
+> 결정 근거: [ADR 0003](adr/0003-agent-protocol-websocket-json-schema.md)(WebSocket + JSON Schema), [ADR 0008](adr/0008-device-identity.md)(신원·서명), [ADR 0017](adr/0017-protocol-wire-rules-and-codegen.md)(엄격 JSON·정수만·정규화·생성기), [ARCHITECTURE](ARCHITECTURE.md) 7절(시간 예산)·12절(이견 D3·D4·D16·D24~D29).
 
 ## 1. 한눈에 보기
 - 전송: TLS 위 WebSocket 하나(에이전트가 연다). 메시지 하나 = 텍스트 프레임 하나 = 봉투 하나. 등록(`enroll.*`)과 큰 입력(`inputRef`)은 HTTPS.
