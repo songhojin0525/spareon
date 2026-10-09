@@ -5,6 +5,7 @@
 //   node scripts/board.mjs --web           웹 보드 http://127.0.0.1:4545 (이 컴퓨터에서만 열림)
 //   node scripts/board.mjs --web --open    웹 보드를 띄우고 브라우저도 연다
 //   node scripts/board.mjs --web --lan     같은 와이파이의 휴대폰에서도 열 수 있게 (비밀 주소가 출력됨)
+//   node scripts/board.mjs --agents        터미널 에이전트 화면: orc ↔ 차수·검토 서브에이전트와 메시지 (보드에서 a 키로 전환)
 //   node scripts/board.mjs --once          한 번만 출력하고 끝 (/status 명령, 로그용)
 //   node scripts/board.mjs --json          상태를 JSON으로 출력
 // 옵션: --port 4545  --interval 2  --ascii (막대·표시가 깨져 보이면)  --no-color  --rows 40 --cols 100 (--once 크기)
@@ -537,7 +538,7 @@ function renderTerminal(st, cols, rows) {
   cols = Math.max(60, Math.min(cols || 100, 160));
   const L = [];
   const hr = gray((ASCII ? '-' : '─').repeat(cols));
-  const nowTxt = `${hhmm(st.now)} · q quit`;
+  const nowTxt = `${hhmm(st.now)} · a agents · q quit`;
   L.push(` ${bold(cyan('BINJARI'))} ${gray('// mission control · ' + st.project)}` + ' '.repeat(Math.max(1, cols - 4 - width('BINJARI // mission control · ' + st.project) - width(nowTxt))) + gray(nowTxt));
   if (!st.hasStages) {
     L.push(red(' prompts/STAGES.md를 찾지 못했습니다. 저장소 맨 위 폴더에서 실행하세요.'));
@@ -600,12 +601,237 @@ function renderTerminal(st, cols, rows) {
   return L.slice(0, Math.max(10, rows || L.length)).map((l) => l.replace(/\s+$/, '')).join('\n');
 }
 
+// ───────────────────────── 터미널 에이전트 화면 ─────────────────────────
+// orc 아래에 최근 차수 서브에이전트, 그 아래에 검토 서브에이전트를 상자로 그리고, 새 메시지는 연결선을 따라 ● 로 날아간다.
+const rgb = (r, g, b) => (s) => (COLOR ? `\x1b[38;2;${r};${g};${b}m${s}\x1b[0m` : String(s));
+const AGC = { orc: rgb(217, 119, 87), stage: rgb(177, 185, 249), review: rgb(229, 143, 176) };
+const agKind = (id) => (id === 'orc' ? 'orc' : id.endsWith(':review') ? 'review' : 'stage');
+const agLabel = (id) => (id === 'orc' ? 'orc' : id.endsWith(':review') ? `${id.slice(0, 3)} reviewer` : `${id} subagent`);
+const AG_SPIN = ASCII ? ['-', '\\', '|', '/'] : ['·', '✢', '✳', '✶', '✻', '✽', '✻', '✶', '✳', '✢'];
+const AG_VERB = { wait: 'Waiting…', standby: 'Idle ·', alert: 'No response ·', blocked: 'Blocked ·', done: 'Done ·' };
+const AG_ACTIVE = { orc: 'Orchestrating…', stage: 'Building…', review: 'Reviewing…' };
+const PKT_MS = 1300;
+const FLASH_MS = 1000;
+// 연결선 방향 비트: 위 1, 아래 2, 왼쪽 4, 오른쪽 8
+const BOXCH = ASCII
+  ? { 3: '|', 1: '|', 2: '|', 12: '-', 4: '-', 8: '-', default: '+' }
+  : { 3: '│', 1: '│', 2: '│', 12: '─', 4: '─', 8: '─', 10: '┌', 6: '┐', 9: '└', 5: '┘', 11: '├', 7: '┤', 14: '┬', 13: '┴', 15: '┼' };
+
+class Canvas {
+  constructor(w, h) {
+    this.w = w;
+    this.h = h;
+    this.cells = Array.from({ length: h }, () => Array.from({ length: w }, () => ({ ch: ' ', col: null })));
+    this.masks = new Map();
+  }
+  put(x, y, ch, col) {
+    if (y < 0 || y >= this.h || x < 0 || x >= this.w) return;
+    this.cells[y][x] = { ch, col };
+  }
+  text(x, y, str, col, maxW) {
+    let cx = x;
+    const end = x + (maxW ?? this.w - x);
+    for (const ch of String(str)) {
+      const cw = charWidth(ch.codePointAt(0));
+      if (cw === 0) continue;
+      if (cx + cw > end) break;
+      this.put(cx, y, ch, col);
+      if (cw === 2) this.put(cx + 1, y, '', col);
+      cx += cw;
+    }
+    return cx;
+  }
+  link(x, y, bits, hot) {
+    const k = y * this.w + x;
+    const m = this.masks.get(k) || { x, y, bits: 0, hot: false };
+    m.bits |= bits;
+    m.hot = m.hot || hot;
+    this.masks.set(k, m);
+  }
+  flushLinks() {
+    for (const m of this.masks.values()) this.put(m.x, m.y, BOXCH[m.bits] ?? BOXCH.default ?? '+', m.hot ? AGC.orc : gray);
+  }
+  lines() {
+    return this.cells.map((row) => {
+      let out = '';
+      let run = '';
+      let col = undefined;
+      for (const c of row) {
+        if (c.col !== col) {
+          out += col ? col(run) : run;
+          run = '';
+          col = c.col;
+        }
+        run += c.ch;
+      }
+      out += col ? col(run) : run;
+      return out.replace(/\s+$/, '');
+    });
+  }
+}
+
+function agBox(cv, x, y, w, h, border) {
+  const [tl, tr, bl, br, hz, vt] = ASCII ? ['+', '+', '+', '+', '-', '|'] : ['╭', '╮', '╰', '╯', '─', '│'];
+  cv.text(x, y, tl + hz.repeat(w - 2) + tr, border);
+  for (let i = 1; i < h - 1; i++) {
+    cv.put(x, y + i, vt, border);
+    cv.put(x + w - 1, y + i, vt, border);
+  }
+  cv.text(x, y + h - 1, bl + hz.repeat(w - 2) + br, border);
+}
+
+function agUnit(cv, id, u, x, y, w, sub, view) {
+  const kind = agKind(id);
+  const kc = AGC[kind];
+  const flashing = view.flash && view.flash.id === id && view.now < view.flash.until;
+  const border = flashing ? (t) => bold(kc(t)) : u.state === 'active' ? kc : u.state === 'alert' ? yellow : u.state === 'blocked' ? red : gray;
+  const h = sub ? 5 : 4;
+  agBox(cv, x, y, w, h, border);
+  const glyph = u.state === 'active' ? AG_SPIN[view.spin % AG_SPIN.length] : u.state === 'done' ? (ASCII ? 'v' : '✓') : u.state === 'alert' || u.state === 'blocked' ? '!' : 'o';
+  const glyphCol = u.state === 'done' ? green : u.state === 'alert' ? yellow : u.state === 'blocked' ? red : kc;
+  cv.text(x + 2, y + 1, glyph, glyphCol);
+  const label = agLabel(id);
+  const right = width(label) + width(u.state) + 7 <= w ? u.state : ''; // 좁으면 이름을 살리고 상태 글자는 뺀다
+  cv.text(x + 4, y + 1, label, u.state === 'done' ? dim : (t) => bold(kc(t)), w - 6);
+  if (right) cv.text(x + w - 2 - width(right), y + 1, right, gray);
+  let row = y + 2;
+  if (sub) cv.text(x + 2, row++, fit(sub, w - 4), gray, w - 4);
+  const verb = u.state === 'active' ? AG_ACTIVE[kind] : AG_VERB[u.state] || u.state;
+  const vx = cv.text(x + 2, row, verb, u.state === 'done' ? dim : kc, w - 4);
+  if (u.text) cv.text(vx + 1, row, u.text, u.state === 'done' ? gray : null, x + w - 2 - (vx + 1));
+  return h;
+}
+
+// 부모 상자 아래(ay)에서 자식 상자 위(by)까지: 내려가고, midY에서 옆으로, 다시 내려간다
+function agPath(ax, ay, bx, by, midY) {
+  const pts = [];
+  for (let y = ay; y <= midY; y++) pts.push([ax, y]);
+  const step = bx > ax ? 1 : -1;
+  for (let x = ax + step; bx !== ax && x !== bx + step; x += step) pts.push([x, midY]);
+  for (let y = midY + 1; y <= by; y++) pts.push([bx, y]);
+  return pts;
+}
+
+function agDrawPath(cv, pts, hot) {
+  pts.forEach(([x, y], i) => {
+    let bits = 0;
+    const nb = [pts[i - 1], pts[i + 1]];
+    if (i === 0) bits |= 1;
+    if (i === pts.length - 1) bits |= 2;
+    for (const q of nb) {
+      if (!q) continue;
+      if (q[1] < y) bits |= 1;
+      else if (q[1] > y) bits |= 2;
+      else if (q[0] < x) bits |= 4;
+      else if (q[0] > x) bits |= 8;
+    }
+    cv.link(x, y, bits, hot);
+  });
+}
+
+function renderAgents(st, cols, rows, view) {
+  const W = Math.max(60, Math.min(cols || 100, 160));
+  const H = Math.max(20, rows || 40);
+  const ag = st.agents;
+  const now = view.now;
+  const head = ` ${AGC.orc((ASCII ? '* ' : '✻ ') + 'binjari')} ${bold('agents')} ${gray('· orc ↔ subagents')}`;
+  const right = gray(`${hhmm(st.now)} · a board · q quit`);
+  const L = [head + ' '.repeat(Math.max(1, W - width(head) - width(right) - 1)) + right];
+  if (!ag) return L.join('\n');
+
+  const n = ag.stages.length;
+  const hasReview = ag.stages.some((x) => x.reviewer);
+  const gap = 2;
+  const cardW = n ? Math.min(46, Math.floor((W - 2 - gap * (n - 1)) / n)) : 0;
+  const x0 = Math.floor((W - (n * cardW + gap * (n - 1))) / 2);
+  const ow = Math.min(46, W - 4);
+  // 차수가 홀수 개면 orc 중심을 가운데 상자 중심에 맞춰 연결선이 곧게 내려가게 한다
+  const oc = n % 2 ? x0 + ((n - 1) / 2) * (cardW + gap) + Math.floor(cardW / 2) : Math.floor(W / 2);
+  const ox = Math.max(0, Math.min(W - ow, oc - Math.floor(ow / 2)));
+  const oy = 1;
+  const sy = oy + 5 + 2; // orc 상자 5줄 + 연결선 2줄
+  const ry = sy + 5 + 1; // 차수 상자 5줄 + 연결선 1줄
+  const ch = hasReview ? ry + 5 : n ? sy + 5 : oy + 5;
+  const cv = new Canvas(W, ch);
+
+  const hotPair = (a, b) => ag.messages.some((m) => ((m.from === a && m.to === b) || (m.from === b && m.to === a)) && now - Date.parse(m.t) < 15 * 60_000);
+  const paths = {};
+  ag.stages.forEach((sx, i) => {
+    const x = x0 + i * (cardW + gap);
+    const c = x + Math.floor(cardW / 2);
+    sx._x = x;
+    sx._c = c;
+    const p1 = agPath(oc, oy + 5, c, sy - 1, oy + 5);
+    paths[`orc>${sx.id}`] = p1;
+    agDrawPath(cv, p1, hotPair('orc', sx.id));
+    if (sx.reviewer) {
+      const p2 = agPath(c, sy + 5, c, ry - 1, sy + 5);
+      paths[`${sx.id}>${sx.id}:review`] = p2;
+      agDrawPath(cv, p2, hotPair(sx.id, `${sx.id}:review`));
+    }
+  });
+  cv.flushLinks();
+
+  agUnit(cv, 'orc', ag.orc, ox, oy, ow, '지휘자 · 차수를 맡기고 결과를 확인', view);
+  for (const sx of ag.stages) {
+    agUnit(cv, sx.id, sx, sx._x, sy, cardW, sx.name, view);
+    if (sx.reviewer) agUnit(cv, `${sx.id}:review`, sx.reviewer, sx._x, ry, cardW, 'adversarial-reviewer', view);
+  }
+  // 상자 테두리와 연결선이 만나는 곳
+  const joint = (x, y, up) => {
+    const hotAny = [...cv.masks.values()].some((m) => m.x === x && (m.y === y + 1 || m.y === y - 1) && m.hot);
+    cv.put(x, y, ASCII ? '+' : up ? '┴' : '┬', hotAny ? AGC.orc : gray);
+  };
+  if (n) joint(oc, oy + 4, false);
+  for (const sx of ag.stages) {
+    joint(sx._c, sy, true);
+    if (sx.reviewer) {
+      joint(sx._c, sy + 4, false);
+      joint(sx._c, ry, true);
+    }
+  }
+  // 날아가는 메시지
+  const a = view.anim;
+  if (a && now - a.start < PKT_MS) {
+    const child = a.m.from === 'orc' ? a.m.to : a.m.to === 'orc' ? a.m.from : a.m.from.endsWith(':review') ? a.m.from : a.m.to;
+    const parent = child.endsWith(':review') ? child.slice(0, 3) : 'orc';
+    let pts = paths[`${parent}>${child}`];
+    if (pts) {
+      if (a.m.from === child) pts = [...pts].reverse();
+      const idx = Math.min(pts.length - 1, Math.floor(((now - a.start) / PKT_MS) * pts.length));
+      const [px, py] = pts[idx];
+      cv.put(px, py, ASCII ? 'o' : '●', (t) => bold(AGC[agKind(a.m.from)](t)));
+    }
+  }
+  if (!n) cv.text(2, oy + 6, 'no subagents yet', gray);
+  L.push(...cv.lines());
+
+  L.push(gray((ASCII ? '-' : '─').repeat(W)));
+  const room = H - L.length;
+  const newest = view.anim ? view.anim.m : null;
+  for (const m of ag.messages) {
+    if (L.length + 2 > H) break;
+    const kc = AGC[agKind(m.from)];
+    const isNew = newest && m.t === newest.t && m.from === newest.from && m.to === newest.to;
+    const t = hhmm(m.t);
+    const left = ` ${kc(ASCII ? '*' : '⏺')} ${bold(kc(agLabel(m.from)))} ${gray('→')} ${agLabel(m.to)}${m.inferred ? '' : gray(' · msg')}`;
+    L.push(left + ' '.repeat(Math.max(1, W - width(left) - width(t) - 1)) + gray(t));
+    const body = fit(m.text, W - 7);
+    L.push(`   ${gray(ASCII ? 'L' : '⎿')}  ${isNew ? bold(body) : body}`);
+  }
+  if (!ag.messages.length && room > 1) L.push(gray('  no messages yet'));
+  return L.slice(0, H).map((l) => l.replace(/\s+$/, '')).join('\n');
+}
+
 function runTerminal() {
   const interval = Math.max(1, Number(opt('--interval', 2))) * 1000;
+  let mode = has('--agents') ? 'agents' : 'board';
+  const view = { spin: 0, now: Date.now(), anim: null, flash: null };
   if (has('--once') || !process.stdout.isTTY) {
     const cols = Number(opt('--cols', process.stdout.columns || 110));
     const rows = Number(opt('--rows', 60));
-    process.stdout.write(renderTerminal(buildState(), cols, rows) + '\n');
+    const st = buildState();
+    process.stdout.write((mode === 'agents' ? renderAgents(st, cols, rows, view) : renderTerminal(st, cols, rows)) + '\n');
     return;
   }
   const out = process.stdout;
@@ -620,20 +846,55 @@ function runTerminal() {
   process.on('SIGINT', quit);
   process.on('SIGTERM', quit);
   process.on('exit', restore);
+  let st = null;
+  let seenT = null;
+  const queue = [];
+  function refresh() {
+    try {
+      st = buildState();
+    } catch (e) {
+      st = { error: String(e?.message ?? e) };
+      return;
+    }
+    const msgs = st.agents?.messages ?? [];
+    if (seenT === null) {
+      if (msgs[0]) queue.push(msgs[0]);
+    } else {
+      for (const m of [...msgs].reverse()) if (Date.parse(m.t) > seenT) queue.push(m);
+    }
+    if (msgs[0]) seenT = Math.max(seenT ?? 0, Date.parse(msgs[0].t));
+  }
   if (process.stdin.isTTY) {
     process.stdin.setRawMode(true);
     process.stdin.resume();
     process.stdin.on('data', (d) => {
       const k = d.toString();
       if (k === 'q' || k === 'Q' || k === '\u0003' || k === '\u001b') quit();
-      if (k === 'r' || k === 'R') draw();
+      if (k === 'a' || k === 'A') {
+        mode = mode === 'agents' ? 'board' : 'agents';
+        last = '';
+        draw();
+      }
+      if (k === 'r' || k === 'R') {
+        refresh();
+        last = '';
+        draw();
+      }
     });
   }
   let last = '';
   function draw() {
+    if (!st) refresh();
+    view.now = Date.now();
+    if (view.anim && view.now - view.anim.start >= PKT_MS) {
+      view.flash = { id: view.anim.m.to, until: view.now + FLASH_MS };
+      view.anim = null;
+    }
+    if (!view.anim && queue.length) view.anim = { m: queue.shift(), start: view.now };
     let frame;
     try {
-      frame = renderTerminal(buildState(), out.columns, out.rows);
+      if (st.error) throw new Error(st.error);
+      frame = mode === 'agents' ? renderAgents(st, out.columns, out.rows, view) : renderTerminal(st, out.columns, out.rows);
     } catch (e) {
       frame = red(` 보드 오류: ${e?.message ?? e}`);
     }
@@ -645,8 +906,17 @@ function runTerminal() {
     last = '';
     draw();
   });
+  refresh();
   draw();
-  setInterval(draw, interval);
+  setInterval(() => {
+    refresh();
+    draw();
+  }, interval);
+  // 스피너와 날아가는 메시지는 에이전트 화면에서만 빠르게 다시 그린다
+  setInterval(() => {
+    view.spin++;
+    if (mode === 'agents') draw();
+  }, 120);
 }
 
 // ───────────────────────── 웹 ─────────────────────────
