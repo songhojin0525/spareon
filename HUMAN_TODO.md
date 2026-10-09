@@ -15,6 +15,10 @@
 - [x] (S00) 저장소 루트의 `board-web.cmd`를 확인한다. S00 밖에서 만들어진 `scripts/board-web.cmd`의 복사본이고, 루트에서 실행하면 상위 폴더로 이동해서 동작하지 않는다. git 추적에서는 뺐다. 필요 없으면 지운다. 보드는 `scripts\board-web.cmd`로 연다. — 완료(2026-10-08): 루트 복사본은 동작하지 않아 사람의 요청으로 지웠다. 보드는 `scripts\board-web.cmd`로 연다.
 - [ ] (S00) `.claude/settings.json` 허용 목록에 추가할 명령을 검토한다(REPORT의 '추가 권장 허용 명령').
 
+## S01에서 추가
+- [ ] (S01, 파일럿 전까지) `docs/THREAT_MODEL.md` 7절의 '수용한 위험' 8건(AGT-12, PC-06, PC-07, EXT-04, DATA-05, DATA-07, ECO-01, ECO-03)을 읽고 받아들일지 정한다. 왜: 막지 않기로 한 위험이고, 구매자·사장님 안내문에도 그대로 적힌다. 절차: 각 행의 '완화책'과 사유를 읽는다 → 받아들일 수 없는 행은 Claude에게 "S01 수용 위험 재검토: <ID>"로 알린다. 결과: S28 보고서(`docs/SECURITY_REVIEW.md`)에 동의 날짜를 남긴다.
+- [ ] (S01, 파일럿 섭외 때) 매장에 미리 물어볼 것(`docs/KNOWN_UNKNOWNS.md` K3·K13·K14): 손님 없는 밤에 PC를 끄는지, 쓰는 PC방 관리(요금) 프로그램과 복원 솔루션 이름, 복원되지 않는 드라이브가 있는지, GPU 모델. 왜: PC를 끄거나 전부 복원되는 매장은 설계 대안(Wake-on-LAN, 영구 드라이브 요구)이 먼저 필요하다. 결과: 답을 Claude에게 알려 주면 KNOWN_UNKNOWNS에 반영한다.
+
 ## 나중에 (차수가 진행되면 각 차수가 구체적인 절차를 추가한다)
 - [ ] Windows PC + NVIDIA GPU에서 실기 확인 (S18~S22, `docs/manual-tests/`)
 - [ ] 친구 PC 2~3대로 0단계 데모 (S04, `docs/DEMO_0.md`)
