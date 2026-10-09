@@ -19,6 +19,10 @@
 - [ ] (S01, 파일럿 전까지) `docs/THREAT_MODEL.md` 7절의 '수용한 위험' 8건(AGT-12, PC-06, PC-07, EXT-04, DATA-05, DATA-07, ECO-01, ECO-03)을 읽고 받아들일지 정한다. 왜: 막지 않기로 한 위험이고, 구매자·사장님 안내문에도 그대로 적힌다. 절차: 각 행의 '완화책'과 사유를 읽는다 → 받아들일 수 없는 행은 Claude에게 "S01 수용 위험 재검토: <ID>"로 알린다. 결과: S28 보고서(`docs/SECURITY_REVIEW.md`)에 동의 날짜를 남긴다.
 - [ ] (S01, 파일럿 섭외 때) 매장에 미리 물어볼 것(`docs/KNOWN_UNKNOWNS.md` K3·K13·K14): 손님 없는 밤에 PC를 끄는지, 쓰는 PC방 관리(요금) 프로그램과 복원 솔루션 이름, 복원되지 않는 드라이브가 있는지, GPU 모델. 왜: PC를 끄거나 전부 복원되는 매장은 설계 대안(Wake-on-LAN, 영구 드라이브 요구)이 먼저 필요하다. 결과: 답을 Claude에게 알려 주면 KNOWN_UNKNOWNS에 반영한다.
 
+## S03에서 추가
+- [ ] (S03) 다음 push 뒤 GitHub Actions `ci`에 새로 생긴 `postgres` 잡(Postgres 16 서비스 컨테이너, `DATABASE_URL` 경로로 서버 DB 테스트)이 초록인지 확인한다. 왜: 로컬에서는 embedded-postgres를 별도 서버로 띄워 `DATABASE_URL` 경로를 확인했지만, 실제 `postgres:16` 이미지 서비스로는 CI에서만 돈다. 절차: Actions 탭 → 최신 `ci` 실행 → `linux (server tests on a Postgres service)` 잡. 결과: 실패하면 로그를 Claude에게 알리거나 `docs/stages/S03/REPORT.md` '막힌 것'에 붙인다.
+- [ ] (S03, 운영 DB를 고를 때 · S30 전) 쓰려는 관리형 Postgres(예: Supabase)의 관리 계정이 역할을 만들 수 있는지(`CREATEROLE`) 확인한다. 왜: 마이그레이션 `0002_app_role`이 최소 권한 역할 `binjari_app`을 만들고, 서버는 그 역할의 멤버로만 접속해야 원장 보호 트리거를 끌 수 없다(docs/DB.md 5절). 권한이 없으면 마이그레이션이 실패한다. 절차: 관리 계정으로 접속해 `SELECT rolcreaterole FROM pg_roles WHERE rolname = current_user;` → `t`인지 확인. `f`면 제공사 콘솔에서 `CREATE ROLE binjari_app NOLOGIN;`을 먼저 실행할 수 있는지 확인. 결과: S30 진행 전에 Claude에게 알려 준다(런북에 반영).
+
 ## 나중에 (차수가 진행되면 각 차수가 구체적인 절차를 추가한다)
 - [ ] Windows PC + NVIDIA GPU에서 실기 확인 (S18~S22, `docs/manual-tests/`)
 - [ ] 친구 PC 2~3대로 0단계 데모 (S04, `docs/DEMO_0.md`)
