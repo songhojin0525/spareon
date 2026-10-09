@@ -68,7 +68,7 @@ func Derive(secret, name string) (Identity, error) {
 	if err != nil {
 		return Identity{}, fmt.Errorf("devauth: node id: %w", err)
 	}
-	seed := hex.EncodeToString(mac(secret, domainNodeKey, nodeID))
+	seed := NodeSeed(secret, nodeID)
 	pub, err := protocol.PublicKeyFromSeed(seed)
 	if err != nil {
 		return Identity{}, fmt.Errorf("devauth: public key: %w", err)
@@ -81,6 +81,12 @@ func Derive(secret, name string) (Identity, error) {
 		FpStore:   hex.EncodeToString(mac(secret, domainFpStore, name)),
 		FpGlobal:  hex.EncodeToString(mac(secret, domainFpGlobal, name)),
 	}, nil
+}
+
+// NodeSeed is the ed25519 seed (lowercase hex) of a node: what a server re-derives from the node id
+// alone to check auth.prove.
+func NodeSeed(secret, nodeID string) string {
+	return hex.EncodeToString(mac(secret, domainNodeKey, nodeID))
 }
 
 // ModelSha256 is the placeholder model digest used until signed model manifests exist.
