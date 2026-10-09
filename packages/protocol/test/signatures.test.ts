@@ -9,6 +9,7 @@ import { FIXTURE_DIR } from '../src/schema-source.js';
 import {
   authSigningBytes,
   enrollSigningBytes,
+  isAcceptablePublicKey,
   publicKeyFromSeed,
   signEd25519,
   SigningInputError,
@@ -53,6 +54,7 @@ interface Vectors {
     signature: string;
     verify: EnrollCase[];
   };
+  publicKeys: { cases: { name: string; publicKey: string; acceptable: boolean }[] };
   manifests: {
     trustedKeys: Record<string, string>;
     cases: {
@@ -77,6 +79,23 @@ describe('ed25519 keys (RFC 8032 test vectors)', () => {
     expect(vectors.key.publicKey).toBe(
       'd75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a',
     );
+  });
+});
+
+describe('public key acceptance (canonical, not small order)', () => {
+  it.each(vectors.publicKeys.cases.map((c) => [c.name, c] as const))('%s', (_n, c) => {
+    expect(isAcceptablePublicKey(c.publicKey)).toBe(c.acceptable);
+  });
+
+  it('every rejected key also fails verification of the valid signature', () => {
+    const bytes = authSigningBytes(
+      vectors.auth.input.nonce,
+      vectors.auth.input.nodeId,
+      vectors.auth.input.protocolHash,
+    );
+    for (const c of vectors.publicKeys.cases.filter((x) => !x.acceptable)) {
+      expect(verifyEd25519(c.publicKey, bytes, vectors.auth.signature)).toBe(false);
+    }
   });
 });
 

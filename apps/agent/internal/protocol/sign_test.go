@@ -56,6 +56,13 @@ type sigVectors struct {
 			Valid     bool   `json:"valid"`
 		} `json:"verify"`
 	} `json:"enroll"`
+	PublicKeys struct {
+		Cases []struct {
+			Name       string `json:"name"`
+			PublicKey  string `json:"publicKey"`
+			Acceptable bool   `json:"acceptable"`
+		} `json:"cases"`
+	} `json:"publicKeys"`
 	Manifests struct {
 		TrustedKeys map[string]string `json:"trustedKeys"`
 		Cases       []struct {
@@ -86,6 +93,23 @@ func TestSignatureVectors(t *testing.T) {
 		if err != nil || pub != k.PublicKey {
 			t.Fatalf("public key %s, want %s (%v)", pub, k.PublicKey, err)
 		}
+	}
+
+	for _, c := range v.PublicKeys.Cases {
+		t.Run("public key: "+c.Name, func(t *testing.T) {
+			if got := IsAcceptablePublicKey(c.PublicKey); got != c.Acceptable {
+				t.Fatalf("acceptable %v, want %v", got, c.Acceptable)
+			}
+			if !c.Acceptable {
+				b, err := AuthSigningBytes(v.Auth.Input.Nonce, v.Auth.Input.NodeID, v.Auth.Input.ProtocolHash)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if VerifyEd25519(c.PublicKey, b, v.Auth.Signature) {
+					t.Fatal("a refused key verified a signature")
+				}
+			}
+		})
 	}
 
 	t.Run("auth bytes and signature", func(t *testing.T) {

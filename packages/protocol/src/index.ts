@@ -34,6 +34,7 @@ export {
   ENROLL_DOMAIN,
   enrollSigningBytes,
   type EnrollSigningInput,
+  isAcceptablePublicKey,
   MANIFEST_DOMAINS,
   manifestSigningBytes,
   type ManifestVerdict,

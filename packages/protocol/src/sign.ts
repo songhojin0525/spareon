@@ -114,16 +114,53 @@ function scalarIsCanonical(sLittleEndian: Buffer): boolean {
   return false; // S == L
 }
 
+/** Field prime p = 2^255 - 19, little-endian. */
+const FIELD_P = Buffer.from('ed' + 'ff'.repeat(30) + '7f', 'hex');
+/**
+ * y-coordinates (little-endian, sign bit clear) of the 8 small-order points of edwards25519: y = 1
+ * (identity), y = p - 1 (order 2), y = 0 (order 4, two points) and the two order-8 y values (four points).
+ */
+const SMALL_ORDER_Y: readonly string[] = [
+  '01' + '00'.repeat(31),
+  'ec' + 'ff'.repeat(30) + '7f',
+  '00'.repeat(32),
+  '26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05',
+  'c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a',
+];
+
+/**
+ * True when a public key may be enrolled and used: lowercase hex of 32 bytes, canonically encoded
+ * (y < p) and not one of the 8 small-order points. Plain RFC 8032 verification (OpenSSL, Go) accepts
+ * small-order keys, for which anyone can forge signatures without a private key, and non-canonical
+ * encodings, which give one key several spellings. Go's IsAcceptablePublicKey is the twin.
+ */
+export function isAcceptablePublicKey(publicKeyHex: string): boolean {
+  if (!HEX32.test(publicKeyHex)) return false;
+  const y = Buffer.from(publicKeyHex, 'hex');
+  y[31] = (y[31] ?? 0) & 0x7f;
+  let belowP = false;
+  for (let i = 31; i >= 0; i--) {
+    const a = y[i] ?? 0;
+    const b = FIELD_P[i] ?? 0;
+    if (a !== b) {
+      belowP = a < b;
+      break;
+    }
+  }
+  return belowP && !SMALL_ORDER_Y.includes(y.toString('hex'));
+}
+
 /**
  * Verifies an ed25519 signature. Inputs must be lowercase hex of the exact length; anything else is
- * false (never throws), as is a non-canonical S. Go applies the same rules.
+ * false (never throws), as is a non-canonical S or a public key that isAcceptablePublicKey refuses. Go
+ * applies the same rules.
  */
 export function verifyEd25519(
   publicKeyHex: string,
   message: Uint8Array,
   signatureHex: string,
 ): boolean {
-  if (!HEX32.test(publicKeyHex) || !HEX64.test(signatureHex)) return false;
+  if (!isAcceptablePublicKey(publicKeyHex) || !HEX64.test(signatureHex)) return false;
   const sig = Buffer.from(signatureHex, 'hex');
   if (!scalarIsCanonical(sig.subarray(32))) return false;
   try {

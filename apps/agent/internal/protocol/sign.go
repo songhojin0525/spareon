@@ -127,10 +127,56 @@ func scalarIsCanonical(s []byte) bool {
 	return false // S == L
 }
 
+// fieldP is the field prime p = 2^255 - 19, little-endian.
+var fieldP = [32]byte{
+	0xed, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+	0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f,
+}
+
+// smallOrderY lists the y-coordinates (little-endian hex, sign bit clear) of the 8 small-order points of
+// edwards25519: y = 1 (identity), y = p - 1 (order 2), y = 0 (order 4, two points) and the two order-8
+// y values (four points).
+var smallOrderY = []string{
+	"0100000000000000000000000000000000000000000000000000000000000000",
+	"ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+	"0000000000000000000000000000000000000000000000000000000000000000",
+	"26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05",
+	"c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a",
+}
+
+// IsAcceptablePublicKey reports whether a public key may be enrolled and used: lowercase hex of 32
+// bytes, canonically encoded (y < p) and not one of the 8 small-order points. crypto/ed25519 (like
+// OpenSSL) accepts small-order keys, for which anyone can forge signatures without a private key, and
+// non-canonical encodings, which give one key several spellings. Same rules as the TS twin.
+func IsAcceptablePublicKey(publicKeyHex string) bool {
+	if !reHex32.MatchString(publicKeyHex) {
+		return false
+	}
+	y, _ := hex.DecodeString(publicKeyHex)
+	y[31] &= 0x7f
+	belowP := false
+	for i := 31; i >= 0; i-- {
+		if y[i] != fieldP[i] {
+			belowP = y[i] < fieldP[i]
+			break
+		}
+	}
+	if !belowP {
+		return false
+	}
+	yHex := hex.EncodeToString(y)
+	for _, s := range smallOrderY {
+		if yHex == s {
+			return false
+		}
+	}
+	return true
+}
+
 // VerifyEd25519 verifies a signature. Inputs must be lowercase hex of the exact length; anything else,
-// or a non-canonical S, is false. Same rules as the TS twin.
+// a non-canonical S, or a public key IsAcceptablePublicKey refuses is false. Same rules as the TS twin.
 func VerifyEd25519(publicKeyHex string, msg []byte, signatureHex string) bool {
-	if !reHex32.MatchString(publicKeyHex) || !reHex64.MatchString(signatureHex) {
+	if !IsAcceptablePublicKey(publicKeyHex) || !reHex64.MatchString(signatureHex) {
 		return false
 	}
 	pub, _ := hex.DecodeString(publicKeyHex)

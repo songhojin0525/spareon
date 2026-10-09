@@ -116,6 +116,69 @@
         "protocolHash": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
         "signature": "3ec8834a934517082d6c0f2b7b57b06248b6c2ba105a332b45326274eef9743f1feadd7b66d21e7af544926009a7dafd364ec09ff3eae6079dec6427dff68402",
         "valid": false
+      },
+      {
+        "name": "small-order public key (identity) with R = identity, S = 0",
+        "publicKey": "0100000000000000000000000000000000000000000000000000000000000000",
+        "nonce": "0000000000000000000000000000000000000000000000000000000000000000",
+        "nodeId": "01920000-0000-7000-8000-000000000010",
+        "protocolHash": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+        "signature": "01000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "valid": false
+      },
+      {
+        "name": "small-order public key (identity, non-canonical (y = p + 1)) with R = identity, S = 0",
+        "publicKey": "eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+        "nonce": "0000000000000000000000000000000000000000000000000000000000000000",
+        "nodeId": "01920000-0000-7000-8000-000000000010",
+        "protocolHash": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+        "signature": "01000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "valid": false
+      },
+      {
+        "name": "small-order public key (identity with x sign bit set) with R = identity, S = 0",
+        "publicKey": "0100000000000000000000000000000000000000000000000000000000000080",
+        "nonce": "0000000000000000000000000000000000000000000000000000000000000000",
+        "nodeId": "01920000-0000-7000-8000-000000000010",
+        "protocolHash": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+        "signature": "01000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "valid": false
+      },
+      {
+        "name": "small-order public key (order 2 (y = p - 1)) with R = identity, S = 0",
+        "publicKey": "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+        "nonce": "0000000000000000000000000000000000000000000000000000000000000002",
+        "nodeId": "01920000-0000-7000-8000-000000000010",
+        "protocolHash": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+        "signature": "01000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "valid": false
+      },
+      {
+        "name": "small-order public key (order 4 (y = 0)) with R = identity, S = 0",
+        "publicKey": "0000000000000000000000000000000000000000000000000000000000000000",
+        "nonce": "0000000000000000000000000000000000000000000000000000000000000001",
+        "nodeId": "01920000-0000-7000-8000-000000000010",
+        "protocolHash": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+        "signature": "01000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "valid": false
+      },
+      {
+        "name": "small-order public key (order 8) with R = identity, S = 0",
+        "publicKey": "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05",
+        "nonce": "0000000000000000000000000000000000000000000000000000000000000007",
+        "nodeId": "01920000-0000-7000-8000-000000000010",
+        "protocolHash": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+        "signature": "01000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "valid": false
+      },
+      {
+        "name": "small-order public key (order 8, other y) with R = identity, S = 0",
+        "publicKey": "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a",
+        "nonce": "0000000000000000000000000000000000000000000000000000000000000001",
+        "nodeId": "01920000-0000-7000-8000-000000000010",
+        "protocolHash": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+        "signature": "01000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "valid": false
       }
     ],
     "badInputs": [
@@ -433,6 +496,91 @@
           "keyId": "release-2026a"
         },
         "expect": "manifest_invalid"
+      }
+    ]
+  },
+  "publicKeys": {
+    "description": "Public keys accepted for enrollment and verification: canonical encoding (y < p) and not one of the 8 small-order points. Every rejected small-order key here forges the matching auth.verify case under plain RFC 8032 verification.",
+    "cases": [
+      {
+        "name": "RFC 8032 test 1",
+        "publicKey": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+        "acceptable": true
+      },
+      {
+        "name": "RFC 8032 test 2",
+        "publicKey": "3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c",
+        "acceptable": true
+      },
+      {
+        "name": "large-order point y = 3",
+        "publicKey": "0300000000000000000000000000000000000000000000000000000000000000",
+        "acceptable": true
+      },
+      {
+        "name": "its negation (y = 3, x sign bit set)",
+        "publicKey": "0300000000000000000000000000000000000000000000000000000000000080",
+        "acceptable": true
+      },
+      {
+        "name": "non-canonical y = p + 3 (same point as y = 3)",
+        "publicKey": "f0ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+        "acceptable": false
+      },
+      {
+        "name": "non-canonical y = p",
+        "publicKey": "edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+        "acceptable": false
+      },
+      {
+        "name": "y = 2^255 - 1 with sign bit",
+        "publicKey": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "acceptable": false
+      },
+      {
+        "name": "small order: identity",
+        "publicKey": "0100000000000000000000000000000000000000000000000000000000000000",
+        "acceptable": false
+      },
+      {
+        "name": "small order: identity, non-canonical (y = p + 1)",
+        "publicKey": "eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+        "acceptable": false
+      },
+      {
+        "name": "small order: identity with x sign bit set",
+        "publicKey": "0100000000000000000000000000000000000000000000000000000000000080",
+        "acceptable": false
+      },
+      {
+        "name": "small order: order 2 (y = p - 1)",
+        "publicKey": "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+        "acceptable": false
+      },
+      {
+        "name": "small order: order 4 (y = 0)",
+        "publicKey": "0000000000000000000000000000000000000000000000000000000000000000",
+        "acceptable": false
+      },
+      {
+        "name": "small order: order 8",
+        "publicKey": "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05",
+        "acceptable": false
+      },
+      {
+        "name": "small order: order 8, other y",
+        "publicKey": "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a",
+        "acceptable": false
+      },
+      {
+        "name": "uppercase hex",
+        "publicKey": "D75A980182B10AB7D54BFED3C964073A0EE172F3DAA62325AF021A68F707511A",
+        "acceptable": false
+      },
+      {
+        "name": "too short",
+        "publicKey": "5a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+        "acceptable": false
       }
     ]
   }
