@@ -7,10 +7,20 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json"
+    "gen": "tsx scripts/gen.ts",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
   },
   "devDependencies": {
+    "@binjari/testkit": "workspace:*",
     "@types/node": "catalog:",
-    "typescript": "catalog:"
+    "fast-check": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "dependencies": {
+    "@binjari/shared": "workspace:*",
+    "ajv": "catalog:"
   }
 }

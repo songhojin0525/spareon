@@ -1,0 +1,335 @@
+{
+  "description": "Strict JSON and canonical JSON vectors. TS and Go must agree on every case (input is UTF-8 text, or raw bytes in inputHex).",
+  "cases": [
+    {
+      "name": "sorts keys",
+      "input": "{\"b\":1,\"a\":[true,false,null],\"c\":\"x\"}",
+      "strict": "ok",
+      "canonical": "{\"a\":[true,false,null],\"b\":1,\"c\":\"x\"}"
+    },
+    {
+      "name": "drops whitespace",
+      "input": " { \"a\" : 1 ,\n\t\"b\" : [ ] }\r\n",
+      "strict": "ok",
+      "canonical": "{\"a\":1,\"b\":[]}"
+    },
+    {
+      "name": "minimal string escapes",
+      "input": "{\"s\":\"\\u0041\\/\\b\\f\\n\\r\\t\\\"\\\\\\u001f\\u007f\\u2028\"}",
+      "strict": "ok",
+      "canonical": "{\"s\":\"A/\\b\\f\\n\\r\\t\\\"\\\\\\u001f \"}"
+    },
+    {
+      "name": "surrogate pair escape becomes UTF-8",
+      "input": "[\"\\ud83d\\ude00\"]",
+      "strict": "ok",
+      "canonical": "[\"😀\"]"
+    },
+    {
+      "name": "raw non-ASCII is kept",
+      "input": "{\"k\":\"한글 ü\"}",
+      "strict": "ok",
+      "canonical": "{\"k\":\"한글 ü\"}"
+    },
+    {
+      "name": "html characters are not escaped",
+      "input": "{\"h\":\"<a>&'\"}",
+      "strict": "ok",
+      "canonical": "{\"h\":\"<a>&'\"}"
+    },
+    {
+      "name": "keys sort by UTF-16 code units, not UTF-8 bytes",
+      "input": "{\"\\uff61\":1,\"\\ud83d\\ude00\":2,\"a\":3,\"B\":4,\"\":5,\"aa\":6}",
+      "strict": "ok",
+      "canonical": "{\"\":5,\"B\":4,\"a\":3,\"aa\":6,\"😀\":2,\"｡\":1}"
+    },
+    {
+      "name": "safe integer range and negative zero",
+      "input": "[0,-0,9007199254740991,-9007199254740991,42]",
+      "strict": "ok",
+      "canonical": "[0,0,9007199254740991,-9007199254740991,42]"
+    },
+    {
+      "name": "top-level scalar",
+      "input": "\"x\"",
+      "strict": "ok",
+      "canonical": "\"x\""
+    },
+    {
+      "name": "depth 32 is allowed",
+      "input": "[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]",
+      "strict": "ok",
+      "canonical": "[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]"
+    },
+    {
+      "name": "integer above 2^53-1 parses but cannot be canonical",
+      "input": "[9007199254740992]",
+      "strict": "ok",
+      "canonical": null
+    },
+    {
+      "name": "16 digits parse but exceed the safe range",
+      "input": "[-9999999999999999]",
+      "strict": "ok",
+      "canonical": null
+    },
+    {
+      "name": "raw UTF-8 4-byte character",
+      "inputHex": "5b22f09f9880225d",
+      "strict": "ok",
+      "canonical": "[\"😀\"]"
+    },
+    {
+      "name": "fraction",
+      "input": "[1.0]",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "exponent",
+      "input": "[1e3]",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "negative exponent",
+      "input": "[-1E-2]",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "half",
+      "input": "{\"t\":0.5}",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "17 digits",
+      "input": "[12345678901234567]",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "leading zero",
+      "input": "[01]",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "lone minus",
+      "input": "[-]",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "negative leading zero",
+      "input": "[-01]",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "duplicate key",
+      "input": "{\"a\":1,\"a\":2}",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "duplicate key after unescaping",
+      "input": "{\"a\":1,\"\\u0061\":2}",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "nested duplicate key",
+      "input": "{\"x\":{\"k\":1,\"k\":1}}",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "lone high surrogate escape",
+      "input": "[\"\\ud800\"]",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "lone low surrogate escape",
+      "input": "[\"\\udc00\"]",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "high surrogate followed by non-surrogate escape",
+      "input": "[\"\\ud800\\u0041\"]",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "reversed surrogate pair",
+      "input": "[\"\\ude00\\ud83d\"]",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "byte order mark",
+      "inputHex": "efbbbf7b7d",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "invalid UTF-8 byte",
+      "inputHex": "5b22ff225d",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "overlong UTF-8",
+      "inputHex": "5b22c0af225d",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "UTF-8 encoded surrogate (CESU-8)",
+      "inputHex": "5b22eda080225d",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "truncated UTF-8",
+      "inputHex": "5b22e282225d",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "depth 33",
+      "input": "[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "trailing comma in array",
+      "input": "[1,]",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "trailing comma in object",
+      "input": "{\"a\":1,}",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "trailing data",
+      "input": "{} {}",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "two values",
+      "input": "1 2",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "raw tab in string",
+      "input": "[\"a\tb\"]",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "raw newline in string",
+      "input": "[\"a\nb\"]",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "invalid escape",
+      "input": "[\"\\x41\"]",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "short unicode escape",
+      "input": "[\"\\u12\"]",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "non-breaking space as whitespace",
+      "input": "[ 1]",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "form feed as whitespace",
+      "input": "[\f1]",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "capitalised literal",
+      "input": "[True]",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "truncated literal",
+      "input": "[nul]",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "empty input",
+      "input": "",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "only whitespace",
+      "input": " \n",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "NaN",
+      "input": "[NaN]",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "Infinity",
+      "input": "[Infinity]",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "single quotes",
+      "input": "{'a':1}",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "unterminated string",
+      "input": "[\"abc",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "missing colon",
+      "input": "{\"a\" 1}",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "comment",
+      "input": "[1 /* c */]",
+      "strict": "reject",
+      "canonical": null
+    },
+    {
+      "name": "plus sign",
+      "input": "[+1]",
+      "strict": "reject",
+      "canonical": null
+    }
+  ]
+}

@@ -16,3 +16,8 @@ coverage/
 .next/
 .runner/
 apps/agent/
+
+# Protocol fixtures are byte-exact contracts (some are deliberately invalid JSON); generated files are checked for freshness instead.
+packages/protocol/fixtures/
+packages/protocol/src/generated/
+packages/protocol/history/
