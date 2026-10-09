@@ -3,13 +3,14 @@
 package protocol
 
 // ProtocolHash is the SHA-256 of the canonical schema bundle (bundle.json).
-const ProtocolHash = "143718a4f6ea898f4d4afc2fcb56f77c308e8dab28bd4c2f0c007c92c0590bf3"
+const ProtocolHash = "c67e072c232742c69718f4e49fa18fdc44f2fc65f61a165e6277af3173e5c6ff"
 
 // Protocol limits (schemas/limits.json).
 const (
 	LimitMaxMessageBytes       = 1048576
 	LimitMaxInlineTextBytes    = 262144
 	LimitMaxHTTPBodyBytes      = 65536
+	LimitMaxInputRefBytes      = 16777216
 	LimitMaxJSONDepth          = 32
 	LimitMaxIntegerDigits      = 16
 	LimitProgressIntervalMs    = 10000

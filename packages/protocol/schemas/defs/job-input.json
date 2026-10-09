@@ -18,7 +18,7 @@
           },
           "content": {
             "type": "string",
-            "maxLength": 262144
+            "maxLength": 16777216
           }
         }
       },
@@ -27,11 +27,11 @@
     },
     "prompt": {
       "type": "string",
-      "maxLength": 262144
+      "maxLength": 16777216
     },
     "continuationPrefix": {
       "type": "string",
-      "maxLength": 262144
+      "maxLength": 16777216
     }
   },
   "oneOf": [

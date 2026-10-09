@@ -90,6 +90,7 @@ type Codec struct {
 	messages  map[string]*jsonschema.Schema
 	http      map[string]*jsonschema.Schema
 	manifests map[string]*jsonschema.Schema
+	jobInput  *jsonschema.Schema
 	registry  map[string]messageInfo
 	httpInfo  map[string]httpInfo
 }
@@ -163,6 +164,9 @@ func newCodec(bundle []byte) (*Codec, error) {
 		return s, nil
 	}
 	if cd.envelope, err = compile("envelope.json"); err != nil {
+		return nil, err
+	}
+	if cd.jobInput, err = compile("defs/job-input.json"); err != nil {
 		return nil, err
 	}
 	for _, m := range messageRegistry {
@@ -331,6 +335,41 @@ func (c *Codec) EncodeMessage(msg *Message, sender Side) ([]byte, error) {
 		return nil, fmt.Errorf("refusing to send an invalid %s message: %w", msg.Type, derr)
 	}
 	return out, nil
+}
+
+// DecodeJobInput checks a job input body fetched through job.offer.inputRef: byte limit
+// (LimitMaxInputRefBytes, or a smaller positive opts.MaxBytes such as inputRef.bytes), strict JSON,
+// defs/job-input.json, and the input shape jobKind requires (chat: messages, completion: prompt). The
+// caller also checks the declared byte count and sha256; any failure is job.fail(input_invalid).
+// Same rules as the TS decodeJobInput.
+func (c *Codec) DecodeJobInput(data []byte, jobKind JobOfferJobKind, opts DecodeOptions) (*JobInput, *DecodeError) {
+	limit := opts.MaxBytes
+	if limit <= 0 {
+		limit = LimitMaxInputRefBytes
+	}
+	if len(data) > limit {
+		return nil, reject(CodeMessageTooLarge, fmt.Sprintf("%d > %d", len(data), limit), "")
+	}
+	inst, err := ParseStrictJSON(data)
+	if err != nil {
+		return nil, reject(CodeMalformedJSON, err.Error(), "")
+	}
+	if err := c.jobInput.Validate(inst); err != nil {
+		return nil, reject(CodeInvalidPayload, schemaDetail(err), "")
+	}
+	obj, _ := inst.(map[string]any) // job-input.json guarantees an object
+	shape := "prompt"
+	if jobKind == JobOfferJobKindChat {
+		shape = "messages"
+	}
+	if _, ok := obj[shape]; !ok {
+		return nil, reject(CodeInvalidPayload, string(jobKind)+" needs "+shape, "")
+	}
+	var in JobInput
+	if err := decodeStrict(data, &in); err != nil {
+		return nil, reject(CodeInvalidPayload, "typed decode failed", "")
+	}
+	return &in, nil
 }
 
 // DecodeHTTPBody validates an enrollment request or response body.

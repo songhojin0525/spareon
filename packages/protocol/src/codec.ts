@@ -20,6 +20,8 @@ import { BUNDLE_CANONICAL } from './generated/bundle.js';
 import type {
   HttpBodyMap,
   HttpBodyName,
+  JobInput,
+  JobOfferJobKind,
   ManifestKind,
   ManifestMap,
   MessageMap,
@@ -129,6 +131,17 @@ export interface ProtocolCodec {
     opts?: DecodeOptions,
   ): Decoded<HttpBodyMap[N]>;
   encodeHttpBody<N extends HttpBodyName>(name: N, body: HttpBodyMap[N]): string;
+  /**
+   * Checks a job input body fetched through job.offer.inputRef: byte limit (maxInputRefBytes, or a
+   * smaller positive maxBytes such as inputRef.bytes), strict JSON, defs/job-input.json, and the input
+   * shape that jobKind requires (chat: messages, completion: prompt). The caller also checks the
+   * declared byte count and sha256; any failure is job.fail(input_invalid). pause is always false.
+   */
+  decodeJobInput(
+    data: Uint8Array | string,
+    jobKind: JobOfferJobKind,
+    opts?: DecodeOptions,
+  ): Decoded<JobInput>;
   /** Schema check for an already strict-parsed manifest object (see sign.ts for the full procedure). */
   isValidManifest<K extends ManifestKind>(kind: K, value: unknown): value is ManifestMap[K];
 }
@@ -234,6 +247,29 @@ export function createCodec(bundle: ProtocolBundle = defaultBundle()): ProtocolC
       return text;
     },
     decodeHttpBody,
+    decodeJobInput(data, jobKind, opts = {}) {
+      const max = maxBytesOr(opts, 'maxInputRefBytes');
+      const size = sizeOf(data);
+      if (size > max) {
+        return { ok: false, code: 'message_too_large', detail: `${size} > ${max}`, pause: false };
+      }
+      const parsed = parseStrictJson(data);
+      if (!parsed.ok)
+        return { ok: false, code: 'malformed_json', detail: parsed.reason, pause: false };
+      if (!v.jobInput(parsed.value) || !isRecord(parsed.value)) {
+        return { ok: false, code: 'invalid_payload', detail: errorsText(v.jobInput), pause: false };
+      }
+      const shape = jobKind === 'chat' ? 'messages' : 'prompt';
+      if (!Object.hasOwn(parsed.value, shape)) {
+        return {
+          ok: false,
+          code: 'invalid_payload',
+          detail: `${jobKind} needs ${shape}`,
+          pause: false,
+        };
+      }
+      return { ok: true, value: parsed.value as JobInput };
+    },
     encodeHttpBody(name, body) {
       const text = JSON.stringify(body);
       const back = decodeHttpBody(name, text);

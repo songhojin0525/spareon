@@ -59,6 +59,7 @@ WS 메시지(받는 쪽 = `server` 또는 `agent`):
 | 7 | 인라인 텍스트 UTF-8 바이트 > 256 KiB | `invalid_payload` |
 
 HTTPS 본문: 1(한도 64 KiB, `maxHttpBodyBytes`) → 2 → `http/<name>.json`·7 → `invalid_payload`.
+`inputRef`로 받은 작업 입력 본문(`decodeJobInput`/`DecodeJobInput`): 1(한도 16 MiB `maxInputRefBytes`, 또는 더 작은 `inputRef.bytes`) → 2 → `defs/job-input.json` → `jobKind`에 맞는 모양(chat이면 `messages`, completion이면 `prompt`) → `invalid_payload`. 호출하는 쪽은 `bytes`·`sha256`도 확인하고, 실패는 모두 `job.fail(input_invalid)`.
 - 처음 실패한 검사가 코드를 정한다. TS·Go 둘 다 이 순서를 지키고, `fixtures/invalid/**/<case>.<code>.json` 파일 이름의 코드와 정확히 같은 코드를 내야 테스트가 통과한다.
 - 거부 사유 설명(`detail`)은 진단용이며 메시지 내용(프롬프트·출력)을 담지 않는다. 언어마다 문구가 달라도 된다.
 - 봉투가 유효했으면 `id`와 `type`을 함께 돌려주므로 `error` 응답의 `corr`에 넣을 수 있다.
@@ -110,7 +111,7 @@ HTTPS 본문: 1(한도 64 KiB, `maxHttpBodyBytes`) → 2 → `http/<name>.json`�
   - **검증 표시 없음**(D4, ADR 0007): 검증·카나리아 작업과 일반 작업은 메시지 형태로 구별할 수 없다. `verification` 같은 필드는 스키마가 거부한다(fixture `job.offer/verification-flag`).
   - `params.seed`는 **항상 있다**(0~2^32−1). 서버가 정한다. 나머지 파라미터도 모두 필수(기본값을 서버가 채운다).
   - 입력은 `input`(인라인) 또는 `inputRef`(HTTPS, 둘 중 정확히 하나). `jobKind = chat`이면 `input.messages`, `completion`이면 `input.prompt`. `continuationPrefix`는 이어쓰기 접두사(4.3절).
-  - `inputRef`: `url`(https만, 사용자 정보·`.`/`..` 경로 조각 금지), `token`(단기 서명 토큰, `Authorization`으로 보냄, 로그 금지), `sha256`(받은 본문의 해시), `bytes`. 받은 본문은 `defs/job-input.json`으로 검증하고 해시가 다르면 `job.fail(input_invalid)`. 에이전트는 서버 호스트 외의 URL을 따르지 않아야 한다(구현 S17·S22).
+  - `inputRef`: `url`(https만, 사용자 정보·`.`/`..` 경로 조각 금지), `token`(단기 서명 토큰, `Authorization`으로 보냄, 로그 금지), `sha256`(받은 본문의 해시), `bytes`. 받은 본문은 `decodeJobInput`/`DecodeJobInput`(4절)으로 검증하고 해시가 다르면 `job.fail(input_invalid)`. `defs/job-input.json`의 문자열 상한은 16 MiB(코드 포인트)라 큰 입력도 표현할 수 있고, 인라인일 때의 256 KiB는 판정 7단계(UTF-8 바이트)와 메시지 1 MiB 한도가 막는다. 그래서 256 KiB를 넘는 프롬프트와 선점 뒤 긴 `continuationPrefix`는 `inputRef`로 보낸다. 에이전트는 서버 호스트 외의 URL을 따르지 않아야 한다(구현 S17·S22).
   - 마감은 절대 시각이 아니라 `timeLimitMs`(받은 순간부터의 상대 시간, 에이전트 단조 시계). 리스는 `leaseTtlMs`.
 - `job.chunk.seq`는 시도마다 0부터 1씩 증가한다. 서버는 받은 청크만 구매자에게 전달·과금 근거로 쓴다(ADR 0009). `tokensSoFar`·`reportedTokens*`는 교차 검증용이다.
 - `job.progress`: 청크를 보내지 않는 동안(비스트리밍) 생성 중이면 `limits.json` `progressIntervalMs`(10초)마다 보낸다. T35(첫 진행 60초, 진행 사이 30초)를 넘으면 서버가 시도를 실패시킨다(D16).
@@ -309,7 +310,7 @@ sequenceDiagram
 
 ## 12. 보안 고려
 - **재전송**: `auth.prove`는 일회용 nonce에 묶인다. 메시지 `id`는 중복 감지용이며, 돈·상태에 영향을 주는 처리(`job.complete` 첫 유효 완료, 캡처)는 서버 쪽 조건부 갱신·멱등 키로 막는다(AGT-08, S11·S12). 시도 메시지는 세션의 노드가 그 시도의 노드인지 서버가 확인한다(AGT-09).
-- **크기**: 메시지 1 MiB, HTTPS 본문 64 KiB, 인라인 텍스트 256 KiB, 모든 문자열 `maxLength`, 모든 배열 `maxItems`, 모든 정수 범위, 중첩 32단계. 생성기가 규칙을 강제하므로 '제한 없는 필드'는 만들 수 없다(13절).
+- **크기**: 메시지 1 MiB, HTTPS 본문 64 KiB, 인라인 텍스트 256 KiB, `inputRef` 본문 16 MiB, 모든 문자열 `maxLength`, 모든 배열 `maxItems`, 모든 정수 범위, 중첩 32단계. 생성기가 규칙을 강제하므로 '제한 없는 필드'는 만들 수 없다(13절).
 - **서명 대상**: 9절. 도메인 분리, 형식 검사로 경계 고정, 비정규 스칼라 거부, 매니페스트는 검증 후 파싱.
 - **신뢰 경계**: 노드가 보낸 문자열(이름·버전·오류 메시지)은 좁은 문자 집합·길이 상한(WEB-03). 표시할 때도 웹은 이스케이프한다(S23).
 - **구별 불가능성**: `job.offer`에는 검증 표시가 없고 시드는 항상 있다(D4). 검증 작업의 크기·지연 분포 비교는 S13.

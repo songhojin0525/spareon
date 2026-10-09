@@ -2,6 +2,7 @@
   "maxMessageBytes": 1048576,
   "maxInlineTextBytes": 262144,
   "maxHttpBodyBytes": 65536,
+  "maxInputRefBytes": 16777216,
   "maxJsonDepth": 32,
   "maxIntegerDigits": 16,
   "progressIntervalMs": 10000,

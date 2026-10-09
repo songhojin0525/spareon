@@ -189,3 +189,42 @@ func TestCapabilitiesDigestVectors(t *testing.T) {
 		}
 	}
 }
+
+// TestJobInputVectors: inputRef bodies, same vector file and verdicts as the TS decodeJobInput test.
+func TestJobInputVectors(t *testing.T) {
+	var v struct {
+		Cases []struct {
+			Name         string          `json:"name"`
+			JobKind      JobOfferJobKind `json:"jobKind"`
+			Body         string          `json:"body"`
+			PromptRepeat int             `json:"promptRepeat"`
+			MaxBytes     int             `json:"maxBytes"`
+			Expect       string          `json:"expect"`
+		} `json:"cases"`
+	}
+	if err := json.Unmarshal(readFile(t, filepath.Join(fixtureDir, "vectors", "job-input.json")), &v); err != nil {
+		t.Fatal(err)
+	}
+	c := mustCodec(t)
+	for _, tc := range v.Cases {
+		t.Run(tc.Name, func(t *testing.T) {
+			body := tc.Body
+			if tc.PromptRepeat > 0 {
+				body = `{"prompt":"` + strings.Repeat("a", tc.PromptRepeat) + `"}`
+			}
+			in, derr := c.DecodeJobInput([]byte(body), tc.JobKind, DecodeOptions{MaxBytes: tc.MaxBytes})
+			got := "ok"
+			if derr != nil {
+				got = derr.Code
+			} else if in == nil {
+				t.Fatal("nil input without error")
+			}
+			if got != tc.Expect {
+				t.Fatalf("verdict %q, want %q (%v)", got, tc.Expect, derr)
+			}
+		})
+	}
+	if len(v.Cases) < 10 {
+		t.Fatalf("only %d cases", len(v.Cases))
+	}
+}

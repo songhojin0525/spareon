@@ -11,6 +11,8 @@ export interface CompiledValidators {
   readonly http: ReadonlyMap<string, ValidateFunction>;
   /** manifests/<kind>.json, keyed by manifest kind. */
   readonly manifests: ReadonlyMap<string, ValidateFunction>;
+  /** defs/job-input.json: job.offer.input and the body fetched through inputRef. */
+  readonly jobInput: ValidateFunction;
 }
 
 const stem = (rel: string, dir: string): string | null =>
@@ -56,5 +58,11 @@ export function compileValidators(bundle: ProtocolBundle): CompiledValidators {
     const k = stem(rel, 'manifests');
     if (k !== null) manifests.set(k, get(rel));
   }
-  return { envelope: get('envelope.json'), messages, http, manifests };
+  return {
+    envelope: get('envelope.json'),
+    messages,
+    http,
+    manifests,
+    jobInput: get('defs/job-input.json'),
+  };
 }

@@ -1,0 +1,89 @@
+{
+  "description": "Bodies fetched through job.offer.inputRef, checked by decodeJobInput (TS) / DecodeJobInput (Go). A case with promptRepeat uses the body {\"prompt\":\"<'a' x promptRepeat>\"} instead of body. maxBytes is the decode option (0 = default maxInputRefBytes).",
+  "cases": [
+    {
+      "name": "chat messages",
+      "jobKind": "chat",
+      "body": "{\"messages\":[{\"role\":\"system\",\"content\":\"be brief\"},{\"role\":\"user\",\"content\":\"hi\"}]}",
+      "maxBytes": 0,
+      "expect": "ok"
+    },
+    {
+      "name": "completion prompt with continuation prefix",
+      "jobKind": "completion",
+      "body": "{\"prompt\":\"Once upon\",\"continuationPrefix\":\" a time\"}",
+      "maxBytes": 0,
+      "expect": "ok"
+    },
+    {
+      "name": "prompt above the 256 KiB inline limit is fine by reference",
+      "jobKind": "completion",
+      "promptRepeat": 300000,
+      "maxBytes": 0,
+      "expect": "ok"
+    },
+    {
+      "name": "byte limit from inputRef.bytes",
+      "jobKind": "completion",
+      "promptRepeat": 300000,
+      "maxBytes": 300012,
+      "expect": "message_too_large"
+    },
+    {
+      "name": "exactly inputRef.bytes",
+      "jobKind": "completion",
+      "promptRepeat": 300000,
+      "maxBytes": 300013,
+      "expect": "ok"
+    },
+    {
+      "name": "chat job with a prompt body",
+      "jobKind": "chat",
+      "body": "{\"prompt\":\"hi\"}",
+      "maxBytes": 0,
+      "expect": "invalid_payload"
+    },
+    {
+      "name": "completion job with a messages body",
+      "jobKind": "completion",
+      "body": "{\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}]}",
+      "maxBytes": 0,
+      "expect": "invalid_payload"
+    },
+    {
+      "name": "both messages and prompt",
+      "jobKind": "chat",
+      "body": "{\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"prompt\":\"hi\"}",
+      "maxBytes": 0,
+      "expect": "invalid_payload"
+    },
+    {
+      "name": "extra field",
+      "jobKind": "completion",
+      "body": "{\"prompt\":\"hi\",\"verification\":true}",
+      "maxBytes": 0,
+      "expect": "invalid_payload"
+    },
+    {
+      "name": "empty object",
+      "jobKind": "completion",
+      "body": "{}",
+      "maxBytes": 0,
+      "expect": "invalid_payload"
+    },
+    {
+      "name": "duplicate key",
+      "jobKind": "completion",
+      "body": "{\"prompt\":\"a\",\"prompt\":\"b\"}",
+      "maxBytes": 0,
+      "expect": "malformed_json"
+    },
+    {
+      "name": "not an object",
+      "jobKind": "completion",
+      "body": "[\"hi\"]",
+      "maxBytes": 0,
+      "expect": "invalid_payload"
+    }
+  ]
+}

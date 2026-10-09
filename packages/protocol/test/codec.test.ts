@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -11,6 +14,7 @@ import {
   protocolHashOf,
   receiversOf,
 } from '../src/index.js';
+import { FIXTURE_DIR } from '../src/schema-source.js';
 
 const codec = defaultCodec();
 const meta = { id: '01920000-0000-7000-8000-000000000001', ts: '2026-10-09T04:36:00.000Z' };
@@ -118,5 +122,37 @@ describe('codec', () => {
     const r = codec.decodeMessage(JSON.stringify(m), 'agent');
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.detail).not.toContain(secret);
+  });
+});
+
+describe('decodeJobInput (inputRef bodies, vectors shared with Go)', () => {
+  interface JobInputCase {
+    name: string;
+    jobKind: 'chat' | 'completion';
+    body?: string;
+    promptRepeat?: number;
+    maxBytes: number;
+    expect: string;
+  }
+  const vectors = JSON.parse(
+    readFileSync(path.join(FIXTURE_DIR, 'vectors', 'job-input.json'), 'utf8'),
+  ) as { cases: JobInputCase[] };
+
+  it.each(vectors.cases.map((c) => [c.name, c] as const))('%s', (_n, c) => {
+    const body =
+      c.promptRepeat === undefined ? (c.body ?? '') : `{"prompt":"${'a'.repeat(c.promptRepeat)}"}`;
+    const r = codec.decodeJobInput(body, c.jobKind, { maxBytes: c.maxBytes });
+    expect(r.ok ? 'ok' : r.code).toBe(c.expect);
+  });
+
+  it('job.offer inputRef.bytes is capped at maxInputRefBytes', () => {
+    const offerSchema = defaultBundle().files['messages/job.offer.json'] as {
+      properties: {
+        payload: { properties: { inputRef: { properties: { bytes: { maximum: number } } } } };
+      };
+    };
+    expect(offerSchema.properties.payload.properties.inputRef.properties.bytes.maximum).toBe(
+      LIMITS.maxInputRefBytes,
+    );
   });
 });
