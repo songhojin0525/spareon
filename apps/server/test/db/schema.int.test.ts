@@ -60,7 +60,12 @@ describe('migrated schema (template database)', () => {
         (await c.query<{ tag: string }>('SELECT tag FROM binjari_meta.migrations ORDER BY idx'))
           .rows,
     );
-    expect(rows.map((r) => r.tag)).toEqual(['0000_schema', '0001_invariants', '0002_app_role']);
+    expect(rows.map((r) => r.tag)).toEqual([
+      '0000_schema',
+      '0001_invariants',
+      '0002_app_role',
+      '0003_review_fixes',
+    ]);
   });
 
   it('uses no floating-point, numeric, money, json or zone-less time columns', () => {

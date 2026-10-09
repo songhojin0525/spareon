@@ -153,6 +153,8 @@ export const nodes = pgTable(
   (t) => [
     // ADR 0008: one node per hardware fingerprint per store (reattach finds it here).
     unique('nodes_store_fp_store_key').on(t.storeId, t.fpStore),
+    // Target of earnings (node_id, store_id): an earning's store is its node's store.
+    unique('nodes_id_store_key').on(t.id, t.storeId),
     index('nodes_fp_global_idx').on(t.fpGlobal),
     index('nodes_store_state_idx').on(t.storeId, t.state),
     check('nodes_state_check', oneOf(t.state, NODE_STATES)),

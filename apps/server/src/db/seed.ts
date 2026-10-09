@@ -37,11 +37,15 @@ const envSchema = z.object({
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
 
+/**
+ * Conservative, like testkit's test-database check: only an explicit loopback host counts. An empty
+ * host (decided by PGHOST) or a `host=`/`hostaddr=` parameter (honoured by pg) may be remote.
+ */
 export function isLocalDatabaseUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
-    const host = parsed.hostname === '' ? 'localhost' : parsed.hostname;
-    return LOCAL_HOSTS.has(host);
+    if (parsed.searchParams.has('host') || parsed.searchParams.has('hostaddr')) return false;
+    return LOCAL_HOSTS.has(parsed.hostname);
   } catch {
     return false;
   }

@@ -25,7 +25,9 @@ beforeAll(async () => {
   const mod = (await import('mermaid')) as unknown as { default: MermaidApi };
   mermaid = mod.default;
   mermaid.initialize({ startOnLoad: false });
-}, 60_000);
+  // Loading mermaid + jsdom can take over a minute while `pnpm verify` runs every package's tests in
+  // parallel (the server's database tests start several Postgres instances). Only the load is slow.
+}, 180_000);
 
 const parseError = async (source: string): Promise<string | null> => {
   try {

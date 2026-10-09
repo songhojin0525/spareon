@@ -183,6 +183,10 @@ export const jobs = pgTable(
   },
   (t) => [
     // The queue (ADR 0002): SELECT ... WHERE status = 'queued' ORDER BY priority DESC, created_at FOR UPDATE SKIP LOCKED.
+    // Claim for one model (a node serves the model it has loaded): same order within the model.
+    index('jobs_queue_model_idx')
+      .on(t.modelId, t.priority.desc(), t.createdAt, t.id)
+      .where(sql`${t.status} = 'queued'`),
     index('jobs_queue_idx')
       .on(t.priority.desc(), t.createdAt, t.id)
       .where(sql`${t.status} = 'queued'`),
@@ -286,12 +290,18 @@ export const jobAttempts = pgTable(
   },
   (t) => [
     unique('job_attempts_job_seq_key').on(t.jobId, t.seq),
+    // Target of earnings (attempt_id, job_id, node_id): an earning matches its attempt's job and node.
+    unique('job_attempts_id_job_node_key').on(t.id, t.jobId, t.nodeId),
     uniqueIndex('job_attempts_one_active_key')
       .on(t.jobId)
       .where(sql`${t.status} IN ('offered', 'running')`),
     index('job_attempts_node_active_idx')
       .on(t.nodeId)
       .where(sql`${t.status} IN ('offered', 'running')`),
+    // Offer-timeout sweeper (T-budget for unanswered offers, S12).
+    index('job_attempts_offered_sweep_idx')
+      .on(t.offeredAt)
+      .where(sql`${t.status} = 'offered'`),
     index('job_attempts_lease_idx')
       .on(t.leaseExpiresAt)
       .where(sql`${t.status} = 'running'`),

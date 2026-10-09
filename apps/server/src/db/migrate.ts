@@ -95,8 +95,13 @@ export interface MigrationRunOptions {
   readonly url: string;
   readonly dir?: string;
   readonly log?: (message: string) => void;
-  /** Wait at most this long for table locks before failing (default 10 s). */
+  /** Wait at most this long for table locks inside a migration before failing (default 10 s). */
   readonly lockTimeoutMs?: number;
+  /**
+   * Wait at most this long for another runner to finish (default 120 s). A runner stuck while holding
+   * the lock must not hang every deploy forever.
+   */
+  readonly runnerWaitMs?: number;
 }
 
 interface AppliedRow {
@@ -105,10 +110,43 @@ interface AppliedRow {
   checksum: string;
 }
 
+const RUNNER_POLL_MS = 250;
+
+function positiveMs(value: number | undefined, fallback: number, name: string): number {
+  const ms = value ?? fallback;
+  if (!Number.isSafeInteger(ms) || ms < 1) {
+    throw new MigrationError(`${name} must be a positive integer (got ${String(value)})`);
+  }
+  return ms;
+}
+
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+/** Take the runner lock, polling with pg_try_advisory_lock so the wait is bounded. */
+async function acquireRunnerLock(client: pg.Client, waitMs: number): Promise<void> {
+  const tries = Math.max(1, Math.ceil(waitMs / RUNNER_POLL_MS));
+  for (let i = 0; i < tries; i++) {
+    const res = await client.query<{ ok: boolean }>('SELECT pg_try_advisory_lock($1, $2) AS ok', [
+      LOCK_KEY_1,
+      LOCK_KEY_2,
+    ]);
+    if (res.rows[0]?.ok === true) return;
+    await sleep(RUNNER_POLL_MS);
+  }
+  throw new MigrationError(
+    `another migration runner held the lock for more than ${String(waitMs)} ms; giving up`,
+  );
+}
+
 async function withMigrationLock<T>(
   options: MigrationRunOptions,
   fn: (client: pg.Client, applied: AppliedRow[], migrations: Migration[]) => Promise<T>,
 ): Promise<T> {
+  const lockTimeoutMs = positiveMs(options.lockTimeoutMs, 10_000, 'lockTimeoutMs');
+  const runnerWaitMs = positiveMs(options.runnerWaitMs, 120_000, 'runnerWaitMs');
   const migrations = await loadMigrations(options.dir);
   const client = new pg.Client({
     connectionString: options.url,
@@ -116,9 +154,9 @@ async function withMigrationLock<T>(
   });
   await client.connect();
   try {
-    await client.query('SELECT pg_advisory_lock($1, $2)', [LOCK_KEY_1, LOCK_KEY_2]);
+    await acquireRunnerLock(client, runnerWaitMs);
     try {
-      await client.query(`SET lock_timeout = ${String(options.lockTimeoutMs ?? 10_000)}`);
+      await client.query(`SET lock_timeout = ${String(lockTimeoutMs)}`);
       await client.query('CREATE SCHEMA IF NOT EXISTS binjari_meta');
       await client.query(`CREATE TABLE IF NOT EXISTS binjari_meta.migrations (
         idx integer PRIMARY KEY,
@@ -132,10 +170,14 @@ async function withMigrationLock<T>(
       verifyApplied(res.rows, migrations);
       return await fn(client, res.rows, migrations);
     } finally {
-      await client.query('SELECT pg_advisory_unlock($1, $2)', [LOCK_KEY_1, LOCK_KEY_2]);
+      // Never let an unlock failure (e.g. a dropped connection) hide the original error; the session
+      // ends right after, which releases the lock anyway.
+      await client
+        .query('SELECT pg_advisory_unlock($1, $2)', [LOCK_KEY_1, LOCK_KEY_2])
+        .catch(() => undefined);
     }
   } finally {
-    await client.end();
+    await client.end().catch(() => undefined);
   }
 }
 
@@ -240,11 +282,34 @@ export interface MigrationStatus {
   readonly pending: string[];
 }
 
-export async function migrationStatus(options: MigrationRunOptions): Promise<MigrationStatus> {
-  return withMigrationLock(options, (_client, done, migrations) =>
-    Promise.resolve({
+/** Read-only: needs no DDL rights and takes no lock (a runner may be applying migrations meanwhile). */
+export async function migrationStatus(
+  options: Pick<MigrationRunOptions, 'url' | 'dir'>,
+): Promise<MigrationStatus> {
+  const migrations = await loadMigrations(options.dir);
+  const client = new pg.Client({
+    connectionString: options.url,
+    application_name: 'binjari-migrate-status',
+  });
+  await client.connect();
+  try {
+    const exists = await client.query<{ t: string | null }>(
+      "SELECT to_regclass('binjari_meta.migrations')::text AS t",
+    );
+    const done =
+      exists.rows[0]?.t == null
+        ? []
+        : (
+            await client.query<AppliedRow>(
+              'SELECT idx, tag, checksum FROM binjari_meta.migrations ORDER BY idx',
+            )
+          ).rows;
+    verifyApplied(done, migrations);
+    return {
       applied: done.map((r) => r.tag),
       pending: migrations.slice(done.length).map((m) => m.tag),
-    }),
-  );
+    };
+  } finally {
+    await client.end().catch(() => undefined);
+  }
 }

@@ -301,6 +301,10 @@ export const holds = pgTable(
     }),
     unique('holds_purpose_reference_key').on(t.purpose, t.referenceId),
     index('holds_buyer_account_idx').on(t.buyerAccountId),
+    // M4 reconciliation: sum of active holds per buyer account (holds are never deleted).
+    index('holds_active_account_idx')
+      .on(t.buyerAccountId)
+      .where(sql`${t.status} = 'active'`),
     index('holds_active_expires_idx')
       .on(t.expiresAt)
       .where(sql`${t.status} = 'active'`),

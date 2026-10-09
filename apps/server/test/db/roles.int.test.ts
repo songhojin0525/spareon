@@ -24,7 +24,8 @@ const FULL = 'DELETE,INSERT,SELECT,UPDATE';
 const EXPECTED_GRANTS: Record<string, string> = {
   ledger_accounts: APPEND_ONLY,
   ledger_transactions: APPEND_ONLY,
-  ledger_postings: APPEND_ONLY,
+  // Table-level SELECT only: INSERT is granted on the columns the app writes, never on id (0003).
+  ledger_postings: READ_ONLY,
   audit_log: APPEND_ONLY,
   price_versions: APPEND_ONLY,
   price_entries: APPEND_ONLY,
@@ -156,6 +157,57 @@ describe('binjari_app role (least privilege)', () => {
       ).rows[0]?.balance;
     });
     expect(result).toBe('5');
+  });
+
+  it('inserts postings only through the writable columns (no chosen ids)', async () => {
+    const privileges = await db.withClient(
+      async (c) =>
+        (
+          await c.query<{ column: string; insert: boolean }>(
+            `SELECT a.attname AS column, has_column_privilege('binjari_app', 'public.ledger_postings', a.attname, 'INSERT') AS insert
+               FROM pg_attribute a WHERE a.attrelid = 'public.ledger_postings'::regclass AND a.attnum > 0 AND NOT a.attisdropped
+              ORDER BY a.attnum`,
+          )
+        ).rows,
+    );
+    expect(privileges).toEqual([
+      { column: 'id', insert: false },
+      { column: 'tx_id', insert: true },
+      { column: 'account_id', insert: true },
+      { column: 'currency', insert: true },
+      { column: 'amount', insert: true },
+    ]);
+    // The review's attack: a balanced entry, the immediate check, then an extra posting with id -1.
+    const attack = await asApp(async (c) => {
+      const conv = id();
+      const wallet = id();
+      await c.query('BEGIN');
+      await c.query(
+        `INSERT INTO ledger_accounts (id, kind, owner_type, owner_id, currency, allow_negative, created_at, shard)
+         VALUES ($1, 'fx_conversion', 'platform', NULL, 'CR', true, $3, 2),
+                ($2, 'buyer_wallet', 'user', $4, 'CR', false, $3, 0)`,
+        [conv, wallet, at(), id()],
+      );
+      const tx = id();
+      await c.query(
+        `INSERT INTO ledger_transactions (id, kind, idempotency_key, created_at) VALUES ($1, 'TEST_TOPUP', $2, $3)`,
+        [tx, `test:${tx}`, at()],
+      );
+      await c.query(
+        `INSERT INTO ledger_postings (tx_id, account_id, currency, amount) VALUES ($1, $2, 'CR', -5), ($1, $3, 'CR', 5)`,
+        [tx, conv, wallet],
+      );
+      await c.query('SET CONSTRAINTS ALL IMMEDIATE');
+      const result = await stateOf(
+        c.query(
+          `INSERT INTO ledger_postings (id, tx_id, account_id, currency, amount) OVERRIDING SYSTEM VALUE VALUES (-1, $1, $2, 'CR', 1000000)`,
+          [tx, wallet],
+        ),
+      );
+      await c.query('ROLLBACK');
+      return result;
+    });
+    expect(attack).toBe('42501');
   });
 
   it('cannot rewrite history, write balances or delete money records (42501)', async () => {

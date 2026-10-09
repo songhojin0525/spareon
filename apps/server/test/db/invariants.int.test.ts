@@ -211,6 +211,44 @@ describe('ledger invariants (DB-enforced)', () => {
     expect(await balance(c, wallet)).toBe(0n);
   });
 
+  it('review fix: a posting with a chosen lower id cannot slip in after the immediate check', async () => {
+    const conv = await account(c, 'fx_conversion', 'CR', { allowNegative: true });
+    const wallet = await account(c, 'buyer_wallet', 'CR');
+    const result = await txn(c, async () => {
+      const tx = await ledgerTx(c);
+      await post(c, tx, conv, 'CR', -5n);
+      await post(c, tx, wallet, 'CR', 5n);
+      await c.query('SET CONSTRAINTS ALL IMMEDIATE'); // checks the sum now (0) and passes
+      // Before the fix: id -1 is not the highest id, so the deferred check never summed it again.
+      await c.query(
+        `INSERT INTO ledger_postings (id, tx_id, account_id, currency, amount)
+         OVERRIDING SYSTEM VALUE VALUES (-1, $1, $2, 'CR', 1000000)`,
+        [tx, wallet],
+      );
+    });
+    expect(result).toBe('BJ001');
+    expect(await balance(c, wallet)).toBe(0n);
+  });
+
+  it('review fix: postings cannot target a ledger transaction another DB transaction has not committed', async () => {
+    const conv = await account(c, 'fx_conversion', 'CR', { allowNegative: true });
+    const wallet = await account(c, 'buyer_wallet', 'CR');
+    await c.query('BEGIN');
+    const tx = await ledgerTx(c);
+    await post(c, tx, conv, 'CR', -1n);
+    await post(c, tx, wallet, 'CR', 1n);
+    // Another connection tries to add a balanced pair while the creator is still open.
+    const intruder = await db.withClient((other) =>
+      txn(other, async () => {
+        await post(other, tx, conv, 'CR', -60n);
+        await post(other, tx, wallet, 'CR', 60n);
+      }),
+    );
+    await c.query('COMMIT');
+    expect(intruder).toBe('BJ004');
+    expect(await balance(c, wallet)).toBe(1n);
+  });
+
   it('refuses postings added to a transaction committed earlier (BJ004)', async () => {
     const conv = await account(c, 'fx_conversion', 'CR', { allowNegative: true });
     const wallet = await account(c, 'buyer_wallet', 'CR');
@@ -381,6 +419,41 @@ describe('append-only and derived tables', () => {
         ),
       ).toBe('BJ003');
       expect(await balance(c, wallet)).toBe(0n);
+    });
+  });
+
+  it('review fix: a hold is created active with nothing captured or released', async () => {
+    await db.withClient(async (c) => {
+      const wallet = await account(c, 'buyer_wallet', 'CR');
+      const conv = await account(c, 'fx_conversion', 'CR', { allowNegative: true });
+      let tx = '';
+      await txn(c, async () => {
+        tx = await ledgerTx(c);
+        await post(c, tx, conv, 'CR', -10n);
+        await post(c, tx, wallet, 'CR', 10n);
+      });
+      const insert = (status: string, captured: number, released: number): Promise<string> =>
+        stateOf(
+          c.query(
+            `INSERT INTO holds (id, buyer_account_id, currency, amount, captured_amount, released_amount, status, purpose, reference_id, hold_tx_id, expires_at, created_at, resolved_at)
+             VALUES ($1, $2, 'CR', 10, $3, $4, $5, 'job', $6, $7, $8, $9, $10)`,
+            [
+              id(),
+              wallet,
+              captured,
+              released,
+              status,
+              id(),
+              tx,
+              new Date(clock.nowMs() + 60_000).toISOString(),
+              at(),
+              status === 'active' ? null : at(),
+            ],
+          ),
+        );
+      expect(await insert('captured', 10, 0)).toBe('BJ005');
+      expect(await insert('active', 3, 0)).toBe('BJ005');
+      expect(await insert('active', 0, 0)).toBe('ok');
     });
   });
 

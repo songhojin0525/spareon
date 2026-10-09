@@ -19,7 +19,7 @@ import * as schema from '../../src/db/schema/index.js';
 import { openTestDb, type TestDb } from '../support/db.js';
 import { migrationBetween, type SchemaSnapshot, snapshotOf } from '../support/drizzle-kit.js';
 
-const TAGS = ['0000_schema', '0001_invariants', '0002_app_role'];
+const TAGS = ['0000_schema', '0001_invariants', '0002_app_role', '0003_review_fixes'];
 
 /** Schema dump of the app's objects; binjari_meta (migration bookkeeping) is compared separately. */
 async function dump(db: TestDb): Promise<string> {
@@ -126,10 +126,10 @@ describe('migration runner', () => {
       dialect: string;
       entries: unknown[];
     };
-    journal.entries = journal.entries.slice(0, 2);
+    journal.entries = journal.entries.slice(0, 3);
     await writeFile(journalFile, JSON.stringify(journal));
     await expect(migrate({ url: db.url, dir })).rejects.toThrow(
-      /0002_app_role.*not in the journal/,
+      /0003_review_fixes.*not in the journal/,
     );
   });
 
@@ -177,6 +177,32 @@ describe('migration runner', () => {
     const results = await Promise.all([migrate({ url: db.url }), migrate({ url: db.url })]);
     const applied = results.map((r) => r.applied).sort((a, b) => b.length - a.length);
     expect(applied).toEqual([TAGS, []]);
+  });
+
+  it('gives up after a bounded wait when another runner holds the lock', async () => {
+    const db = await fresh();
+    await db.withClient(async (holder) => {
+      await holder.query('SELECT pg_advisory_lock($1, $2)', [0x62696e6a, 1]);
+      await expect(migrate({ url: db.url, runnerWaitMs: 300 })).rejects.toThrow(
+        /another migration runner/,
+      );
+    });
+    // Released with the holder's session: the next run proceeds.
+    expect((await migrate({ url: db.url })).applied).toEqual(TAGS);
+  });
+
+  it('status is read-only (no schema created, no lock taken)', async () => {
+    const db = await fresh();
+    expect(await migrationStatus({ url: db.url })).toEqual({ applied: [], pending: TAGS });
+    const meta = await db.withClient(
+      async (c) =>
+        (
+          await c.query<{ n: number }>(
+            "SELECT count(*)::int AS n FROM pg_namespace WHERE nspname = 'binjari_meta'",
+          )
+        ).rows[0]?.n,
+    );
+    expect(meta).toBe(0);
   });
 
   it('rejects invalid rollback step counts', async () => {
@@ -254,17 +280,18 @@ describe('db CLI', () => {
   };
 
   it('migrates, reports status and rolls back only with confirmation', async () => {
-    expect((await run(['migrate'])).out.at(-1)).toBe('applied 3');
+    expect((await run(['migrate'])).out.at(-1)).toBe('applied 4');
     expect((await run(['migrate'])).out).toEqual(['up to date']);
     expect((await run(['status'])).out).toEqual(TAGS.map((t) => `applied  ${t}`));
     const refused = await run(['rollback']);
     expect(refused.code).toBe(2);
     expect(refused.err.join('\n')).toContain('--yes');
-    expect((await run(['rollback', '--yes', '--steps', '2'])).out.at(-1)).toBe('rolled back 2');
+    expect((await run(['rollback', '--yes', '--steps', '3'])).out.at(-1)).toBe('rolled back 3');
     expect((await run(['status'])).out).toEqual([
       'applied  0000_schema',
       'pending  0001_invariants',
       'pending  0002_app_role',
+      'pending  0003_review_fixes',
     ]);
     expect((await run(['rollback', '--yes', '--all'])).out.at(-1)).toBe('rolled back 1');
   });

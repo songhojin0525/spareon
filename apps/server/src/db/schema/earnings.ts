@@ -2,9 +2,11 @@ import { sql } from 'drizzle-orm';
 import {
   type AnyPgColumn,
   check,
+  foreignKey,
   index,
   pgTable,
   text,
+  unique,
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
@@ -67,6 +69,8 @@ export const payoutRecords = pgTable(
   },
   (t) => [
     index('payout_records_store_idx').on(t.storeId, t.recordedAt.desc()),
+    // Target of earnings (payout_record_id, store_id): a payout record links only its own store's earnings.
+    unique('payout_records_id_store_key').on(t.id, t.storeId),
     check('payout_records_currency_check', sql`${t.currency} = 'CR'`),
     check('payout_records_amount_check', sql`${t.amountUcr} > 0`),
     check('payout_records_method_check', oneOf(t.method, PAYOUT_METHODS)),
@@ -122,6 +126,22 @@ export const earnings = pgTable(
   (t) => [
     // One earning per attempt: a capture replay cannot pay the same attempt twice.
     uniqueIndex('earnings_attempt_key').on(t.attemptId),
+    // Consistency the payout and reconciliation code relies on (M10): node, store, job and attempt agree.
+    foreignKey({
+      name: 'earnings_node_store_fk',
+      columns: [t.nodeId, t.storeId],
+      foreignColumns: [nodes.id, nodes.storeId],
+    }),
+    foreignKey({
+      name: 'earnings_attempt_job_node_fk',
+      columns: [t.attemptId, t.jobId, t.nodeId],
+      foreignColumns: [jobAttempts.id, jobAttempts.jobId, jobAttempts.nodeId],
+    }),
+    foreignKey({
+      name: 'earnings_payout_record_store_fk',
+      columns: [t.payoutRecordId, t.storeId],
+      foreignColumns: [payoutRecords.id, payoutRecords.storeId],
+    }),
     index('earnings_store_status_idx').on(t.storeId, t.status),
     index('earnings_node_status_idx').on(t.nodeId, t.status),
     index('earnings_pending_matures_idx')

@@ -106,7 +106,7 @@ erDiagram
 | 운영 | `settings` | 설정·기능 플래그(`ledger_frozen` 등), 개발 시드 표시 `dev.seed` | — |
 | | `audit_log` | 민감 동작 감사 기록(추가 전용) | 영구 |
 | | `outbox_events` | 트랜잭션 아웃박스(ID·상태만) | 발행 후 정리 |
-| 메타 | `binjari_meta.migrations` | 적용한 마이그레이션 태그·체크섬 | — |
+| 메타 | `binjari_meta.migrations` | 적용한 마이그레이션 태그·체크섬 (`0000_schema` 표, `0001_invariants` 트리거, `0002_app_role` 역할, `0003_review_fixes` 검토 반영) | — |
 
 ## 4. 불변식과 강제 위치
 
@@ -114,36 +114,39 @@ erDiagram
 
 | ID | 불변식 | 강제 위치 | 구현 | 테스트 |
 |---|---|---|---|---|
-| M1 | 거래 하나의 통화별 기입 합 = 0, 기입 없는 거래 금지 | DB(커밋 시점) | 지연 제약 트리거 `ledger_tx_balanced`(거래마다)·`ledger_postings_balanced`(기입마다, 마지막 기입에서만 합 계산). `SET CONSTRAINTS ... IMMEDIATE` 뒤에 붙인 기입도 다시 검사 | `invariants.int.test.ts` |
-| M1-b | 기입은 거래를 만든 DB 트랜잭션 안에서만 붙는다(커밋된 옛 거래에 합 0 쌍을 끼워 넣는 위조 차단) | DB | `created_xid = pg_current_xact_id()`를 트리거가 강제로 채우고 기입 때 비교(BJ004) | `invariants.int.test.ts` |
+| M1 | 거래 하나의 통화별 기입 합 = 0, 기입 없는 거래 금지 | DB(커밋 시점) | 지연 제약 트리거 `ledger_tx_balanced`(거래마다)·`ledger_postings_balanced`(기입마다, 마지막 기입에서만 합 계산). `SET CONSTRAINTS ... IMMEDIATE` 뒤에 붙인 기입도 다시 검사. 기입은 그 거래 안에서 id가 커지는 순서로만 붙는다(작은 id를 골라 넣어 마지막 기입 검사를 피하는 우회 차단, 0003). 앱 역할은 `id` 열에 INSERT 권한이 없다(`OVERRIDING SYSTEM VALUE` 불가) | `invariants`·`roles.int.test.ts` |
+| M1-b | 기입은 거래를 만든 DB 트랜잭션 안에서만 붙는다(커밋된 옛 거래나 아직 커밋 안 된 남의 거래에 합 0 쌍을 끼워 넣는 위조 차단) | DB | `created_xid = pg_current_xact_id()`를 트리거가 강제로 채우고 기입 때 비교. 거래 행이 보이지 않아도 거부(BJ004, 0003) | `invariants.int.test.ts` |
 | M2 | 계정 잔액 = 그 계정 기입 합 | DB(트리거) + 대사(S06) | 기입 INSERT 트리거가 같은 트랜잭션에서 `balance += amount`, `version += 1`. 직접 쓰기는 트리거 밖에서 거부(BJ003) | 속성 테스트(`invariants.int.test.ts`) |
 | M3 | 음수 불가 계정은 음수가 되지 않는다 | DB | `account_balances_non_negative_check`(`allow_negative`를 복합 FK로 복사). 음수 허용은 비용·출처·변환 계정 종류만(CHECK) | `invariants.int.test.ts` |
 | M4 | 홀드 계정 잔액 = 활성 홀드 합, 미성숙 계정 = pending·held 수익 합 | 대사(S06) | — | S06 |
-| M5 | 홀드는 끝나면 `captured + released = amount`, 끝난 홀드는 다시 바뀌지 않는다 | DB | `holds_resolved_check`, 트리거 `holds_guard`(BJ005) | `invariants.int.test.ts` |
+| M5 | 홀드는 `active`로 시작하고(INSERT 검사), 끝나면 `captured + released = amount`, 끝난 홀드는 다시 바뀌지 않는다 | DB | `holds_resolved_check`, 트리거 `holds_insert_guard`·`holds_guard`(BJ005) | `invariants.int.test.ts` |
 | M6 | 캡처 ≤ 홀드, 금액은 줄지 않는다, 시도당 수익 1건 | DB + 앱(S06) | `holds_amounts_check`, `holds_guard`, `earnings_attempt_key` | `invariants`·`factories.int.test.ts` |
 | M7 | 같은 멱등 키는 한 번만 | DB | `ledger_transactions_idempotency_key`, `idempotency_keys` 기본 키 | `invariants.int.test.ts` |
 | M8 | TCR은 정산 처리 중·외부 환전 정산·준비금으로 가지 않는다 | DB | 계정 종류별 허용 통화 CHECK + 기입 통화 = 계정 통화(복합 FK). 정산 기록은 CR만(CHECK) | `invariants.int.test.ts` |
 | M9 | 크레딧이 무에서 생기는 거래는 `TEST_TOPUP`·`SANDBOX_TOPUP`뿐 | 앱(S06) + 감사 | 거래 종류 CHECK 목록. 어떤 종류가 어떤 계정을 움직이는지는 S06 | S06 |
-| M10 | 정산 기록에 연결된 수익은 `matured`에서 한 번만 연결, TCR 수익은 연결 불가 | DB | `earnings_payout_link_check`(CR만, 상태와 연결이 함께), 트리거 `earnings_guard` | `factories.int.test.ts` |
+| M10 | 정산 기록에 연결된 수익은 `matured`에서 한 번만 연결, TCR 수익은 연결 불가, 같은 매장의 정산 기록에만 | DB | `earnings_payout_link_check`(CR만, 상태와 연결이 함께), 트리거 `earnings_insert_guard`(수익은 `pending`·`held`로, 정산 기록은 `recorded`로 시작)·`earnings_guard`(연결은 `matured`에서 한 번), 복합 FK `(payout_record_id, store_id)`·`(node_id, store_id)`·`(attempt_id, job_id, node_id)` | `factories.int.test.ts` |
 | M11 | 준비금 = 테스트 충전 − 외부 지출 − 정산 지급 | 대사(S06) + 런북 | — | S06 |
 | A1 | `ledger_accounts`·`ledger_transactions`·`ledger_postings`·`audit_log`·`price_versions`·`price_entries`·`fx_rates`는 추가만 | DB + DB 역할 | 행 트리거(UPDATE·DELETE)와 문장 트리거(TRUNCATE)로 거부(BJ002). `binjari_app`은 SELECT·INSERT 권한만 | `invariants`·`roles.int.test.ts` |
 | A2 | `holds`·`earnings`·`payout_records`는 지우지 않고, 금액·주체는 바뀌지 않으며 끝난 상태는 최종 | DB + DB 역할 | 트리거(BJ005), 앱 역할에 DELETE 권한 없음 | `invariants`·`factories`·`roles` |
 | A3 | 트리거를 끄는 경로가 없다 | DB 역할 | 모든 불변식 트리거 `ENABLE ALWAYS`(`session_replication_role = replica`에서도 동작). `binjari_app`은 테이블 소유자가 아니고 DDL·TRIGGER·TRUNCATE 권한이 없으며 슈퍼유저가 아니다 | `roles.int.test.ts` |
 | A4 | 잔액 트리거를 임시 테이블로 속일 수 없다 | DB | `SECURITY DEFINER` 함수는 `search_path = pg_catalog, pg_temp` + 스키마를 붙인 이름 | `roles.int.test.ts` |
-| Q1 | 큐 조회가 인덱스를 탄다 | DB | `jobs_queue_idx`(`status = 'queued'` 부분 인덱스, `priority DESC, created_at, id`) | `factories.int.test.ts`(EXPLAIN) |
+| Q1 | 큐·스윕·대사 조회가 인덱스를 탄다 | DB | `jobs_queue_model_idx`(`model_id, priority DESC, created_at, id`, `status = 'queued'` 부분), `jobs_queue_idx`(모델 무관), `job_attempts_offered_sweep_idx`·`job_attempts_lease_idx`(만료 스윕), `holds_active_account_idx`(M4 대사), `ledger_postings_account_idx`(M2 대사) | `factories.int.test.ts`(통계가 있는 2만 행에서 실제 claim 쿼리의 EXPLAIN) |
 | C1 | 구매자 콘텐츠는 암호문으로만, 정해진 열에만 | DB 스키마 | `job_payloads.ciphertext`·`batch_files.ciphertext`(최소 28바이트), 콘텐츠 열 목록 고정 테스트 | `schema.int.test.ts` |
 
 트리거가 쓰는 SQLSTATE: `BJ001` 합 불일치, `BJ002` 추가 전용 위반, `BJ003` 잔액 직접 쓰기, `BJ004` 다른 트랜잭션에서 기입, `BJ005` 돈 기록 금지 변경. 서버는 `src/db/errors.ts`의 `toDbError()`로 타입 있는 코드로 바꾼다(쿼리 내용·파라미터는 메시지에 넣지 않는다).
 
-**DB가 막지 못하는 것(의도)**: 마이그레이션 소유자(DDL 권한) 연결은 트리거를 지우거나 끌 수 있다. 그래서 운영에서 서버는 소유자로 접속하지 않는다(5절). 거래가 '맞는 종류의 계정'을 움직이는지(예: `JOB_CAPTURE`가 홀드에서 나가는지)는 비즈니스 규칙이라 S06 원장 서비스와 대사가 맡는다.
+**DB가 막지 못하는 것(의도)**:
+- 마이그레이션 소유자(DDL 권한) 연결은 트리거를 지우거나 끌 수 있다. 그래서 운영에서 서버는 소유자로 접속하지 않는다(5절).
+- 거래가 '맞는 종류의 계정'을 움직이는지(예: `JOB_CAPTURE`가 홀드에서 나가는지)는 비즈니스 규칙이라 S06 원장 서비스와 대사가 맡는다.
+- **앱 역할로도 크레딧을 만들 수 있다(M9는 DB가 막지 않는다).** `binjari_app`은 음수 허용 계정(예: `fx_conversion`)을 만들고, 그 계정에서 구매자 지갑으로 가는 합 0 거래를 쓸 수 있다. DB가 보장하는 것은 '합 0·음수 금지·기록 불변'까지이고, 누가 어떤 종류의 거래를 만들 수 있는지는 S06(거래 종류별 허용 계정)과 대사(M11: 준비금 대조, 발행 감사)가 막는다. 탈취된 앱 연결은 여전히 돈 사고다 — 다만 흔적(추가 전용 기록)은 지울 수 없다.
 
 ## 5. DB 역할
 | 역할 | 누가 | 권한 |
 |---|---|---|
 | 마이그레이션 소유자 | `pnpm db:migrate`를 돌리는 연결(관리형 DB의 관리 계정) | 테이블·함수 소유, DDL |
-| `binjari_app` (NOLOGIN 그룹) | 서버. 운영 로그인 역할을 이 역할의 멤버로 만든다(S30) | 추가 전용 표 7개: SELECT·INSERT / `account_balances`: SELECT / `holds`·`earnings`·`payout_records`: SELECT·INSERT·UPDATE / 나머지: SELECT·INSERT·UPDATE·DELETE / 시퀀스 USAGE·SELECT. TRUNCATE·TRIGGER·REFERENCES·DDL 없음 |
+| `binjari_app` (NOLOGIN 그룹) | 서버. 운영 로그인 역할을 이 역할의 멤버로 만든다(S30) | 추가 전용 표 7개: SELECT·INSERT(단 `ledger_postings`는 `tx_id, account_id, currency, amount` 열에만 INSERT — `id`는 지정 불가) / `account_balances`: SELECT / `holds`·`earnings`·`payout_records`: SELECT·INSERT·UPDATE / 나머지: SELECT·INSERT·UPDATE·DELETE / 시퀀스 USAGE·SELECT. TRUNCATE·TRIGGER·REFERENCES·DDL 없음 |
 
-- 새 테이블은 `0002_app_role` 이후 마이그레이션에서 권한을 정해야 한다. 정하지 않으면 `roles.int.test.ts`가 실패한다.
+- 새 테이블은 그 테이블을 만드는 마이그레이션에서 권한을 정해야 한다. 정하지 않으면 `roles.int.test.ts`가 실패한다.
 - 역할은 클러스터 전역이다. down 마이그레이션은 이 DB의 권한만 회수하고 역할은 지우지 않는다. 역할을 만들 권한(`CREATEROLE`)이 없는 DB에서는 마이그레이션이 실패한다(조용히 건너뛰면 서버가 소유자 권한으로 돌게 되므로). 그때는 관리자가 `CREATE ROLE binjari_app NOLOGIN`을 먼저 하면 된다.
 
 ## 6. 마이그레이션
@@ -158,7 +161,9 @@ erDiagram
 - 실행기는 직접 만들었다(`src/db/migrate.ts`): 저널(`drizzle/meta/_journal.json`) 순서, 파일마다 한 트랜잭션, `binjari_meta.migrations`에 태그·SHA-256 체크섬 기록(줄 끝 CRLF·LF 무관), 적용 뒤 바뀐 파일·저널에 없는 적용 기록이 있으면 거부, advisory lock으로 동시 실행 직렬화, `lock_timeout` 10초.
 - down은 `drizzle/down/<tag>.sql`. 되돌리기 전에 필요한 down 파일이 모두 있는지 먼저 확인한다.
 - 트리거·함수·권한은 `drizzle-kit generate --custom`으로 만든 빈 마이그레이션에 손으로 쓴다(0001, 0002).
-- 마이그레이션 파일 머리에 잠금 영향(`Locking:`)을 적는다. 큰 테이블에 잠금이 긴 변경(열 타입 변경, 기본값 있는 NOT NULL 추가, 인덱스 생성)은 `CONCURRENTLY`·나눠 적용을 검토하고 주석으로 표시한다.
+- 마이그레이션 파일 머리에 잠금 영향(`Locking:`)을 적는다. 실행기는 파일마다 트랜잭션으로 감싸므로 `CREATE INDEX CONCURRENTLY`는 마이그레이션 파일에 쓸 수 없다. 운영 중인 큰 테이블에 잠금이 긴 변경(열 타입 변경, 인덱스·제약 추가)이 필요해지면 ① 인덱스는 운영자가 `CONCURRENTLY`로 먼저 만들고 ② 마이그레이션은 `ADD CONSTRAINT ... USING INDEX` 또는 `NOT VALID` 뒤 `VALIDATE CONSTRAINT`로 짧게 잠그는 방식으로 나눈다(절차는 S30 런북). 파일럿 전에는 테이블이 비어 있어 해당 없음.
+- 실행기 잠금은 `pg_try_advisory_lock`을 기다리되 상한(기본 120초)이 있다. 멈춘 실행기 하나가 배포를 무기한 막지 않는다. `db:status`는 읽기만 한다(DDL·잠금 없음).
+- down 파일은 체크섬을 기록하지 않는다(개발·사고 대응용. 운영 되돌리기는 새 up 마이그레이션으로 한다).
 - 검증(`test/db/migrate.int.test.ts`): up → 전체 down → up 뒤 카탈로그 덤프가 같다(수용 3), 단계별 down·up도 같다. 드리프트 검사 두 가지 — ① 마지막 drizzle-kit 스냅숏과 TS 스키마의 차이가 없다 ② drizzle-kit이 TS 스키마에서 만든 SQL을 빈 DB에 적용한 결과와 마이그레이션한 DB의 표·열·제약·인덱스가 같다(손으로 다듬은 SQL이 TS와 어긋나면 실패).
 
 ## 7. 테스트 키트

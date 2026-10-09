@@ -1,6 +1,6 @@
 import { isUuidV7, MICRO_CR_PER_CR, uuidV7TimeMs } from '@binjari/shared';
 import { createSeededRandom, FakeClock } from '@binjari/testkit';
-import { eq, sql } from 'drizzle-orm';
+import { eq, type SQL, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { type Tx, withTransaction } from '../../src/db/client.js';
@@ -82,15 +82,25 @@ describe('factories', () => {
       ORDER BY priority DESC, created_at, id LIMIT 1 FOR UPDATE SKIP LOCKED`;
     const first = await db.db.execute<{ id: string }>(claim);
     expect(first.rows[0]?.id).toBe(high.id);
-    const plan = await withTransaction(db.db, async (tx) => {
-      await tx.execute(sql`SET LOCAL enable_seqscan = off`);
-      const rows = await tx.execute<{ 'QUERY PLAN': string }>(
-        sql`EXPLAIN SELECT id FROM jobs WHERE status = 'queued' ORDER BY priority DESC, created_at, id LIMIT 1 FOR UPDATE SKIP LOCKED`,
-      );
-      return rows.rows.map((r) => r['QUERY PLAN']).join('\n');
-    });
-    expect(plan).toContain('jobs_queue_idx');
     expect(low.priority).toBe(0);
+
+    // A realistic table: thousands of finished and queued jobs of a busier model, with statistics.
+    // The planner must then pick the per-model queue index for the real claim query on its own.
+    const other = await f.model();
+    const filler = (n: number, modelId: string, status: string): SQL =>
+      sql`INSERT INTO jobs (id, buyer_id, kind, currency, model_id, status, params, input_bytes, max_tokens,
+            price_version_id, deadline_at, created_at, status_changed_at, ended_at)
+          SELECT gen_random_uuid(), ${low.buyerId}, 'chat', 'CR', ${modelId}, ${status}, '{}'::jsonb, 1, 1,
+                 ${pv.id}, now() + interval '1 hour', now(), now(),
+                 CASE WHEN ${status} = 'completed' THEN now() END
+            FROM generate_series(1, ${n})`;
+    await db.db.execute(filler(20_000, other.id, 'completed'));
+    await db.db.execute(filler(3_000, other.id, 'queued'));
+    await db.db.execute(filler(200, model.id, 'completed'));
+    await db.db.execute(sql`ANALYZE jobs`);
+    const plan = await db.db.execute<{ 'QUERY PLAN': string }>(sql`EXPLAIN ${claim}`);
+    expect(plan.rows.map((r) => r['QUERY PLAN']).join('\n')).toContain('jobs_queue_model_idx');
+    expect((await db.db.execute<{ id: string }>(claim)).rows[0]?.id).toBe(high.id);
   });
 
   it('ledger accounts follow ACCOUNT_RULES and entries move balances', async () => {
@@ -200,12 +210,81 @@ describe('earnings and payout record guards (M10, BJ005)', () => {
       .returning();
     if (payout === undefined) throw new Error('insert failed');
 
+    // Review fix: records start in their initial state, and node/store/job/attempt/payout agree.
+    const base = { ...earning, payoutRecordId: null };
+    expect(
+      await stateOf(
+        db.db.insert(earnings).values({
+          ...base,
+          id: f.id(),
+          status: 'payout_recorded',
+          matureTxId: await entry('direct-mature'),
+          payoutRecordId: payout.id,
+        }),
+      ),
+    ).toBe('BJ005');
+    const elsewhere = await f.node();
+    const otherJob = await f.job({ status: 'completed' });
+    const otherAttempt = await f.attempt({
+      jobId: otherJob.id,
+      nodeId: elsewhere.id,
+      status: 'completed',
+    });
+    // An earning claiming another store than its node's.
+    expect(
+      await stateOf(
+        db.db.insert(earnings).values({
+          ...base,
+          id: f.id(),
+          nodeId: elsewhere.id,
+          jobId: otherJob.id,
+          attemptId: otherAttempt.id,
+        }),
+      ),
+    ).toBe('23503');
+    // An earning whose attempt belongs to another node.
+    expect(
+      await stateOf(
+        db.db.insert(earnings).values({
+          ...base,
+          id: f.id(),
+          jobId: otherJob.id,
+          attemptId: otherAttempt.id,
+        }),
+      ),
+    ).toBe('23503');
+    const otherStorePayout = {
+      ...payout,
+      id: f.id(),
+      storeId: elsewhere.storeId,
+      recordTxId: await entry('record-other-store'),
+    };
+    await db.db.insert(payoutRecords).values(otherStorePayout);
+    expect(
+      await stateOf(
+        db.db.insert(payoutRecords).values({
+          ...payout,
+          id: f.id(),
+          status: 'settled',
+          recordTxId: await entry('record-settled'),
+          settledAt: clock.now(),
+          settledBy: operator.id,
+          settleTxId: await entry('settle-direct'),
+          krwAmount: 1n,
+        }),
+      ),
+    ).toBe('BJ005');
+
     // M10: only a matured earning can be linked.
     expect(await upd({ status: 'payout_recorded', payoutRecordId: payout.id })).toBe('BJ005');
     // Matured needs its ledger transaction.
     expect(await upd({ status: 'matured' })).toBe('23514');
     expect(await upd({ status: 'matured', matureTxId: await entry('mature') })).toBe('ok');
     expect(await upd({ matureTxId: await entry('mature-again') })).toBe('BJ005');
+    // A payout record of another store cannot take this store's earning.
+    expect(await upd({ status: 'payout_recorded', payoutRecordId: otherStorePayout.id })).toBe(
+      '23503',
+    );
     expect(await upd({ status: 'payout_recorded', payoutRecordId: payout.id })).toBe('ok');
     // The link is set once.
     const other = { ...payout, id: f.id(), recordTxId: await entry('record-2') };
@@ -280,6 +359,9 @@ describe('dev seed', () => {
     expect(isLocalDatabaseUrl('postgres://u:p@127.0.0.1:5432/x')).toBe(true);
     expect(isLocalDatabaseUrl('postgres://u:p@localhost/x')).toBe(true);
     expect(isLocalDatabaseUrl('postgres://u:p@db.example.supabase.co:5432/postgres')).toBe(false);
+    // Review fix: the target could be decided elsewhere (PGHOST, host= parameter).
+    expect(isLocalDatabaseUrl('postgres:///x')).toBe(false);
+    expect(isLocalDatabaseUrl('postgres://u:p@localhost/x?host=db.example.com')).toBe(false);
     const io = { out: [] as string[], err: [] as string[] };
     const sink = { out: (l: string) => io.out.push(l), err: (l: string) => io.err.push(l) };
     const remote = await runSeedCli(
