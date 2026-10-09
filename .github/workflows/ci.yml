@@ -33,7 +33,7 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: apps/agent/go.mod
-          cache-dependency-path: apps/agent/go.mod
+          cache-dependency-path: apps/agent/go.sum
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -59,7 +59,7 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: apps/agent/go.mod
-          cache-dependency-path: apps/agent/go.mod
+          cache-dependency-path: apps/agent/go.sum
 
       - name: Go test
         run: go test ./...
