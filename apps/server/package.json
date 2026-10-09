@@ -8,7 +8,10 @@
     "start": "tsx src/main.ts",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/bin/db.ts migrate",
+    "db:rollback": "tsx src/bin/db.ts rollback",
+    "db:status": "tsx src/bin/db.ts status"
   },
   "dependencies": {
     "@binjari/shared": "workspace:*",
