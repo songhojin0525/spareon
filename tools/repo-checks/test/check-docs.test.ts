@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -113,6 +113,15 @@ describe('check-docs', () => {
   it('the repository itself passes, including the required design documents', () => {
     expect(checkDocs(repoRoot, { requiredFiles: REQUIRED_FILES })).toEqual([]);
   });
+
+  it('ARCHITECTURE.md keeps at least 10 sequence diagrams and 6 state machines (S01 criterion 2)', () => {
+    const text = readFileSync(path.join(repoRoot, 'docs', 'ARCHITECTURE.md'), 'utf8');
+    const kinds = extractMermaidBlocks(text).map(
+      (b) => b.body.find((l) => l.trim() !== '' && !l.trim().startsWith('%%'))?.trim() ?? '',
+    );
+    expect(kinds.filter((k) => k.startsWith('sequenceDiagram')).length).toBeGreaterThanOrEqual(10);
+    expect(kinds.filter((k) => k.startsWith('stateDiagram')).length).toBeGreaterThanOrEqual(6);
+  });
 });
 
 const STAGES = '| ID | 파일 |\n|---|---|\n| S00 | a |\n| S01 | b |\n| S12 | c |\n';
@@ -186,6 +195,32 @@ describe('check-docs: mermaid structure and state machine actors', () => {
     expect(STATE_ACTORS).toContain('손님');
   });
 
+  it('requires an event after the actor and ignores actors hidden in %% comments', () => {
+    write(
+      'docs/a.md',
+      [
+        '```mermaid',
+        'stateDiagram-v2',
+        '  a --> b : [에이전트]',
+        '  b --> c : 사건 %%: [운영자]',
+        '  c --> d : [운영자] 해제 %% 주석은 괜찮다',
+        '```',
+        '',
+      ].join('\n'),
+    );
+    expect(checkDocs(root)).toEqual([
+      "docs/a.md:3: state transition without an event after the actor (': [actor] event')",
+      "docs/a.md:4: state transition without a trigger actor (': [actor] event')",
+    ]);
+  });
+
+  it('finds the diagram type after mermaid front matter', () => {
+    write('docs/a.md', '```mermaid\n---\ntitle: 노드\n---\nstateDiagram-v2\n  a --> b\n```\n');
+    expect(checkDocs(root)).toEqual([
+      "docs/a.md:6: state transition without a trigger actor (': [actor] event')",
+    ]);
+  });
+
   it('does not apply the actor rule outside docs/ or to non-state diagrams', () => {
     write('prompts/x.md', '```mermaid\nstateDiagram-v2\n  a --> b\n```\n');
     write('docs/f.md', '```mermaid\nflowchart LR\n  a --> b\n```\n');
@@ -204,16 +239,31 @@ describe('check-docs: threat model tables', () => {
     expect(checkDocs(root)).toEqual([]);
   });
 
-  it('rejects rows without a stage or a reason, and duplicate IDs', () => {
+  it('rejects rows without a stage or a reason, free text, and duplicate IDs', () => {
     write(
       'docs/THREAT_MODEL.md',
-      `# t\n${header}| T-1 | a | b | 나중에 |\n| T-2 | a | b | 수용: |\n| T-1 | a | b | S06 |\n| | a | b | S06 |\n`,
+      [
+        '# t',
+        header.trimEnd(),
+        '| T-1 | a | b | 나중에 |',
+        '| T-2 | a | b | 수용: |',
+        '| T-1 | a | b | S06 |',
+        '| | a | b | S06 |',
+        '| T-3 | a | b | 나중에 S01에서 검토 안 함 |',
+        '| T-4 | a | b | 수용: - |',
+        '| T-5 | a | b | S06 아마도 |',
+        '',
+      ].join('\n'),
     );
+    const msg = "'담당 차수' must be stage IDs only (SNN, SNN) or '수용: <reason>'";
     expect(checkDocs(root)).toEqual([
-      "docs/THREAT_MODEL.md:4: '담당 차수' must name a stage (SNN) or '수용: <reason>'",
-      "docs/THREAT_MODEL.md:5: '담당 차수' must name a stage (SNN) or '수용: <reason>'",
+      `docs/THREAT_MODEL.md:4: ${msg}`,
+      `docs/THREAT_MODEL.md:5: ${msg}`,
       'docs/THREAT_MODEL.md:6: duplicate threat ID T-1 (also line 4)',
       'docs/THREAT_MODEL.md:7: threat row without ID',
+      `docs/THREAT_MODEL.md:8: ${msg}`,
+      `docs/THREAT_MODEL.md:9: ${msg}`,
+      `docs/THREAT_MODEL.md:10: ${msg}`,
     ]);
   });
 

@@ -6,9 +6,9 @@
 //   3. PROGRESS.md stage rows and stage REPORT.md files use only the allowed status values.
 //   4. Every stage reference (S00..) exists in prompts/STAGES.md; every "ADR NNNN" text reference has a file.
 //   5. Mermaid blocks are closed and not empty; stateDiagram transitions under docs/ name a trigger actor
-//      (": [actor] event", actor from STATE_ACTORS).
-//   6. docs/THREAT_MODEL.md: every row of a table with a '담당 차수' column names a stage ID or
-//      '수용: <reason>', and threat IDs are unique.
+//      and an event (": [actor] event", actor from STATE_ACTORS; front matter and %% comments handled).
+//   6. docs/THREAT_MODEL.md: every row of a table with a '담당 차수' column holds only stage IDs or
+//      '수용: <reason>' (reason of 4+ letters), and threat IDs are unique.
 //   7. (CLI only) the design documents every later stage relies on exist (REQUIRED_FILES).
 // Mermaid *syntax* is checked by tools/repo-checks/test/mermaid-syntax.test.ts with the real parser,
 // because that needs dependencies and this script must run before `pnpm install`.
@@ -343,6 +343,19 @@ export function extractMermaidBlocks(text) {
 }
 
 /**
+ * The diagram keyword of a mermaid block (first content line after an optional `---` front matter).
+ * @param {string[]} content non-empty, non-comment lines of the block
+ */
+export function diagramKind(content) {
+  let k = 0;
+  if (content[0]?.trim() === '---') {
+    const close = content.findIndex((l, i) => i > 0 && l.trim() === '---');
+    k = close < 0 ? content.length : close + 1;
+  }
+  return content[k]?.trim() ?? '';
+}
+
+/**
  * @param {string} file
  * @param {string} text
  * @returns {string[]} problems
@@ -358,15 +371,21 @@ export function checkMermaid(file, text) {
       problems.push(`${file}:${block.line}: mermaid block is empty`);
       continue;
     }
-    if (!underDocs || !/^stateDiagram/.test(content[0]?.trim() ?? '')) continue;
+    if (!underDocs || !/^stateDiagram/.test(diagramKind(content))) continue;
     block.body.forEach((raw, j) => {
-      const line = raw.trim();
-      if (!line.includes('-->') || line.startsWith('%%')) return;
+      // Text after %% is a mermaid comment: an actor written there does not count.
+      const line = raw.replace(/%%.*$/, '').trim();
+      if (!line.includes('-->')) return;
       const where = `${file}:${block.line + j + 1}`;
-      const label = /:\s*\[([^\]]+)\]/.exec(line);
+      const label = /:\s*\[([^\]]+)\]\s*(\S?)/.exec(line);
       if (label?.[1] === undefined) {
         problems.push(`${where}: state transition without a trigger actor (': [actor] event')`);
         return;
+      }
+      if (label[2] === '') {
+        problems.push(
+          `${where}: state transition without an event after the actor (': [actor] event')`,
+        );
       }
       for (const actor of label[1].split(/[/·,]/).map((a) => a.trim())) {
         if (!STATE_ACTORS.includes(actor))
@@ -384,6 +403,17 @@ export function checkMermaid(file, text) {
 export function splitRow(line) {
   const body = line.trim().replace(/^\|/, '').replace(/\|$/, '');
   return body.split(/(?<!\\)\|/).map((c) => c.trim());
+}
+
+/**
+ * A '담당 차수' cell is either a plain list of stage IDs ("S05, S12") or an explicit acceptance
+ * ("수용: <reason>") whose reason has at least 4 letters or digits, so "나중에 S01" or "수용: -" fail.
+ * @param {string} value
+ */
+export function isStageCell(value) {
+  if (/^S\d{2}(?:\s*,\s*S\d{2})*$/.test(value)) return true;
+  const reason = /^수용\s*[:：]\s*(.*)$/.exec(value)?.[1] ?? '';
+  return reason.replace(/[^\p{L}\p{N}]/gu, '').length >= 4;
 }
 
 /**
@@ -412,9 +442,9 @@ export function checkThreatModel(root) {
       const cells = splitRow(lines[j] ?? '');
       const where = `${THREAT_FILE}:${j + 1}`;
       const value = cells[stageCol] ?? '';
-      if (!/\bS\d{2}\b/.test(value) && !/^수용\s*[:：]\s*\S/.test(value)) {
+      if (!isStageCell(value)) {
         problems.push(
-          `${where}: '${THREAT_STAGE_COLUMN}' must name a stage (SNN) or '수용: <reason>'`,
+          `${where}: '${THREAT_STAGE_COLUMN}' must be stage IDs only (SNN, SNN) or '수용: <reason>'`,
         );
       }
       if (idCol < 0) continue;
