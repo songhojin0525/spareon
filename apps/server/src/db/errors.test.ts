@@ -52,9 +52,7 @@ describe('toDbError', () => {
   });
 
   it('ignores error codes that are not SQLSTATEs (Node system errors)', () => {
-    expect(sqlState(Object.assign(new Error('refused'), { code: 'ECONNREFUSED' }))).toBe(
-      undefined,
-    );
+    expect(sqlState(Object.assign(new Error('refused'), { code: 'ECONNREFUSED' }))).toBe(undefined);
   });
 });
 

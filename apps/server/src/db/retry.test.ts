@@ -73,8 +73,6 @@ describe('retry', () => {
 
   it('rejects a non-positive or fractional attempt limit', async () => {
     await expect(retry(() => Promise.resolve(1), { maxAttempts: 0 })).rejects.toThrow(RangeError);
-    await expect(retry(() => Promise.resolve(1), { maxAttempts: 1.5 })).rejects.toThrow(
-      RangeError,
-    );
+    await expect(retry(() => Promise.resolve(1), { maxAttempts: 1.5 })).rejects.toThrow(RangeError);
   });
 });

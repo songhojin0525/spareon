@@ -11,7 +11,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/bin/db.ts migrate",
     "db:rollback": "tsx src/bin/db.ts rollback",
-    "db:status": "tsx src/bin/db.ts status"
+    "db:status": "tsx src/bin/db.ts status",
+    "db:seed": "tsx src/bin/seed.ts"
   },
   "dependencies": {
     "@binjari/shared": "workspace:*",
