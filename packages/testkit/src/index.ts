@@ -9,6 +9,18 @@ export {
 } from './clock.js';
 export type { DatabaseSource, StartTestDatabaseOptions, TestDatabase } from './db.js';
 export { resolveDatabaseSource, startTestDatabase } from './db.js';
+export type {
+  FakeAcceptMode,
+  FakeAgentOptions,
+  FakeAgentProtocol,
+  FakeAgentStats,
+  FakeBehavior,
+  FakeCapabilities,
+  FakeDecoded,
+  FakeEnvelope,
+  FakeRunMode,
+} from './fake-agent.js';
+export { FAKE_AGENT_VERSION, FakeAgent, fakeOutput } from './fake-agent.js';
 export type { GlobalSetup, TestDatabaseSetupOptions } from './global-setup.js';
 export { createTestDatabaseSetup } from './global-setup.js';
 export type { IsolatedDatabase, IsolatedDatabaseOptions, TestDatabaseInfo } from './isolated.js';

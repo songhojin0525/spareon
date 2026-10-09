@@ -27,6 +27,7 @@
     "@binjari/testkit": "workspace:*",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
+    "@types/ws": "catalog:",
     "drizzle-kit": "catalog:",
     "fast-check": "catalog:",
     "tsx": "catalog:",
