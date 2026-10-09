@@ -61,7 +61,16 @@
       "Bash(powershell:*)",
       "Bash(bash scripts/:*)",
       "Bash(sh scripts/:*)",
-      "Bash(make:*)"
+      "Bash(make:*)",
+      "Bash(git clone:*)",
+      "Bash(env)",
+      "Bash(date:*)",
+      "Bash(uname:*)",
+      "Bash(whoami:*)",
+      "Bash(net session:*)",
+      "Bash(sed:*)",
+      "Bash(grep:*)",
+      "Bash(printf:*)"
     ],
     "deny": [
       "Bash(git push --force:*)",
