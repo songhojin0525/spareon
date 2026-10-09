@@ -65,12 +65,15 @@ v0.1이 쓸 PostgreSQL 스키마를 Drizzle(TS)로 정의하고, drizzle-kit이 
 - 템플릿 DB에 연결이 남아 있으면 `CREATE DATABASE ... TEMPLATE`이 실패 → 마이그레이션 함수가 풀을 닫는지 테스트.
 
 ## 체크포인트
+
+> 재개(2026-10-09) 때 순서 조정: 중단 시점 작업 트리에 스키마·SQL 0000~0002·실행기가 이미 함께 있었고 클라이언트가 스키마 타입을 쓰므로, 스키마·마이그레이션 SQL·실행기를 2로, 클라이언트를 3으로 바꿨다. 4는 실행기·불변식 검증과 CLI.
+
 | # | 내용 | 검증 |
 |---|---|---|
 | 1 | 테스트 키트 확장: 템플릿 준비 훅, 빈 DB 옵션, FakeClock, 시드 난수, 스키마 덤프 | testkit 단위·통합 테스트 |
-| 2 | DB 클라이언트(`client.ts`: 풀, 트랜잭션 헬퍼, 직렬화 실패·교착 재시도) | 서버 통합 테스트(실제 40001 유도) |
-| 3 | Drizzle 스키마 전체 + drizzle-kit 설정 + 생성 SQL 검토본(0000) | typecheck, 생성 SQL 적용 |
-| 4 | 불변식 마이그레이션(트리거) + 실행기(up/down/체크섬/잠금) + CLI(`db:migrate`·`db:rollback`) + 템플릿에 적용 | 제약 테스트(수용 2), up→down→up 덤프 비교(수용 3), 드리프트 검사 |
+| 2 | Drizzle 스키마 전체 + drizzle-kit 설정 + 검토한 SQL(0000~0002) + 마이그레이션 실행기 + 테스트 템플릿에 적용 | 스키마 카탈로그 테스트(열 타입·시계 기본값·콘텐츠 열 목록·큐 인덱스), `drizzle-kit generate` 변경 없음 |
+| 3 | DB 클라이언트(`client.ts`: 풀, 트랜잭션 헬퍼, 직렬화 실패·교착 재시도) | 단위 테스트 + 서버 통합 테스트(실제 40001·40P01 유도) |
+| 4 | 실행기 테스트(체크섬·부분 실패·동시 실행·down 순서) + CLI(`db:migrate`·`db:rollback`·`db:status`) + 불변식 제약 테스트 | 제약 테스트(수용 2), up→down→up 덤프 비교(수용 3), 드리프트 검사 |
 | 5 | 앱 역할 분리 + 우회 시도 테스트 | 역할로 UPDATE·DISABLE TRIGGER·잔액 직접 변경 실패 |
 | 6 | 팩토리 + 시드 스크립트(`db:seed`) | 팩토리 통합 테스트, 시드 두 번 실행 |
 | 7 | `docs/DB.md`(ERD·불변식 표), ADR 0018, ARCHITECTURE·README 갱신, CI에 Postgres 서비스(`DATABASE_URL` 경로) | check-docs, `pnpm verify`, `DATABASE_URL`로 서버 테스트 |
