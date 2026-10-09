@@ -12,7 +12,9 @@
     "db:migrate": "tsx src/bin/db.ts migrate",
     "db:rollback": "tsx src/bin/db.ts rollback",
     "db:status": "tsx src/bin/db.ts status",
-    "db:seed": "tsx src/bin/seed.ts"
+    "db:seed": "tsx src/bin/seed.ts",
+    "dev:server": "tsx src/bin/dev-server.ts",
+    "demo": "tsx src/bin/demo.ts"
   },
   "dependencies": {
     "@binjari/protocol": "workspace:*",
