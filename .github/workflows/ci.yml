@@ -46,6 +46,42 @@ jobs:
         env:
           REQUIRE_GO: '1'
 
+  postgres:
+    # The DATABASE_URL path (S03 acceptance 1): migrations, invariant triggers and the app role on a
+    # real Postgres server instead of embedded-postgres. The password is for this throwaway container only.
+    name: linux (server tests on a Postgres service)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: binjari-ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Server tests (DATABASE_URL)
+        run: pnpm --filter @binjari/server test
+        env:
+          DATABASE_URL: postgres://postgres:binjari-ci@127.0.0.1:5432/postgres
+
   windows:
     name: windows (agent go test)
     runs-on: windows-latest

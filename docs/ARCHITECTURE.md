@@ -995,16 +995,18 @@ flowchart LR
 | ID | 불변식 | 강제 위치 |
 |---|---|---|
 | M1 | 모든 거래에서 통화별 기입 합 = 0 | DB 제약 + 원장 |
-| M2 | 계정 잔액 = 그 계정 기입 합 | 원장 + 대사 |
+| M2 | 계정 잔액 = 그 계정 기입 합 | DB 트리거(기입이 잔액을 갱신, 직접 쓰기 거부) + 대사 |
 | M3 | 음수 불가 계정은 음수가 되지 않는다 | DB 제약 |
 | M4 | 홀드 계정 잔액 = 활성 홀드 합, 미성숙 계정 = pending·held 수익 합 | 대사 |
-| M5 | 모든 홀드는 결국 captured·released·expired 중 하나로 끝난다 | 스케줄러 + 청소 작업 + 시뮬레이션 |
-| M6 | 작업 하나에 캡처는 최대 1번(배치는 줄마다 1번), 캡처 ≤ 홀드 | 멱등 키 + 조건부 갱신 |
+| M5 | 모든 홀드는 결국 captured·released·expired 중 하나로 끝난다 | 스케줄러 + 청소 작업 + 시뮬레이션. 끝난 홀드는 `captured + released = amount`이고 다시 바뀌지 않는다(DB 제약·트리거) |
+| M6 | 작업 하나에 캡처는 최대 1번(배치는 줄마다 1번), 캡처 ≤ 홀드 | 멱등 키 + 조건부 갱신 + DB 제약(캡처+해제 ≤ 홀드, 시도당 수익 1건) |
 | M7 | 같은 멱등 키 재실행은 잔액을 바꾸지 않는다 | 멱등 테이블(UNIQUE) |
-| M8 | TCR은 정산 처리 중·외부 환전 정산·준비금으로 가지 않는다 | 원장 거래 종류 검증 |
+| M8 | TCR은 정산 처리 중·외부 환전 정산·준비금으로 가지 않는다 | 원장 거래 종류 검증 + DB 제약(계정 종류별 허용 통화, 기입 통화 = 계정 통화) |
 | M9 | 크레딧이 무에서 생기는 거래는 `TEST_TOPUP`(운영자)·샌드박스 충전뿐이다. 검증 보수도 플랫폼 매출에서 나온다 | 원장 거래 종류 목록 + 감사 |
 | M10 | 정산 기록에 연결된 수익은 모두 `matured`이고 한 번만 연결된다. `under_review`·`held`·TCR 수익은 연결되지 않는다 | 원장 + DB 제약 |
 | M11 | 원장의 준비금(KRW) = 테스트 충전 합 − 외부 지출 − 정산 지급. 은행 잔고와는 사람이 대조 | 대사 + 운영 런북 |
+
+DB가 강제하는 부분(트리거·제약·최소 권한 역할 `binjari_app`)과 각 불변식의 테스트 위치는 [DB.md](DB.md) 4절(ADR 0018).
 
 ## 10. 안전 스위치와 기능 플래그
 | 스위치 | 기본값 | 켜면 | 위치 | 담당 |
@@ -1070,6 +1072,7 @@ BUSINESS_CONTEXT의 사업 결정은 뒤집지 않았다. 아래는 차수 명�
 | D27 | 명령 확인 메시지 없음(S02, 4.9 `확인(ack)`) | `ack`(result, code?) 추가. `job.cancel`·`control.*`·`config.update`·`model.ensure`·`update.available`에 `corr`로 1초(T15) 안에 응답 | ack 없이 명령을 성공 처리하면 킬스위치가 전달됐다고 착각한다(S11 검토 포인트) | S02, S11, S17 |
 | D28 | `job.complete`의 `outputRef`는 정의 없음(S02) | `outputRef = {kind: "chunks", chunkCount}` = "출력은 `job.chunk` 0..N−1을 이어붙인 것". 256 KiB 넘는 출력은 청크로 보낸다. 별도 업로드 경로 없음 | 업로드 엔드포인트·토큰 없이 큰 출력을 처리하고, 서버가 받은 청크만 근거로 쓴다(ADR 0009) | S02, S12, S17 |
 | D29 | `hello`에 지문 없음(S02) | `hello`에 `fpStore`·`fpGlobal`(D3), `auth.ok`에 `control`(현재 제어 상태)·`needCapabilities`, `heartbeat.ack`·`auth.ok`에 `serverTime` | 인증 때마다 '같은 키 + 다른 지문' 복제 탐지(ADR 0008), 재연결 즉시 Paused(4.9), 서버 시각 기반 일정(7절) | S02, S10, S11, S17 |
+| D30 | 테이블 최소 목록(S03): `jobs`에 입력·결과 암호문, `params_b`·`score`·`reputation` 실수, 상태 이름(노드 `state`, 수익 `pending/matured/clawed_back`, 릴리스 `draft/rolling/...`) | 구매자 콘텐츠는 `job_payloads`(암호문·보존 기한)로 분리, 실수 열 대신 정수(`params_millions`·`score_ppm`·`reputation_ppm`), 상태 이름은 5절, 통화에 `TCR`, 지문 2개(`fp_store`·`fp_global`), 홀드는 도메인 FK 없이 `(purpose, reference_id)` | 큐 테이블을 작게 하고 콘텐츠 파기를 행 삭제로(ADR 0010), 부동소수점 금지(절대 규칙 3), 5절 상태 기계와 일치(ADR 0018) | S03, S06, S12, S13 |
 
 사업 쪽에 남기는 관찰(결정은 사람 몫, HUMAN_TODO 후보):
 - 사장님 수익은 원장에서 CR이고 지급은 원화다. 어느 시점 환율로 바꿀지(지급 기록 시점 권장)와 세금 처리는 미정이다.

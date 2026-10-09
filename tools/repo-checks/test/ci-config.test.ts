@@ -16,6 +16,7 @@ interface Step {
 interface Job {
   'runs-on': string;
   steps: Step[];
+  services?: Record<string, { image?: string }>;
   defaults?: { run?: { 'working-directory'?: string } };
 }
 interface Workflow {
@@ -49,6 +50,14 @@ describe('ci.yml', () => {
     expect(uses.some((u) => u.startsWith('pnpm/action-setup@'))).toBe(true);
     const node = linux?.steps.find((s) => s.uses?.startsWith('actions/setup-node@') === true);
     expect(node?.with?.['cache']).toBe('pnpm');
+  });
+
+  it('postgres job runs the server tests against a Postgres 16 service through DATABASE_URL', () => {
+    const job = wf.jobs['postgres'];
+    expect(job?.['runs-on']).toBe('ubuntu-latest');
+    expect(job?.services?.['postgres']?.image).toMatch(/^postgres:16(\.|$)/);
+    const step = job?.steps.find((s) => s.run === 'pnpm --filter @binjari/server test');
+    expect(step?.env?.['DATABASE_URL']).toMatch(/^postgres:\/\/[^@]+@127\.0\.0\.1:5432\//);
   });
 
   it('windows job runs go test in apps/agent', () => {
