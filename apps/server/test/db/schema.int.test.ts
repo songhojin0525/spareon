@@ -7,7 +7,7 @@ import { openTestDb, type TestDb } from '../support/db.js';
 
 /** Every pgTable exported by the Drizzle schema. */
 function schemaTables(): PgTable[] {
-  return Object.values(schema).filter((v): v is PgTable => is(v, PgTable));
+  return (Object.values(schema) as unknown[]).filter((v): v is PgTable => is(v, PgTable));
 }
 
 interface ColumnRow {
