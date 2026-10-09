@@ -138,7 +138,7 @@ function loadEvents(limit = 40) {
       if (!l.trim()) continue;
       try {
         const e = JSON.parse(l);
-        if (e && e.t) out.push({ t: e.t, stage: e.stage ?? null, kind: String(e.kind ?? ''), text: String(e.text ?? ''), worker: e.worker ?? null });
+        if (e && e.t) out.push({ t: e.t, stage: e.stage ?? null, kind: String(e.kind ?? ''), text: String(e.text ?? ''), worker: e.worker ?? null, from: e.from ?? null, to: e.to ?? null });
       } catch {
         /* 깨진 줄 무시 */
       }
@@ -149,6 +149,94 @@ function loadEvents(limit = 40) {
   } finally {
     if (fd !== undefined) fs.closeSync(fd);
   }
+}
+
+// ───────────────────────── MAGI (에이전트 간 메시지) ─────────────────────────
+// 지휘자(MELCHIOR·1) ↔ 차수 담당(BALTHASAR·2) ↔ 검토자(CASPER·3) 사이에 오간 것을 활동 기록에서 다시 만든다.
+// 명시적 메시지(status.mjs msg)가 있으면 그대로 쓰고, 나머지는 기록 종류로 추정한다(추정은 inferred=true).
+const MAGI_UNITS = ['conductor', 'builder', 'reviewer'];
+
+function magiMessages(events) {
+  const out = [];
+  const phaseOf = {};
+  const push = (e, from, to, text, inferred = true) => {
+    if (!MAGI_UNITS.includes(from) || !MAGI_UNITS.includes(to) || from === to) return;
+    out.push({ t: e.t, stage: e.stage ?? null, from, to, text, inferred });
+  };
+  for (const e of events) {
+    const prev = e.stage ? phaseOf[e.stage] : null;
+    switch (e.kind) {
+      case 'msg':
+        push(e, e.from, e.to, e.text, false);
+        break;
+      case 'runner': {
+        const m = e.text.match(/^(S\d{2})\b/);
+        if (/^stop/i.test(e.text)) break;
+        push({ ...e, stage: m ? m[1] : null }, 'conductor', 'builder', /retry/i.test(e.text) ? `재시도 지시 · ${e.text}` : m ? `${m[1]} 맡김` : e.text);
+        break;
+      }
+      case 'start':
+        push(e, 'builder', 'conductor', `${e.stage} 수락 · 시작`);
+        break;
+      case 'resume':
+        push(e, 'builder', 'conductor', `${e.stage} 이어서 시작`);
+        break;
+      case 'plan':
+        push(e, 'builder', 'conductor', `계획 보고 · ${e.text.replace(/^plan ready · /, '')}`);
+        break;
+      case 'checkpoint':
+        push(e, 'builder', 'conductor', e.text);
+        break;
+      case 'phase': {
+        const ph = (e.text.match(/phase → (\w+)/) || [])[1] || '';
+        if (ph === 'review') push(e, 'builder', 'reviewer', '적대적 검토 요청');
+        else if (prev === 'review') push(e, 'reviewer', 'builder', ph === 'build' ? '검토 지적 전달 · 수정 필요' : '검토 결과 전달');
+        if (e.stage) phaseOf[e.stage] = ph;
+        break;
+      }
+      case 'finish':
+        if (e.stage && phaseOf[e.stage] === 'review') push(e, 'reviewer', 'builder', '검토 결과 전달');
+        push(e, 'builder', 'conductor', `결과 보고 · ${e.text}`);
+        if (e.stage) phaseOf[e.stage] = null;
+        break;
+      default:
+        break;
+    }
+  }
+  return out;
+}
+
+function buildMagi(rows, events, runnerState) {
+  const msgs = magiMessages(events);
+  const run = rows.find((r) => r.status === 'IN_PROGRESS') || null;
+  const lastFinished = rows.filter((r) => r.finishedAt).sort((a, b) => Date.parse(b.finishedAt) - Date.parse(a.finishedAt))[0] || null;
+  const units = {
+    conductor: { state: 'standby', text: '' },
+    builder: { state: 'standby', text: '' },
+    reviewer: { state: 'standby', text: '' },
+  };
+  if (run) {
+    const stale = run.stale;
+    units.conductor = { state: stale ? 'alert' : 'wait', text: stale ? '응답 없음 · /resume 필요' : `${run.id} 결과 대기` };
+    if (run.phase === 'review') {
+      units.reviewer = { state: stale ? 'alert' : 'active', text: run.activity || '적대적 검토 중' };
+      units.builder = { state: 'wait', text: `${run.id} 검토 결과 대기` };
+    } else {
+      units.builder = { state: stale ? 'alert' : 'active', text: `${run.id} ${run.activity || run.phaseLabel || ''}`.trim() };
+    }
+  } else if (runnerState === 'stopped') {
+    units.conductor = { state: 'halt', text: '러너 멈춤' };
+  } else if (runnerState === 'finished') {
+    units.conductor = { state: 'approve', text: '모든 차수 완료' };
+  } else {
+    units.conductor = { state: 'active', text: '다음 차수 고르는 중' };
+  }
+  // 결의: 진행 중이면 審議中, 아니면 마지막으로 끝난 차수의 결과
+  let verdict;
+  if (run) verdict = { code: run.phase === 'review' ? 'review' : 'build', stage: run.id, text: run.name };
+  else if (lastFinished) verdict = { code: lastFinished.status === 'BLOCKED' ? 'reject' : 'approve', stage: lastFinished.id, text: lastFinished.name };
+  else verdict = { code: 'idle', stage: null, text: '' };
+  return { units, verdict, messages: msgs.slice(-40).reverse() };
 }
 
 function loadTodos() {
@@ -268,6 +356,7 @@ function buildState() {
   }
 
   const events = loadEvents(40);
+  const magiEvents = loadEvents(400);
   const runnerStatus = (readText(P('.runner', 'STATUS')) || '').trim().split(/\r?\n/)[0] || '';
   const lastActivity = Math.max(
     mtime(P('.runner', 'events.jsonl')),
@@ -295,6 +384,7 @@ function buildState() {
     events: events.reverse(),
     todos: { open: todos.open.slice(0, 12), openCount: todos.open.length, done: todos.done },
     commits: loadCommits(),
+    magi: buildMagi(rows, magiEvents, runner.state),
     hasStages: rows.length > 0,
   };
 }
