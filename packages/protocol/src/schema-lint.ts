@@ -14,6 +14,31 @@
  */
 
 const MAX_SAFE = 2 ** 53 - 1;
+/** Largest maxLength/maxItems: the biggest thing the protocol carries (maxInputRefBytes, 16 MiB). */
+const MAX_SIZE = 16 * 1024 * 1024;
+
+/** True when `|` appears outside any group or character class, e.g. `^a|b$`. */
+function hasTopLevelAlternation(pattern: string): boolean {
+  let depth = 0;
+  let inClass = false;
+  for (let i = 0; i < pattern.length; i++) {
+    const c = pattern[i];
+    if (c === '\\') {
+      i++;
+    } else if (inClass) {
+      if (c === ']') inClass = false;
+    } else if (c === '[') {
+      inClass = true;
+    } else if (c === '(') {
+      depth++;
+    } else if (c === ')') {
+      depth--;
+    } else if (c === '|' && depth === 0) {
+      return true;
+    }
+  }
+  return false;
+}
 
 const SCHEMA_KEYWORDS = new Set([
   '$schema',
@@ -106,6 +131,15 @@ export function lintSchema(file: string, doc: unknown): string[] {
       const p = node['pattern'];
       if (!isAscii(p) || !p.startsWith('^') || !p.endsWith('$') || p.endsWith('\\$')) {
         report(at, 'pattern must be ASCII and anchored with ^...$');
+      }
+      if (hasTopLevelAlternation(p)) {
+        report(at, 'pattern must not alternate at the top level (^a|b$ anchors only one side)');
+      }
+    }
+    for (const key of ['maxLength', 'maxItems'] as const) {
+      const n = node[key];
+      if (typeof n === 'number' && (!Number.isSafeInteger(n) || n < 0 || n > MAX_SIZE)) {
+        report(at, `${key} must be an integer in 0..${String(MAX_SIZE)}`);
       }
     }
 

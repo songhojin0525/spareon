@@ -39,6 +39,17 @@ describe('schema rules (lint)', () => {
     ['unanchored pattern', { type: 'string', maxLength: 9, pattern: '[a-z]+' }, 'anchored'],
     ['non-ASCII pattern', { type: 'string', maxLength: 9, pattern: '^한$' }, 'anchored'],
     [
+      'top-level alternation',
+      { type: 'string', maxLength: 9, pattern: '^a|b$' },
+      'must not alternate at the top level',
+    ],
+    ['huge maxLength', { type: 'string', maxLength: 1e15 }, 'maxLength must be an integer'],
+    [
+      'huge maxItems',
+      { type: 'array', items: { type: 'boolean' }, maxItems: 2 ** 40 },
+      'maxItems must be an integer',
+    ],
+    [
       'optional array without minItems',
       {
         type: 'object',
@@ -137,5 +148,22 @@ describe('schema bundle', () => {
     };
     const names = Object.keys(offer.properties.payload.properties).join(' ');
     expect(names).not.toMatch(/verif|canary|duplicate|check/i);
+  });
+});
+
+describe('pattern alternation rule', () => {
+  it.each([
+    ['^(0|[1-9][0-9]*)$', true],
+    ['^[a|b]$', true],
+    [String.raw`^a\|b$`, true],
+    ['^(?:a|b)$', true],
+    ['^a|b$', false],
+    ['^(a)|(b)$', false],
+  ])('%s is allowed: %s', (pattern, allowed) => {
+    const problems = lintSchema('t.json', {
+      $schema: 'x',
+      $defs: { x: { type: 'string', maxLength: 9, pattern } },
+    });
+    expect(problems.some((p) => p.includes('alternate'))).toBe(!allowed);
   });
 });
