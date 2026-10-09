@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const P = (...p) => path.join(ROOT, ...p);
-const STALE_MIN = 25; // 진행 중인데 이만큼 기록이 없으면 '멈춘 듯' 표시 (한도 도달·창 닫힘 등)
+const STALE_MIN = 40; // 진행 중인데 이만큼 상태 기록도 커밋도 없으면 '멈춘 듯' 표시 (한도 도달·창 닫힘 등). 적대적 검토는 30분 넘게 조용할 수 있다
 const SIZE_WEIGHT = { S: 1, M: 1, L: 2, XL: 3 };
 const FINAL = new Set(['DONE', 'DONE_NEEDS_HUMAN', 'BLOCKED']);
 
@@ -213,6 +213,8 @@ function buildState() {
   const stages = loadStages();
   const prog = loadProgress();
   const live = loadLive();
+  // A commit is also a sign of life: long review/fix phases often commit without a status record.
+  const lastCommitMs = Math.max(0, ...loadCommits().map((c) => Date.parse(c.t) || 0));
   const byId = {};
   const rows = stages.map((s) => {
     const pr = prog[s.id];
@@ -244,7 +246,7 @@ function buildState() {
       waitingOn: [],
       ready: false,
     };
-    if (status === 'IN_PROGRESS' && r.updatedAt) r.stale = now - Date.parse(r.updatedAt) > STALE_MIN * 60_000;
+    if (status === 'IN_PROGRESS' && r.updatedAt) r.stale = now - Math.max(Date.parse(r.updatedAt), lastCommitMs) > STALE_MIN * 60_000;
     byId[s.id] = r;
     return r;
   });
