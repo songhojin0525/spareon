@@ -1,9 +1,13 @@
 import { newUuidV7 } from '@binjari/shared';
-import { FakeClock } from '@binjari/testkit';
+import { createSeededRandom, FakeClock } from '@binjari/testkit';
+import { eq } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/node-postgres';
 import type pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { sqlState } from '../../src/db/errors.js';
+import * as schema from '../../src/db/schema/index.js';
+import { createFactories } from '../../src/testing/factories.js';
 import { openTestDb, type TestDb } from '../support/db.js';
 
 /**
@@ -24,8 +28,7 @@ const FULL = 'DELETE,INSERT,SELECT,UPDATE';
 const EXPECTED_GRANTS: Record<string, string> = {
   ledger_accounts: APPEND_ONLY,
   ledger_transactions: APPEND_ONLY,
-  // Table-level SELECT only: INSERT is granted on the columns the app writes, never on id (0003).
-  ledger_postings: READ_ONLY,
+  ledger_postings: APPEND_ONLY,
   audit_log: APPEND_ONLY,
   price_versions: APPEND_ONLY,
   price_entries: APPEND_ONLY,
@@ -159,25 +162,39 @@ describe('binjari_app role (least privilege)', () => {
     expect(result).toBe('5');
   });
 
-  it('inserts postings only through the writable columns (no chosen ids)', async () => {
-    const privileges = await db.withClient(
-      async (c) =>
-        (
-          await c.query<{ column: string; insert: boolean }>(
-            `SELECT a.attname AS column, has_column_privilege('binjari_app', 'public.ledger_postings', a.attname, 'INSERT') AS insert
-               FROM pg_attribute a WHERE a.attrelid = 'public.ledger_postings'::regclass AND a.attnum > 0 AND NOT a.attisdropped
-              ORDER BY a.attnum`,
-          )
-        ).rows,
-    );
-    expect(privileges).toEqual([
-      { column: 'id', insert: false },
-      { column: 'tx_id', insert: true },
-      { column: 'account_id', insert: true },
-      { column: 'currency', insert: true },
-      { column: 'amount', insert: true },
-    ]);
-    // The review's attack: a balanced entry, the immediate check, then an extra posting with id -1.
+  it('writes a ledger entry through Drizzle (the path S06 uses)', async () => {
+    // Re-review finding: a column-level grant without `id` broke Drizzle's INSERT, which names the
+    // identity column (`VALUES (default, ...)`). Run the real ORM path as binjari_app.
+    const balance = await asApp(async (c) => {
+      const appDb = drizzle(c as pg.Client, { schema });
+      const f = createFactories({ db: appDb, clock, random: createSeededRandom('app-role') });
+      const conv = await f.ledgerAccount({ kind: 'fx_conversion', currency: 'CR', shard: 3 });
+      const wallet = await f.ledgerAccount({ kind: 'buyer_wallet', currency: 'CR' });
+      await appDb.transaction(async (tx) => {
+        await createFactories({
+          db: tx,
+          clock,
+          random: createSeededRandom('app-role-entry'),
+        }).ledgerEntry({
+          kind: 'TEST_TOPUP',
+          idempotencyKey: `test:${id()}`,
+          postings: [
+            { accountId: conv.id, currency: 'CR', amount: -7n },
+            { accountId: wallet.id, currency: 'CR', amount: 7n },
+          ],
+        });
+      });
+      const [row] = await appDb
+        .select({ balance: schema.accountBalances.balance })
+        .from(schema.accountBalances)
+        .where(eq(schema.accountBalances.accountId, wallet.id));
+      return row?.balance;
+    });
+    expect(balance).toBe(7n);
+  });
+
+  it('cannot slip an unbalanced posting in after the immediate check (chosen id)', async () => {
+    // The first review's attack: a balanced entry, the immediate check, then an extra posting with id -1.
     const attack = await asApp(async (c) => {
       const conv = id();
       const wallet = id();
@@ -207,7 +224,7 @@ describe('binjari_app role (least privilege)', () => {
       await c.query('ROLLBACK');
       return result;
     });
-    expect(attack).toBe('42501');
+    expect(attack).toBe('BJ001');
   });
 
   it('cannot rewrite history, write balances or delete money records (42501)', async () => {

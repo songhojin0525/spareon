@@ -4,9 +4,6 @@ DROP TRIGGER earnings_insert_guard ON earnings;
 DROP TRIGGER holds_insert_guard ON holds;
 DROP FUNCTION binjari_money_record_insert_guard();
 
-REVOKE INSERT (tx_id, account_id, currency, amount) ON ledger_postings FROM binjari_app;
-GRANT INSERT ON ledger_postings TO binjari_app;
-
 CREATE OR REPLACE FUNCTION binjari_ledger_posting_same_xact() RETURNS trigger
 LANGUAGE plpgsql AS $$
 DECLARE

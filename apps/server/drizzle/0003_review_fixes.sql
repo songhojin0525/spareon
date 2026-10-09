@@ -53,10 +53,9 @@ END
 $$;
 --> statement-breakpoint
 
--- The app role may not choose posting ids at all (OVERRIDING SYSTEM VALUE needs INSERT on the column).
-REVOKE INSERT ON ledger_postings FROM binjari_app;
-GRANT INSERT (tx_id, account_id, currency, amount) ON ledger_postings TO binjari_app;
---> statement-breakpoint
+-- The app role keeps INSERT on every column of ledger_postings: Drizzle names the identity column in
+-- its INSERT (`"id" ... VALUES (default, ...)`), which needs the column privilege. A chosen id cannot
+-- bypass M1 any more because of the id-order check above.
 
 -- ===================================================================================
 -- Money records start in their initial state (review finding: M10 was only checked on UPDATE, so an

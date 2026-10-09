@@ -114,7 +114,7 @@ erDiagram
 
 | ID | 불변식 | 강제 위치 | 구현 | 테스트 |
 |---|---|---|---|---|
-| M1 | 거래 하나의 통화별 기입 합 = 0, 기입 없는 거래 금지 | DB(커밋 시점) | 지연 제약 트리거 `ledger_tx_balanced`(거래마다)·`ledger_postings_balanced`(기입마다, 마지막 기입에서만 합 계산). `SET CONSTRAINTS ... IMMEDIATE` 뒤에 붙인 기입도 다시 검사. 기입은 그 거래 안에서 id가 커지는 순서로만 붙는다(작은 id를 골라 넣어 마지막 기입 검사를 피하는 우회 차단, 0003). 앱 역할은 `id` 열에 INSERT 권한이 없다(`OVERRIDING SYSTEM VALUE` 불가) | `invariants`·`roles.int.test.ts` |
+| M1 | 거래 하나의 통화별 기입 합 = 0, 기입 없는 거래 금지 | DB(커밋 시점) | 지연 제약 트리거 `ledger_tx_balanced`(거래마다)·`ledger_postings_balanced`(기입마다, 마지막 기입에서만 합 계산). `SET CONSTRAINTS ... IMMEDIATE` 뒤에 붙인 기입도 다시 검사. 기입은 그 거래 안에서 id가 커지는 순서로만 붙는다(작은 id를 골라 넣어 마지막 기입 검사를 피하는 우회 차단, 0003). 골라 넣은 id(`OVERRIDING SYSTEM VALUE`)도 이 검사를 통과해야 한다 | `invariants`·`roles.int.test.ts` |
 | M1-b | 기입은 거래를 만든 DB 트랜잭션 안에서만 붙는다(커밋된 옛 거래나 아직 커밋 안 된 남의 거래에 합 0 쌍을 끼워 넣는 위조 차단) | DB | `created_xid = pg_current_xact_id()`를 트리거가 강제로 채우고 기입 때 비교. 거래 행이 보이지 않아도 거부(BJ004, 0003) | `invariants.int.test.ts` |
 | M2 | 계정 잔액 = 그 계정 기입 합 | DB(트리거) + 대사(S06) | 기입 INSERT 트리거가 같은 트랜잭션에서 `balance += amount`, `version += 1`. 직접 쓰기는 트리거 밖에서 거부(BJ003) | 속성 테스트(`invariants.int.test.ts`) |
 | M3 | 음수 불가 계정은 음수가 되지 않는다 | DB | `account_balances_non_negative_check`(`allow_negative`를 복합 FK로 복사). 음수 허용은 비용·출처·변환 계정 종류만(CHECK) | `invariants.int.test.ts` |
@@ -144,7 +144,7 @@ erDiagram
 | 역할 | 누가 | 권한 |
 |---|---|---|
 | 마이그레이션 소유자 | `pnpm db:migrate`를 돌리는 연결(관리형 DB의 관리 계정) | 테이블·함수 소유, DDL |
-| `binjari_app` (NOLOGIN 그룹) | 서버. 운영 로그인 역할을 이 역할의 멤버로 만든다(S30) | 추가 전용 표 7개: SELECT·INSERT(단 `ledger_postings`는 `tx_id, account_id, currency, amount` 열에만 INSERT — `id`는 지정 불가) / `account_balances`: SELECT / `holds`·`earnings`·`payout_records`: SELECT·INSERT·UPDATE / 나머지: SELECT·INSERT·UPDATE·DELETE / 시퀀스 USAGE·SELECT. TRUNCATE·TRIGGER·REFERENCES·DDL 없음 |
+| `binjari_app` (NOLOGIN 그룹) | 서버. 운영 로그인 역할을 이 역할의 멤버로 만든다(S30) | 추가 전용 표 7개: SELECT·INSERT / `account_balances`: SELECT / `holds`·`earnings`·`payout_records`: SELECT·INSERT·UPDATE / 나머지: SELECT·INSERT·UPDATE·DELETE / 시퀀스 USAGE·SELECT. TRUNCATE·TRIGGER·REFERENCES·DDL 없음 |
 
 - 새 테이블은 그 테이블을 만드는 마이그레이션에서 권한을 정해야 한다. 정하지 않으면 `roles.int.test.ts`가 실패한다.
 - 역할은 클러스터 전역이다. down 마이그레이션은 이 DB의 권한만 회수하고 역할은 지우지 않는다. 역할을 만들 권한(`CREATEROLE`)이 없는 DB에서는 마이그레이션이 실패한다(조용히 건너뛰면 서버가 소유자 권한으로 돌게 되므로). 그때는 관리자가 `CREATE ROLE binjari_app NOLOGIN`을 먼저 하면 된다.
