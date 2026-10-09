@@ -268,7 +268,7 @@ export function createCodec(bundle: ProtocolBundle = defaultBundle()): ProtocolC
           pause: false,
         };
       }
-      return { ok: true, value: parsed.value as JobInput };
+      return { ok: true, value: parsed.value };
     },
     encodeHttpBody(name, body) {
       const text = JSON.stringify(body);
