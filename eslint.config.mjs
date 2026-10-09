@@ -98,6 +98,8 @@ export default defineConfig(
       '**/.next/**',
       '.runner/**',
       'apps/agent/**',
+      // Generated from packages/protocol/schemas; freshness is tested instead (packages/protocol/test/generated.test.ts).
+      'packages/protocol/src/generated/**',
       // Kit tools: dependency-free, must not be modified (prompts/S00_bootstrap.md §3).
       'scripts/board.mjs',
       'scripts/status.mjs',
