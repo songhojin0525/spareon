@@ -12,7 +12,7 @@
 //
 // 읽는 것: prompts/STAGES.md(차수 목록·의존), PROGRESS.md(공식 상태), .runner/board/*.json(실시간 진행률),
 //          .runner/events.jsonl(활동 기록), .runner/STATUS, HUMAN_TODO.md, git log
-// 웹 보드의 agents 패널: orc(지휘자) ↔ 차수 서브에이전트 ↔ 검토 서브에이전트 사이의 메시지를 활동 기록에서 재구성한다
+// 웹 보드의 agents 패널: orchestrator(지휘자) ↔ 차수 서브에이전트 ↔ 검토 서브에이전트 사이의 메시지를 활동 기록에서 재구성한다
 //          (status.mjs msg로 남긴 메시지는 그대로, 나머지는 start·checkpoint·phase·finish 기록에서 추정)
 
 import fs from 'node:fs';
@@ -219,8 +219,158 @@ function agentMessages(events) {
   return out;
 }
 
+// ───────────────────────── 에이전트가 지금 하는 일 ─────────────────────────
+// Claude Code 대화 기록(~/.claude/projects/<저장소>/<세션>.jsonl, <세션>/subagents/agent-*.jsonl)의 끝부분에서
+// 마지막 도구 호출만 읽어 'Bash(설명)', 'Edit(파일)'처럼 보여 준다. 명령 본문·파일 내용은 보여 주지 않는다.
+const LIVE_MS = 10 * 60_000; // 이 시간 안에 기록이 바뀐 에이전트만 '지금 하는 일'을 보여 준다
+const liveCache = new Map();
+
+function claudeProjectDir() {
+  const base = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
+  return path.join(base, 'projects', ROOT.replace(/[^a-zA-Z0-9]/g, '-'));
+}
+
+function shortPath(p) {
+  const s = String(p || '');
+  const rel = path.relative(ROOT, s);
+  if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) return path.basename(s);
+  const parts = rel.split(path.sep);
+  return parts.length > 2 && rel.length > 28 ? '…/' + parts.slice(-2).join('/') : parts.join('/'); // 좁은 상자에서도 파일 이름이 보이게
+}
+
+function describeTool(name, input = {}) {
+  const cut = (x, n = 60) => {
+    const t = String(x ?? '').replace(/\s+/g, ' ').trim();
+    return t.length > n ? t.slice(0, n - 1) + '…' : t;
+  };
+  let arg = '';
+  if (name === 'Bash' || name === 'PowerShell') arg = input.description ? cut(input.description) : cut(String(input.command || '').split(/\s+/)[0], 20);
+  else if (['Read', 'Edit', 'Write', 'NotebookEdit', 'MultiEdit'].includes(name)) arg = shortPath(input.file_path || input.notebook_path);
+  else if (name === 'Grep' || name === 'Glob') arg = cut(input.pattern, 40);
+  else if (name === 'Agent' || name === 'Task') arg = cut(input.description, 50);
+  else if (name === 'Skill') arg = cut(input.skill, 30);
+  else if (name === 'WebSearch') arg = cut(input.query, 40);
+  else if (name === 'WebFetch') {
+    try {
+      arg = new URL(input.url).host;
+    } catch {
+      arg = '';
+    }
+  }
+  return arg ? `${name}(${arg})` : name;
+}
+
+function readLiveTranscript(file) {
+  let st;
+  try {
+    st = fs.statSync(file);
+  } catch {
+    return null;
+  }
+  const hit = liveCache.get(file);
+  if (hit && hit.mtime === st.mtimeMs && hit.size === st.size) return hit.v;
+  let v = null;
+  let fd;
+  try {
+    fd = fs.openSync(file, 'r');
+    const len = Math.min(st.size, 512 * 1024);
+    const buf = Buffer.alloc(len);
+    fs.readSync(fd, buf, 0, len, st.size - len);
+    const lines = buf.toString('utf8').split('\n');
+    if (len < st.size) lines.shift();
+    let lastTool = null;
+    let lastKind = null;
+    let lastT = null;
+    const done = new Set();
+    for (const l of lines) {
+      if (!l.trim()) continue;
+      let e;
+      try {
+        e = JSON.parse(l);
+      } catch {
+        continue;
+      }
+      const content = Array.isArray(e?.message?.content) ? e.message.content : [];
+      if (e.type === 'assistant') {
+        for (const c of content) {
+          if (c.type === 'tool_use') {
+            lastTool = { id: c.id, label: describeTool(c.name, c.input), t: e.timestamp };
+            lastKind = 'tool';
+          } else if (c.type === 'text' && c.text && c.text.trim()) lastKind = 'text';
+          else if (c.type === 'thinking') lastKind = lastKind === 'tool' ? 'tool' : 'thinking';
+        }
+        lastT = e.timestamp || lastT;
+      } else if (e.type === 'user') {
+        for (const c of content) if (c.type === 'tool_result') done.add(c.tool_use_id);
+        lastT = e.timestamp || lastT;
+        if (content.some((c) => c.type === 'tool_result')) lastKind = 'thinking';
+      }
+    }
+    if (lastTool && !done.has(lastTool.id)) v = { kind: 'tool', label: lastTool.label, since: lastTool.t, at: st.mtimeMs };
+    else if (lastKind === 'text') v = { kind: 'text', label: '응답 작성', since: lastT, at: st.mtimeMs };
+    else v = { kind: 'thinking', label: lastTool ? lastTool.label : '생각 중', since: lastT, at: st.mtimeMs };
+  } catch {
+    v = null;
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
+  }
+  liveCache.set(file, { mtime: st.mtimeMs, size: st.size, v });
+  return v;
+}
+
+function loadLiveAgents(now) {
+  const out = { orc: null, stages: {}, reviewers: {} };
+  const dir = claudeProjectDir();
+  let sessions = [];
+  try {
+    sessions = fs
+      .readdirSync(dir)
+      .filter((f) => f.endsWith('.jsonl'))
+      .map((f) => ({ f, m: fs.statSync(path.join(dir, f)).mtimeMs }))
+      .sort((a, b) => b.m - a.m)
+      .slice(0, 2);
+  } catch {
+    return out;
+  }
+  if (sessions[0] && now - sessions[0].m < LIVE_MS) out.orc = readLiveTranscript(path.join(dir, sessions[0].f));
+  for (const s of sessions) {
+    const sd = path.join(dir, s.f.replace(/\.jsonl$/, ''), 'subagents');
+    let files = [];
+    try {
+      files = fs.readdirSync(sd).filter((f) => /^agent-[\w-]+\.meta\.json$/.test(f));
+    } catch {
+      continue;
+    }
+    const metas = {};
+    for (const f of files) {
+      try {
+        metas[f.slice(6, -10)] = JSON.parse(fs.readFileSync(path.join(sd, f), 'utf8'));
+      } catch {
+        /* 쓰는 중 */
+      }
+    }
+    const stageOf = (id, depth = 0) => {
+      const m = metas[id];
+      if (!m || depth > 3) return null;
+      const hit = String(m.description || '').match(/\bS(\d{2})\b/);
+      if (hit) return 'S' + hit[1];
+      return m.parentAgentId ? stageOf(m.parentAgentId, depth + 1) : null;
+    };
+    for (const [id, m] of Object.entries(metas)) {
+      const stage = stageOf(id);
+      if (!stage) continue;
+      const v = readLiveTranscript(path.join(sd, `agent-${id}.jsonl`));
+      if (!v || now - v.at > LIVE_MS) continue;
+      const bucket = m.agentType === 'adversarial-reviewer' || /review/i.test(m.agentType || '') ? out.reviewers : out.stages;
+      if (!bucket[stage] || bucket[stage].at < v.at) bucket[stage] = v;
+    }
+  }
+  return out;
+}
+
 function buildAgents(rows, events, runnerState) {
   const msgs = agentMessages(events);
+  const live = loadLiveAgents(Date.now());
   const byId = Object.fromEntries(rows.map((r) => [r.id, r]));
   // 보여 줄 차수: 진행 중인 차수 + 최근에 활동한 차수, 최대 3개(오래된 것이 왼쪽)
   const recent = [];
@@ -248,9 +398,17 @@ function buildAgents(rows, events, runnerState) {
       text = r.summary || r.status;
     }
     let reviewer = null;
-    if (r.status === 'IN_PROGRESS' && r.phase === 'review') reviewer = { state: r.stale ? 'alert' : 'active', text: r.activity || '적대적 검토 중' };
+    const lr = live.reviewers[id];
+    if (lr && r.status === 'IN_PROGRESS') reviewer = { state: 'active', text: '적대적 검토 중', now: lr };
+    else if (r.status === 'IN_PROGRESS' && r.phase === 'review') reviewer = { state: r.stale ? 'alert' : 'active', text: r.activity || '적대적 검토 중' };
     else if (reviewed.has(id)) reviewer = { state: 'done', text: '검토 끝' };
-    return { id, name: r.name, state, text, reviewer };
+    const ls = r.status === 'IN_PROGRESS' ? live.stages[id] : null;
+    if (ls && state === 'alert') {
+      state = 'active'; // 기록은 조용해도 대화 기록이 움직이면 일하는 중이다
+      text = r.activity || r.phaseLabel || '';
+    }
+    if (lr && r.status === 'IN_PROGRESS' && state === 'active' && !ls) state = 'wait';
+    return { id, name: r.name, state, text, reviewer, now: ls || null };
   });
   const run = rows.find((r) => r.status === 'IN_PROGRESS') || null;
   let orc;
@@ -258,6 +416,8 @@ function buildAgents(rows, events, runnerState) {
   else if (runnerState === 'stopped') orc = { state: 'blocked', text: '러너 멈춤' };
   else if (runnerState === 'finished') orc = { state: 'done', text: '모든 차수 완료' };
   else orc = { state: 'standby', text: '다음 차수 고르는 중' };
+  orc.now = live.orc;
+  if (live.orc && live.orc.kind === 'tool' && orc.state !== 'alert') orc.state = 'active';
   return { orc, stages, messages: msgs.slice(-40).reverse() };
 }
 
@@ -606,10 +766,11 @@ function renderTerminal(st, cols, rows) {
 const rgb = (r, g, b) => (s) => (COLOR ? `\x1b[38;2;${r};${g};${b}m${s}\x1b[0m` : String(s));
 const AGC = { orc: rgb(217, 119, 87), stage: rgb(177, 185, 249), review: rgb(229, 143, 176) };
 const agKind = (id) => (id === 'orc' ? 'orc' : id.endsWith(':review') ? 'review' : 'stage');
-const agLabel = (id) => (id === 'orc' ? 'orc' : id.endsWith(':review') ? `${id.slice(0, 3)} reviewer` : `${id} subagent`);
+const agLabel = (id) => (id === 'orc' ? 'orchestrator' : id.endsWith(':review') ? `${id.slice(0, 3)} reviewer` : `${id} subagent`);
 const AG_SPIN = ASCII ? ['-', '\\', '|', '/'] : ['·', '✢', '✳', '✶', '✻', '✽', '✻', '✶', '✳', '✢'];
 const AG_VERB = { wait: 'Waiting…', standby: 'Idle ·', alert: 'No response ·', blocked: 'Blocked ·', done: 'Done ·' };
 const AG_ACTIVE = { orc: 'Orchestrating…', stage: 'Building…', review: 'Reviewing…' };
+const agoShort = (ms) => (ms < 60_000 ? `${Math.max(0, Math.round(ms / 1000))}s` : ms < 3_600_000 ? `${Math.round(ms / 60_000)}m` : `${Math.round(ms / 3_600_000)}h`);
 const PKT_MS = 2600; // 메시지 하나가 선을 따라 이동하는 시간
 const FLASH_MS = 1800; // 받은 쪽이 'Received'로 빛나는 시간
 const HEAVY = { '│': '┃', '─': '━', '┌': '┏', '┐': '┓', '└': '┗', '┘': '┛', '├': '┣', '┤': '┫', '┬': '┳', '┴': '┻', '┼': '╋' };
@@ -687,8 +848,18 @@ function agUnit(cv, id, u, x, y, w, sub, view) {
   const kc = AGC[kind];
   const flashing = view.flash && view.flash.id === id && view.now < view.flash.until;
   const border = flashing ? (t) => bold(kc(t)) : u.state === 'active' ? kc : u.state === 'alert' ? yellow : u.state === 'blocked' ? red : gray;
-  const h = sub ? 5 : 4;
+  const h = sub ? 6 : 5;
   agBox(cv, x, y, w, h, border);
+  // 맨 아래 줄: 지금 실행 중인 도구 호출(대화 기록에서)
+  if (u.now) {
+    const age = u.now.since ? agoShort(view.now - Date.parse(u.now.since)) : '';
+    const mark = u.now.kind === 'tool' ? (ASCII ? '> ' : '▸ ') : u.now.kind === 'text' ? (ASCII ? '~ ' : '✎ ') : ASCII ? '. ' : '… ';
+    let nx = cv.text(x + 2, y + h - 2, ASCII ? 'L ' : '⎿ ', gray);
+    nx = cv.text(nx, y + h - 2, mark, u.now.kind === 'tool' ? AGC.orc : gray);
+    const tail = age ? ` · ${age}` : '';
+    const ex = cv.text(nx, y + h - 2, u.now.label, u.now.kind === 'tool' ? (t) => bold(t) : gray, x + w - 2 - nx - width(tail));
+    if (tail) cv.text(ex, y + h - 2, tail, gray);
+  } else if (u.state !== 'done') cv.text(x + 2, y + h - 2, ASCII ? 'L -' : '⎿ —', gray);
   const glyph = u.state === 'active' ? AG_SPIN[view.spin % AG_SPIN.length] : u.state === 'done' ? (ASCII ? 'v' : '✓') : u.state === 'alert' || u.state === 'blocked' ? '!' : 'o';
   const glyphCol = u.state === 'done' ? green : u.state === 'alert' ? yellow : u.state === 'blocked' ? red : kc;
   cv.text(x + 2, y + 1, glyph, glyphCol);
@@ -698,6 +869,7 @@ function agUnit(cv, id, u, x, y, w, sub, view) {
   if (right) cv.text(x + w - 2 - width(right), y + 1, right, gray);
   let row = y + 2;
   if (sub) cv.text(x + 2, row++, fit(sub, w - 4), gray, w - 4);
+  if (u.state === 'done') cv.text(x + 2, y + h - 2, '', null);
   const sending = view.anim && view.anim.m.from === id && view.now - view.anim.start < PKT_MS;
   const received = flashing && view.flash.m;
   if (sending || received) {
@@ -744,7 +916,7 @@ function renderAgents(st, cols, rows, view) {
   const H = Math.max(20, rows || 40);
   const ag = st.agents;
   const now = view.now;
-  const head = ` ${AGC.orc((ASCII ? '* ' : '✻ ') + 'binjari')} ${bold('agents')} ${gray('· orc ↔ subagents')}`;
+  const head = ` ${AGC.orc((ASCII ? '* ' : '✻ ') + 'binjari')} ${bold('agents')} ${gray('· orchestrator ↔ subagents')}`;
   const right = gray(`${hhmm(st.now)} · a board · q quit`);
   const L = [head + ' '.repeat(Math.max(1, W - width(head) - width(right) - 1)) + right];
   if (!ag) return L.join('\n');
@@ -759,9 +931,9 @@ function renderAgents(st, cols, rows, view) {
   const oc = n % 2 ? x0 + ((n - 1) / 2) * (cardW + gap) + Math.floor(cardW / 2) : Math.floor(W / 2);
   const ox = Math.max(0, Math.min(W - ow, oc - Math.floor(ow / 2)));
   const oy = 1;
-  const sy = oy + 5 + 2; // orc 상자 5줄 + 연결선 2줄
-  const ry = sy + 5 + 1; // 차수 상자 5줄 + 연결선 1줄
-  const ch = hasReview ? ry + 5 : n ? sy + 5 : oy + 5;
+  const sy = oy + 6 + 2; // orchestrator 상자 6줄 + 연결선 2줄
+  const ry = sy + 6 + 1; // 차수 상자 6줄 + 연결선 1줄
+  const ch = hasReview ? ry + 6 : n ? sy + 6 : oy + 6;
   const cv = new Canvas(W, ch);
 
   const hotPair = (a, b) => ag.messages.some((m) => ((m.from === a && m.to === b) || (m.from === b && m.to === a)) && now - Date.parse(m.t) < 15 * 60_000);
@@ -771,11 +943,11 @@ function renderAgents(st, cols, rows, view) {
     const c = x + Math.floor(cardW / 2);
     sx._x = x;
     sx._c = c;
-    const p1 = agPath(oc, oy + 5, c, sy - 1, oy + 5);
+    const p1 = agPath(oc, oy + 6, c, sy - 1, oy + 6);
     paths[`orc>${sx.id}`] = p1;
     agDrawPath(cv, p1, hotPair('orc', sx.id));
     if (sx.reviewer) {
-      const p2 = agPath(c, sy + 5, c, ry - 1, sy + 5);
+      const p2 = agPath(c, sy + 6, c, ry - 1, sy + 6);
       paths[`${sx.id}>${sx.id}:review`] = p2;
       agDrawPath(cv, p2, hotPair(sx.id, `${sx.id}:review`));
     }
@@ -792,11 +964,11 @@ function renderAgents(st, cols, rows, view) {
     const hotAny = [...cv.masks.values()].some((m) => m.x === x && (m.y === y + 1 || m.y === y - 1) && m.hot);
     cv.put(x, y, ASCII ? '+' : up ? '┴' : '┬', hotAny ? AGC.orc : gray);
   };
-  if (n) joint(oc, oy + 4, false);
+  if (n) joint(oc, oy + 5, false);
   for (const sx of ag.stages) {
     joint(sx._c, sy, true);
     if (sx.reviewer) {
-      joint(sx._c, sy + 4, false);
+      joint(sx._c, sy + 5, false);
       joint(sx._c, ry, true);
     }
   }
@@ -830,7 +1002,7 @@ function renderAgents(st, cols, rows, view) {
     bx = cv.text(bx + 1, 0, agLabel(a.m.to), (t) => bold(AGC[agKind(a.m.to)](t)));
     cv.text(bx + 2, 0, `"${a.m.text}"`, null, W - bx - 4);
   }
-  if (!n) cv.text(2, oy + 6, 'no subagents yet', gray);
+  if (!n) cv.text(2, oy + 7, 'no subagents yet', gray);
   L.push(...cv.lines());
 
   L.push(gray((ASCII ? '-' : '─').repeat(W)));
@@ -1148,6 +1320,10 @@ body{
 .flowbar .trk i{position:absolute;inset:0 auto 0 0;background:var(--acc);border-radius:2px}
 .flowbar .who{font-weight:700} .flowbar .ftx{overflow:hidden;text-overflow:ellipsis;color:var(--text)}
 .unit .ut .send{color:var(--acc);font-weight:700}
+.unit .now{display:flex;gap:6px;align-items:baseline;margin-top:6px;padding-top:6px;border-top:1px dashed var(--line);font-size:12px;color:var(--muted);min-width:0}
+.unit .now .el{color:var(--faint);flex:none} .unit .now .nl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.unit .now.tool .nl{color:var(--text);font-weight:600} .unit .now .age{margin-left:auto;color:var(--faint);flex:none;font-variant-numeric:tabular-nums}
+.unit .now.idle{color:var(--faint)} .unit .now .mk{flex:none;color:var(--faint)} .unit .now.tool .mk{color:var(--acc)}
 .arow{display:grid;grid-template-columns:repeat(var(--n,1),minmax(0,1fr));gap:14px;position:relative;z-index:1}
 .arow.root{grid-template-columns:minmax(0,320px);justify-content:center}
 .slot{min-width:0}
@@ -1293,7 +1469,7 @@ body{
   </section>
 
   <section class="panel">
-    <div class="phead"><span class="cap">agents · orc ↔ subagents</span><span class="cap ko" id="agSub"></span></div>
+    <div class="phead"><span class="cap">agents · orchestrator ↔ subagents</span><span class="cap ko" id="agSub"></span></div>
     <div class="flowbar ko" id="flowbar"></div>
     <div class="agents" id="agents">
       <svg id="agSvg" aria-hidden="true"></svg>
@@ -1392,7 +1568,7 @@ body{
   var SPIN = ['·', '✢', '✳', '✶', '✻', '✽', '✻', '✶', '✳', '✢'], spinI = 0, seenT = null, agState = null;
   var SVGNS = 'http://www.w3.org/2000/svg';
   function kindOf(id){ return id === 'orc' ? 'orc' : /:review$/.test(id) ? 'review' : 'stage'; }
-  function label(id){ return id === 'orc' ? 'orc' : /:review$/.test(id) ? id.slice(0, 3) + ' reviewer' : id + ' subagent'; }
+  function label(id){ return id === 'orc' ? 'orchestrator' : /:review$/.test(id) ? id.slice(0, 3) + ' reviewer' : id + ' subagent'; }
   function nodeEl(id){ return document.querySelector('[data-agent="' + id + '"]'); }
   function center(id){ var n = nodeEl(id); if (!n) return null; var box = $('agents').getBoundingClientRect(), r = n.getBoundingClientRect(); return { x: r.left - box.left + r.width / 2, y: r.top - box.top + r.height / 2 }; }
   function unit(id, u, role){
@@ -1407,6 +1583,15 @@ body{
     var p = el('div', 'ut ko'); p.appendChild(el('span', 'verb', (u.state === 'active' ? VERB.active[k] + '…' : (VERB[u.state] || u.state) + (u.state === 'wait' ? '…' : ' ·'))));
     if (u.text) p.appendChild(document.createTextNode(' ' + u.text));
     box.appendChild(p);
+    if (u.now) {
+      var nw = el('div', 'now' + (u.now.kind === 'tool' ? ' tool' : ''));
+      nw.appendChild(el('span', 'el', '⎿'));
+      nw.appendChild(el('span', 'mk', u.now.kind === 'tool' ? '▸' : u.now.kind === 'text' ? '✎' : '…'));
+      nw.title = u.now.kind === 'tool' ? '실행 중인 도구' : u.now.kind === 'text' ? '답변 작성 중' : '생각 중 · 직전에 끝난 도구';
+      nw.appendChild(el('span', 'nl ko', u.now.label));
+      if (u.now.since) { var ag = el('span', 'age', ago(u.now.since)); ag.setAttribute('data-since', u.now.since); nw.appendChild(ag); }
+      box.appendChild(nw);
+    } else if (u.state !== 'done') box.appendChild(el('div', 'now idle', '⎿ —'));
     return box;
   }
   function drawLinks(){
