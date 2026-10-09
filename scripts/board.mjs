@@ -11,6 +11,8 @@
 //
 // 읽는 것: prompts/STAGES.md(차수 목록·의존), PROGRESS.md(공식 상태), .runner/board/*.json(실시간 진행률),
 //          .runner/events.jsonl(활동 기록), .runner/STATUS, HUMAN_TODO.md, git log
+// 웹 보드의 agents 패널: orc(지휘자) ↔ 차수 서브에이전트 ↔ 검토 서브에이전트 사이의 메시지를 활동 기록에서 재구성한다
+//          (status.mjs msg로 남긴 메시지는 그대로, 나머지는 start·checkpoint·phase·finish 기록에서 추정)
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -151,53 +153,63 @@ function loadEvents(limit = 40) {
   }
 }
 
-// ───────────────────────── MAGI (에이전트 간 메시지) ─────────────────────────
-// 지휘자(MELCHIOR·1) ↔ 차수 담당(BALTHASAR·2) ↔ 검토자(CASPER·3) 사이에 오간 것을 활동 기록에서 다시 만든다.
-// 명시적 메시지(status.mjs msg)가 있으면 그대로 쓰고, 나머지는 기록 종류로 추정한다(추정은 inferred=true).
-const MAGI_UNITS = ['conductor', 'builder', 'reviewer'];
+// ───────────────────────── 에이전트 채널 ─────────────────────────
+// orc(지휘자) ↔ 차수 서브에이전트(SNN) ↔ 그 차수의 검토 서브에이전트(SNN:review) 사이에 오간 것을 활동 기록에서 다시 만든다.
+// 명시적 메시지(status.mjs msg)는 그대로 쓰고, 나머지는 기록 종류로 추정한다(inferred=true).
+function agentId(role, stage) {
+  if (role === 'orc' || role === 'conductor' || role === 'runner') return 'orc';
+  if (/^S\d{2}(:review)?$/.test(role)) return role;
+  if (!stage) return null;
+  if (role === 'builder' || role === 'stage') return stage;
+  if (role === 'reviewer' || role === 'review') return `${stage}:review`;
+  return null;
+}
 
-function magiMessages(events) {
+function agentMessages(events) {
   const out = [];
   const phaseOf = {};
-  const push = (e, from, to, text, inferred = true) => {
-    if (!MAGI_UNITS.includes(from) || !MAGI_UNITS.includes(to) || from === to) return;
-    out.push({ t: e.t, stage: e.stage ?? null, from, to, text, inferred });
+  const push = (e, stage, from, to, text, inferred = true) => {
+    const f = agentId(from, stage);
+    const t = agentId(to, stage);
+    if (!f || !t || f === t) return;
+    out.push({ t: e.t, stage: stage ?? null, from: f, to: t, text, inferred });
   };
   for (const e of events) {
-    const prev = e.stage ? phaseOf[e.stage] : null;
+    const st = e.stage;
+    const prev = st ? phaseOf[st] : null;
     switch (e.kind) {
       case 'msg':
-        push(e, e.from, e.to, e.text, false);
+        push(e, st, e.from, e.to, e.text, false);
         break;
       case 'runner': {
-        const m = e.text.match(/^(S\d{2})\b/);
         if (/^stop/i.test(e.text)) break;
-        push({ ...e, stage: m ? m[1] : null }, 'conductor', 'builder', /retry/i.test(e.text) ? `재시도 지시 · ${e.text}` : m ? `${m[1]} 맡김` : e.text);
+        const m = e.text.match(/^(S\d{2})\b/);
+        if (m) push(e, m[1], 'orc', 'builder', /retry/i.test(e.text) ? `재시도 지시 · ${e.text}` : `${m[1]} 맡김`);
         break;
       }
       case 'start':
-        push(e, 'builder', 'conductor', `${e.stage} 수락 · 시작`);
+        push(e, st, 'builder', 'orc', '수락 · 시작');
         break;
       case 'resume':
-        push(e, 'builder', 'conductor', `${e.stage} 이어서 시작`);
+        push(e, st, 'builder', 'orc', '이어서 시작');
         break;
       case 'plan':
-        push(e, 'builder', 'conductor', `계획 보고 · ${e.text.replace(/^plan ready · /, '')}`);
+        push(e, st, 'builder', 'orc', `계획 보고 · ${e.text.replace(/^plan ready · /, '')}`);
         break;
       case 'checkpoint':
-        push(e, 'builder', 'conductor', e.text);
+        push(e, st, 'builder', 'orc', e.text);
         break;
       case 'phase': {
         const ph = (e.text.match(/phase → (\w+)/) || [])[1] || '';
-        if (ph === 'review') push(e, 'builder', 'reviewer', '적대적 검토 요청');
-        else if (prev === 'review') push(e, 'reviewer', 'builder', ph === 'build' ? '검토 지적 전달 · 수정 필요' : '검토 결과 전달');
-        if (e.stage) phaseOf[e.stage] = ph;
+        if (ph === 'review') push(e, st, 'builder', 'reviewer', '적대적 검토 요청');
+        else if (prev === 'review') push(e, st, 'reviewer', 'builder', ph === 'build' ? '검토 지적 전달 · 수정 필요' : '검토 결과 전달');
+        if (st) phaseOf[st] = ph;
         break;
       }
       case 'finish':
-        if (e.stage && phaseOf[e.stage] === 'review') push(e, 'reviewer', 'builder', '검토 결과 전달');
-        push(e, 'builder', 'conductor', `결과 보고 · ${e.text}`);
-        if (e.stage) phaseOf[e.stage] = null;
+        if (st && phaseOf[st] === 'review') push(e, st, 'reviewer', 'builder', '검토 결과 전달');
+        push(e, st, 'builder', 'orc', `결과 보고 · ${e.text}`);
+        if (st) phaseOf[st] = null;
         break;
       default:
         break;
@@ -206,37 +218,46 @@ function magiMessages(events) {
   return out;
 }
 
-function buildMagi(rows, events, runnerState) {
-  const msgs = magiMessages(events);
-  const run = rows.find((r) => r.status === 'IN_PROGRESS') || null;
-  const lastFinished = rows.filter((r) => r.finishedAt).sort((a, b) => Date.parse(b.finishedAt) - Date.parse(a.finishedAt))[0] || null;
-  const units = {
-    conductor: { state: 'standby', text: '' },
-    builder: { state: 'standby', text: '' },
-    reviewer: { state: 'standby', text: '' },
-  };
-  if (run) {
-    const stale = run.stale;
-    units.conductor = { state: stale ? 'alert' : 'wait', text: stale ? '응답 없음 · /resume 필요' : `${run.id} 결과 대기` };
-    if (run.phase === 'review') {
-      units.reviewer = { state: stale ? 'alert' : 'active', text: run.activity || '적대적 검토 중' };
-      units.builder = { state: 'wait', text: `${run.id} 검토 결과 대기` };
-    } else {
-      units.builder = { state: stale ? 'alert' : 'active', text: `${run.id} ${run.activity || run.phaseLabel || ''}`.trim() };
-    }
-  } else if (runnerState === 'stopped') {
-    units.conductor = { state: 'halt', text: '러너 멈춤' };
-  } else if (runnerState === 'finished') {
-    units.conductor = { state: 'approve', text: '모든 차수 완료' };
-  } else {
-    units.conductor = { state: 'active', text: '다음 차수 고르는 중' };
+function buildAgents(rows, events, runnerState) {
+  const msgs = agentMessages(events);
+  const byId = Object.fromEntries(rows.map((r) => [r.id, r]));
+  // 보여 줄 차수: 진행 중인 차수 + 최근에 활동한 차수, 최대 3개(오래된 것이 왼쪽)
+  const recent = [];
+  for (let i = events.length - 1; i >= 0 && recent.length < 3; i--) {
+    const id = events[i].stage || (events[i].kind === 'runner' ? (events[i].text.match(/^(S\d{2})\b/) || [])[1] : null);
+    if (id && byId[id] && !recent.includes(id)) recent.push(id);
   }
-  // 결의: 진행 중이면 審議中, 아니면 마지막으로 끝난 차수의 결과
-  let verdict;
-  if (run) verdict = { code: run.phase === 'review' ? 'review' : 'build', stage: run.id, text: run.name };
-  else if (lastFinished) verdict = { code: lastFinished.status === 'BLOCKED' ? 'reject' : 'approve', stage: lastFinished.id, text: lastFinished.name };
-  else verdict = { code: 'idle', stage: null, text: '' };
-  return { units, verdict, messages: msgs.slice(-40).reverse() };
+  for (const r of rows) if (r.status === 'IN_PROGRESS' && !recent.includes(r.id)) recent.unshift(r.id);
+  const reviewed = new Set(msgs.filter((m) => m.to.endsWith(':review')).map((m) => m.stage));
+  const stages = recent.slice(0, 3).reverse().map((id) => {
+    const r = byId[id];
+    let state;
+    let text;
+    if (r.status === 'IN_PROGRESS') {
+      state = r.stale ? 'alert' : r.phase === 'review' ? 'wait' : 'active';
+      text = r.stale ? '응답 없음 · /resume 필요' : r.phase === 'review' ? '검토 결과 대기' : r.activity || r.phaseLabel || '';
+    } else if (r.status === 'BLOCKED') {
+      state = 'blocked';
+      text = r.summary || '막힘';
+    } else if (r.status === 'TODO') {
+      state = 'wait';
+      text = '대기';
+    } else {
+      state = 'done';
+      text = r.summary || r.status;
+    }
+    let reviewer = null;
+    if (r.status === 'IN_PROGRESS' && r.phase === 'review') reviewer = { state: r.stale ? 'alert' : 'active', text: r.activity || '적대적 검토 중' };
+    else if (reviewed.has(id)) reviewer = { state: 'done', text: '검토 끝' };
+    return { id, name: r.name, state, text, reviewer };
+  });
+  const run = rows.find((r) => r.status === 'IN_PROGRESS') || null;
+  let orc;
+  if (run) orc = run.stale ? { state: 'alert', text: `${run.id} 응답 없음` } : { state: 'wait', text: `${run.id} 결과 대기` };
+  else if (runnerState === 'stopped') orc = { state: 'blocked', text: '러너 멈춤' };
+  else if (runnerState === 'finished') orc = { state: 'done', text: '모든 차수 완료' };
+  else orc = { state: 'standby', text: '다음 차수 고르는 중' };
+  return { orc, stages, messages: msgs.slice(-40).reverse() };
 }
 
 function loadTodos() {
@@ -356,7 +377,7 @@ function buildState() {
   }
 
   const events = loadEvents(40);
-  const magiEvents = loadEvents(400);
+  const agentEvents = loadEvents(400);
   const runnerStatus = (readText(P('.runner', 'STATUS')) || '').trim().split(/\r?\n/)[0] || '';
   const lastActivity = Math.max(
     mtime(P('.runner', 'events.jsonl')),
@@ -384,7 +405,7 @@ function buildState() {
     events: events.reverse(),
     todos: { open: todos.open.slice(0, 12), openCount: todos.open.length, done: todos.done },
     commits: loadCommits(),
-    magi: buildMagi(rows, magiEvents, runner.state),
+    agents: buildAgents(rows, agentEvents, runner.state),
     hasStages: rows.length > 0,
   };
 }
@@ -728,26 +749,28 @@ const PAGE = String.raw`<!doctype html>
 <title>BINJARI · Mission Control</title>
 <style nonce="__NONCE__">
 :root,[data-theme="dark"]{
-  --bg:#05070a;--bg2:#0a0e14;--panel:rgba(14,19,27,.82);--panel-solid:#0e131b;--line:#1b2330;--line2:#253042;
-  --text:#e6edf6;--muted:#8a96a8;--faint:#4f5b6d;
-  --acc:#3df0c2;--acc-dim:rgba(61,240,194,.14);
-  --run:#4db8ff;--run-dim:rgba(77,184,255,.14);
-  --done:#3ddc84;--done-dim:rgba(61,220,132,.13);
-  --warn:#ffb547;--warn-dim:rgba(255,181,71,.14);
-  --bad:#ff5d6c;--bad-dim:rgba(255,93,108,.14);
-  --ready:#c792ff;--ready-dim:rgba(199,146,255,.14);
-  --track:#141b26;--grid:rgba(120,150,190,.06);--glow:rgba(61,240,194,.10);
+  --bg:#1a1918;--bg2:#222120;--panel:#262624;--panel-solid:#262624;--line:#3a3936;--line2:#4a4844;
+  --text:#f5f4ef;--muted:#a8a69d;--faint:#6f6d66;
+  --acc:#d97757;--acc-dim:rgba(217,119,87,.16);
+  --run:#d97757;--run-dim:rgba(217,119,87,.13);
+  --done:#4eba65;--done-dim:rgba(78,186,101,.13);
+  --warn:#ffc107;--warn-dim:rgba(255,193,7,.12);
+  --bad:#ff6b80;--bad-dim:rgba(255,107,128,.13);
+  --ready:#b1b9f9;--ready-dim:rgba(177,185,249,.14);
+  --u1:#d97757;--u2:#b1b9f9;--u3:#e58fb0;
+  --track:#33322f;--grid:transparent;--glow:transparent;
 }
 [data-theme="light"]{
-  --bg:#f3f5f8;--bg2:#e9edf2;--panel:rgba(255,255,255,.9);--panel-solid:#fff;--line:#dde3ea;--line2:#c9d2dd;
-  --text:#0d1520;--muted:#5a6676;--faint:#97a2b0;
-  --acc:#0a9e7c;--acc-dim:rgba(10,158,124,.12);
-  --run:#0a6fc2;--run-dim:rgba(10,111,194,.10);
-  --done:#16884a;--done-dim:rgba(22,136,74,.10);
-  --warn:#a76400;--warn-dim:rgba(167,100,0,.10);
-  --bad:#c42a3a;--bad-dim:rgba(196,42,58,.10);
-  --ready:#7a3fc0;--ready-dim:rgba(122,63,192,.10);
-  --track:#e3e8ee;--grid:rgba(30,50,80,.05);--glow:rgba(10,158,124,.08);
+  --bg:#faf9f5;--bg2:#f0eee6;--panel:#ffffff;--panel-solid:#fff;--line:#e5e2d9;--line2:#d3cfc3;
+  --text:#1f1e1d;--muted:#6b6962;--faint:#a3a097;
+  --acc:#c6613f;--acc-dim:rgba(198,97,63,.12);
+  --run:#c6613f;--run-dim:rgba(198,97,63,.10);
+  --done:#2c7a3f;--done-dim:rgba(44,122,63,.10);
+  --warn:#9a6700;--warn-dim:rgba(154,103,0,.10);
+  --bad:#c2334d;--bad-dim:rgba(194,51,77,.10);
+  --ready:#5763c9;--ready-dim:rgba(87,99,201,.10);
+  --u1:#c6613f;--u2:#5763c9;--u3:#b23a6b;
+  --track:#ebe8df;--grid:transparent;--glow:transparent;
 }
 *{box-sizing:border-box}
 html,body{margin:0;min-height:100%}
@@ -768,8 +791,7 @@ body{
 /* top bar */
 .top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;border:1px solid var(--line);border-radius:12px;background:var(--panel);backdrop-filter:blur(6px)}
 .brand{display:flex;align-items:center;gap:12px;min-width:0}
-.logo{width:26px;height:26px;border-radius:7px;background:conic-gradient(from 210deg,var(--acc),var(--run),var(--ready),var(--acc));box-shadow:0 0 18px var(--acc-dim);flex:none;position:relative}
-.logo::after{content:"";position:absolute;inset:6px;border-radius:3px;background:var(--bg)}
+.logo{flex:none;color:var(--acc);font-size:22px;line-height:1;width:22px;text-align:center}
 .brand b{font-size:15px;letter-spacing:.18em}
 .brand .cap{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .live{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted);white-space:nowrap}
@@ -811,6 +833,50 @@ body{
 @keyframes ring{0%{transform:scale(1);opacity:.7}100%{transform:scale(1.25);opacity:0}}
 .groups{display:grid;grid-template-columns:repeat(33,minmax(0,1fr));gap:4px;margin-top:6px}
 .groups span{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);border-top:1px solid var(--line2);padding-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* agents — orc and subagents, Claude Code style */
+.agents{position:relative;display:flex;flex-direction:column;gap:44px;padding:4px 0}
+.agents svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+.agents .link{stroke:var(--line2);stroke-width:1.5;stroke-dasharray:3 5;fill:none;transition:stroke .4s}
+.agents .link.hot{stroke:var(--acc);stroke-dasharray:none}
+.agents .pkt{fill:var(--acc)}
+.arow{display:grid;grid-template-columns:repeat(var(--n,1),minmax(0,1fr));gap:14px;position:relative;z-index:1}
+.arow.root{grid-template-columns:minmax(0,320px);justify-content:center}
+.slot{min-width:0}
+.unit{border:1px solid var(--line2);border-radius:10px;background:var(--panel-solid);padding:10px 12px;min-width:0}
+.unit .uh{display:flex;align-items:center;gap:8px;min-width:0}
+.unit .glyph{width:16px;text-align:center;color:var(--uc);flex:none}
+.unit .un{font-weight:700;color:var(--uc);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.unit .ur{margin-left:auto;font-size:11px;color:var(--muted);white-space:nowrap}
+.unit .role{font-size:12px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.unit .ut{font-size:12.5px;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.unit .ut .verb{color:var(--uc)}
+.unit.st-standby{border-style:dashed} .unit.st-standby .ut{color:var(--faint)}
+.unit.st-active{border-color:var(--uc);box-shadow:0 0 0 3px color-mix(in srgb,var(--uc) 14%,transparent)}
+.unit.st-wait .ut{color:var(--muted)}
+.unit.st-done{opacity:.72} .unit.st-done .glyph{color:var(--done)}
+.unit.st-alert{border-color:var(--warn)} .unit.st-alert .ut{color:var(--warn)}
+.unit.st-blocked{border-color:var(--bad)} .unit.st-blocked .ut{color:var(--bad)}
+.unit.flash{animation:flash 1.1s ease-out}
+@keyframes flash{0%{box-shadow:0 0 0 6px color-mix(in srgb,var(--uc) 35%,transparent)}100%{box-shadow:0 0 0 0 transparent}}
+.k-orc{--uc:var(--u1)} .k-stage{--uc:var(--u2)} .k-review{--uc:var(--u3)}
+.tx{margin-top:16px;border-top:1px solid var(--line);padding-top:10px;font-size:12.5px;max-height:380px;overflow:auto}
+.msg{padding:5px 0}
+.msg .mh{display:flex;gap:8px;align-items:baseline;min-width:0}
+.msg .bul{color:var(--uc);flex:none}
+.msg .who{font-weight:700;color:var(--uc);white-space:nowrap}
+.msg .arr{color:var(--faint)} .msg .to{color:var(--muted);white-space:nowrap}
+.msg .mt{margin-left:auto;color:var(--faint);font-variant-numeric:tabular-nums;white-space:nowrap}
+.msg .mb{display:flex;gap:8px;padding-left:4px;color:var(--text);overflow-wrap:anywhere}
+.msg .mb .el{color:var(--faint);flex:none}
+.msg .inf{color:var(--faint);font-size:11px;white-space:nowrap}
+.msg.new .mb{animation:fadein .6s ease-out}
+@keyframes fadein{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+@media (max-width:620px){
+  .agents{gap:34px} .arow{gap:8px}
+  .unit{padding:8px 9px} .unit .ur{display:none} .unit .role{display:none}
+  .msg .inf{display:none}
+}
 
 /* orchestrator */
 .orch{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px}
@@ -900,7 +966,7 @@ body{
 <body>
 <div class="wrap">
   <div class="top">
-    <div class="brand"><span class="logo"></span><b>BINJARI</b><span class="cap" id="proj">mission control</span></div>
+    <div class="brand"><span class="logo" aria-hidden="true">✻</span><b>BINJARI</b><span class="cap" id="proj">mission control</span></div>
     <div class="live"><span class="pulse" id="pulse"></span><span id="clock">connecting…</span><button class="iconbtn" id="theme" type="button" title="Toggle theme">◐</button></div>
   </div>
   <div class="warn ko" id="warn"></div>
@@ -916,6 +982,17 @@ body{
     </div>
     <div class="pipe" id="pipe" aria-label="Stage pipeline"></div>
     <div class="groups" id="groups"></div>
+  </section>
+
+  <section class="panel">
+    <div class="phead"><span class="cap">agents · orc ↔ subagents</span><span class="cap ko" id="agSub"></span></div>
+    <div class="agents" id="agents">
+      <svg id="agSvg" aria-hidden="true"></svg>
+      <div class="arow root" id="rowOrc"></div>
+      <div class="arow" id="rowStage"></div>
+      <div class="arow" id="rowReview"></div>
+    </div>
+    <div class="tx" id="tx"></div>
   </section>
 
   <section class="panel">
@@ -1001,10 +1078,107 @@ body{
   }
   function tile(n, label, color, ko){ var t = el('div', 'tile'); t.style.setProperty('--c', color); t.appendChild(el('div', 'n', String(n))); t.appendChild(el('div', 'l' + (ko ? ' ko' : ''), label)); return t; }
 
+  // ── agents: orc ↔ subagents ──
+  var VERB = { active: { orc: 'Orchestrating', stage: 'Building', review: 'Reviewing' }, wait: 'Waiting', standby: 'Idle', alert: 'No response', blocked: 'Blocked', done: 'Done' };
+  var SPIN = ['·', '✢', '✳', '✶', '✻', '✽', '✻', '✶', '✳', '✢'], spinI = 0, seenT = null, agState = null;
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  function kindOf(id){ return id === 'orc' ? 'orc' : /:review$/.test(id) ? 'review' : 'stage'; }
+  function label(id){ return id === 'orc' ? 'orc' : /:review$/.test(id) ? id.slice(0, 3) + ' reviewer' : id + ' subagent'; }
+  function nodeEl(id){ return document.querySelector('[data-agent="' + id + '"]'); }
+  function center(id){ var n = nodeEl(id); if (!n) return null; var box = $('agents').getBoundingClientRect(), r = n.getBoundingClientRect(); return { x: r.left - box.left + r.width / 2, y: r.top - box.top + r.height / 2 }; }
+  function unit(id, u, role){
+    var k = kindOf(id);
+    var box = el('div', 'unit k-' + k + ' st-' + u.state); box.setAttribute('data-agent', id);
+    var h = el('div', 'uh');
+    h.appendChild(el('span', 'glyph', u.state === 'active' ? SPIN[spinI % SPIN.length] : u.state === 'done' ? '✓' : u.state === 'alert' || u.state === 'blocked' ? '!' : '○'));
+    h.appendChild(el('span', 'un', label(id)));
+    h.appendChild(el('span', 'ur', u.state));
+    box.appendChild(h);
+    if (role) box.appendChild(el('div', 'role ko', role));
+    var p = el('div', 'ut ko'); p.appendChild(el('span', 'verb', (u.state === 'active' ? VERB.active[k] + '…' : (VERB[u.state] || u.state) + (u.state === 'wait' ? '…' : ' ·'))));
+    if (u.text) p.appendChild(document.createTextNode(' ' + u.text));
+    box.appendChild(p);
+    return box;
+  }
+  function drawLinks(){
+    if (!agState) return;
+    var svg = $('agSvg'); var keep = Array.prototype.slice.call(svg.querySelectorAll('.pkt')); clear(svg);
+    var now = Date.now(), pairs = [];
+    agState.stages.forEach(function(s){ pairs.push(['orc', s.id]); if (s.reviewer) pairs.push([s.id, s.id + ':review']); });
+    pairs.forEach(function(pr){
+      var a = center(pr[0]), b = center(pr[1]); if (!a || !b) return;
+      var l = document.createElementNS(SVGNS, 'line');
+      l.setAttribute('x1', a.x); l.setAttribute('y1', a.y); l.setAttribute('x2', b.x); l.setAttribute('y2', b.y);
+      var hot = agState.messages.some(function(m){ return ((m.from === pr[0] && m.to === pr[1]) || (m.from === pr[1] && m.to === pr[0])) && now - Date.parse(m.t) < 15 * 60000; });
+      l.setAttribute('class', 'link' + (hot ? ' hot' : ''));
+      svg.appendChild(l);
+    });
+    keep.forEach(function(k){ svg.appendChild(k); });
+  }
+  function sendPacket(m, delay){
+    setTimeout(function(){
+      var a = center(m.from), b = center(m.to); if (!a || !b) return;
+      var svg = $('agSvg');
+      var c = document.createElementNS(SVGNS, 'circle'); c.setAttribute('r', '5'); c.setAttribute('class', 'pkt'); c.setAttribute('cx', a.x); c.setAttribute('cy', a.y); svg.appendChild(c);
+      var t0 = null, D = 1100;
+      function step(ts){
+        if (t0 === null) t0 = ts; var k = Math.min(1, (ts - t0) / D); var e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+        c.setAttribute('cx', a.x + (b.x - a.x) * e); c.setAttribute('cy', a.y + (b.y - a.y) * e);
+        if (k < 1) requestAnimationFrame(step);
+        else { if (c.parentNode) c.parentNode.removeChild(c); var u = nodeEl(m.to); if (u) { u.classList.remove('flash'); void u.offsetWidth; u.classList.add('flash'); } }
+      }
+      requestAnimationFrame(step);
+    }, delay);
+  }
+  function renderAgents(st){
+    var ag = st.agents; if (!ag) return; agState = ag;
+    var ro = $('rowOrc'); clear(ro); ro.appendChild(unit('orc', ag.orc, '지휘자 · 차수를 맡기고 결과를 확인'));
+    var rs = $('rowStage'), rr = $('rowReview'); clear(rs); clear(rr);
+    var n = Math.max(1, ag.stages.length); rs.style.setProperty('--n', n); rr.style.setProperty('--n', n);
+    var anyReview = false;
+    ag.stages.forEach(function(s){
+      var a = el('div', 'slot'); a.appendChild(unit(s.id, s, s.name)); rs.appendChild(a);
+      var b = el('div', 'slot'); if (s.reviewer) { anyReview = true; b.appendChild(unit(s.id + ':review', s.reviewer, 'adversarial-reviewer')); } rr.appendChild(b);
+    });
+    rr.style.display = anyReview ? '' : 'none';
+    if (!ag.stages.length) rs.appendChild(el('div', 'empty', 'no subagents yet'));
+    $('agSub').textContent = ag.messages.length ? '상태 기록에서 재구성 · ' + ag.messages.length + '건' : '';
+
+    var tx = $('tx'); clear(tx);
+    if (!ag.messages.length) tx.appendChild(el('div', 'empty', 'no messages yet'));
+    var fresh = [];
+    ag.messages.slice(0, 24).forEach(function(m){
+      var isNew = seenT !== null && Date.parse(m.t) > seenT;
+      if (isNew) fresh.push(m);
+      var d = el('div', 'msg k-' + kindOf(m.from) + (isNew ? ' new' : ''));
+      var h = el('div', 'mh');
+      h.appendChild(el('span', 'bul', '⏺'));
+      h.appendChild(el('span', 'who', label(m.from)));
+      h.appendChild(el('span', 'arr', '→'));
+      h.appendChild(el('span', 'to', label(m.to)));
+      h.appendChild(el('span', 'mt', hhmm(m.t)));
+      d.appendChild(h);
+      var b = el('div', 'mb'); b.appendChild(el('span', 'el', '⎿')); b.appendChild(el('span', 'ko', m.text));
+      if (!m.inferred) b.appendChild(el('span', 'inf', 'msg'));
+      d.appendChild(b);
+      tx.appendChild(d);
+    });
+    drawLinks();
+    if (seenT === null && ag.messages[0]) fresh = [ag.messages[0]];
+    fresh.reverse().forEach(function(m, i){ sendPacket(m, 250 + i * 650); });
+    if (ag.messages[0]) seenT = Math.max(seenT || 0, Date.parse(ag.messages[0].t));
+  }
+  setInterval(function(){
+    spinI++;
+    Array.prototype.forEach.call(document.querySelectorAll('.unit.st-active .glyph'), function(g){ g.textContent = SPIN[spinI % SPIN.length]; });
+  }, 130);
+  window.addEventListener('resize', drawLinks);
+
   function render(st){
     $('pulse').className = 'pulse';
     $('clock').textContent = 'LIVE · ' + hhmm(st.now) + ' · ' + (POLL/1000) + 's';
     $('proj').textContent = 'mission control · ' + st.project;
+    renderAgents(st);
     var w = $('warn'); w.className = 'warn ko'; w.textContent = '';
     if (!st.hasStages) { w.textContent = '⚠ prompts/STAGES.md를 찾지 못했습니다. 저장소 맨 위 폴더에서 보드를 실행하세요.'; w.className = 'warn ko on'; }
     else if (st.runner.state === 'stalled') { w.textContent = '⚠ 진행 중인 차수의 기록이 한동안 멈췄어요. 사용량 한도에 걸렸거나 창이 닫혔을 수 있습니다. 한도가 풀리면 Claude Code에서 /resume 을 입력하세요.'; w.className = 'warn ko on'; }

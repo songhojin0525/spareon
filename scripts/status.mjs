@@ -12,6 +12,8 @@
 //   node scripts/status.mjs note   S05 "<지금 하는 일>"                    진행률은 그대로, 현재 활동만 갱신
 //   node scripts/status.mjs finish S05 <DONE|DONE_NEEDS_HUMAN|BLOCKED> "<한 줄 요약>"
 //   node scripts/status.mjs runner "<메시지>"                             지휘자·스크립트의 기록
+//   node scripts/status.mjs msg    <보낸쪽> <받는쪽> "<한 줄>" [--stage S05]  에이전트 사이 메시지(보드 agents 패널)
+//          보낸쪽·받는쪽: orc | SNN(차수 서브에이전트) | SNN:review(그 차수의 검토자). 콘텐츠·비밀값은 적지 말 것
 //   node scripts/status.mjs show   [S05]                                 기록 확인
 
 import fs from 'node:fs';
@@ -108,9 +110,9 @@ function percentOf(s) {
   }
 }
 
-function event(stage, kind, text, worker) {
+function event(stage, kind, text, worker, extra = {}) {
   ensureDirs();
-  const line = JSON.stringify({ t: new Date().toISOString(), stage: stage || null, kind, text: clean(text), worker: worker || null });
+  const line = JSON.stringify({ t: new Date().toISOString(), stage: stage || null, kind, text: clean(text), worker: worker || null, ...extra });
   fs.appendFileSync(EVENTS, line + '\n');
 }
 
@@ -227,6 +229,24 @@ try {
       if (!msg) fail('메시지가 필요합니다');
       event(null, 'runner', msg, flags.worker || 'runner');
       console.log(`status: runner · ${msg}`);
+      break;
+    }
+    case 'msg': {
+      const agent = (a) => {
+        const v = String(a || '').trim();
+        if (v.toLowerCase() === 'orc') return 'orc';
+        const m = v.toUpperCase().match(/^S?(\d{1,2})(:REVIEW)?$/);
+        if (!m) fail(`에이전트는 orc | SNN | SNN:review 중 하나: ${v}`);
+        return 'S' + m[1].padStart(2, '0') + (m[2] ? ':review' : '');
+      };
+      const from = agent(rest[0]);
+      const to = agent(rest[1]);
+      if (from === to) fail('보낸쪽과 받는쪽이 같습니다');
+      const msg = clean(rest.slice(2).join(' '));
+      if (!msg) fail('메시지가 필요합니다');
+      const stage = flags.stage ? normStage(flags.stage) : [from, to].map((x) => x.slice(0, 3)).find((x) => /^S\d{2}$/.test(x)) || null;
+      event(stage, 'msg', msg, null, { from, to });
+      console.log(`status: msg ${from} → ${to} · ${msg}`);
       break;
     }
     case 'show': {
