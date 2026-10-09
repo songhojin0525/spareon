@@ -318,7 +318,7 @@ sequenceDiagram
 1. 허용 키워드만. `format`, `title`·`description`·`examples`·`default`(사람이 읽는 문구) 금지
 2. `type`은 object·array·string·integer·boolean. `number`·`null` 금지
 3. 문자열은 `maxLength`(열거·상수 제외). `pattern`은 ASCII, `^…$`로 고정. Go(RE2)는 반복 횟수 곱이 1000을 넘는 패턴을 거부하므로 중첩된 `{m,n}` 대신 `*` + `maxLength`를 쓴다
-4. 배열은 `items`·`maxItems`. 선택 배열은 `minItems ≥ 1`(Go `omitempty`가 값을 잃지 않게)
+4. 배열은 `items`·`maxItems`. 선택 배열은 `minItems ≥ 1`(Go `omitempty`가 값을 잃지 않게). 필수 배열이 Go에서 nil이면 생성된 `MarshalJSON`이 `null` 대신 `[]`로 쓴다(빈 상태 보고와 `capabilitiesDigest`가 nil/빈 슬라이스에 따라 달라지지 않게)
 5. 정수는 `minimum`·`maximum`, |값| ≤ 2^53−1
 6. 객체는 `additionalProperties: false`(봉투의 `payload` 하나만 예외, 메시지 스키마가 닫는다), `required`는 선언된 속성만
 7. `oneOf`·`anyOf`·`allOf`·`not`·`if/then/else`는 부모가 선언한 속성에 대한 제약(`required`·`const`·`enum`)만

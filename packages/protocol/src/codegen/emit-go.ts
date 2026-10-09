@@ -74,6 +74,19 @@ export function emitGo(ir: ProtocolIR, protocolHash: string): string {
         ),
       );
       out.push('}', '');
+      const requiredArrays = n.fields.filter((f) => f.required && f.type.k === 'array');
+      if (requiredArrays.length > 0) {
+        out.push(
+          '// MarshalJSON writes nil required arrays as [] because the schemas forbid null.',
+          `func (v ${n.name}) MarshalJSON() ([]byte, error) {`,
+          `\ttype plain ${n.name}`,
+        );
+        for (const f of requiredArrays) {
+          const name = pascal(f.json);
+          out.push(`\tif v.${name} == nil {`, `\t\tv.${name} = ${fieldType(f)}{}`, '\t}');
+        }
+        out.push('\treturn marshal(plain(v))', '}', '');
+      }
     }
   }
 

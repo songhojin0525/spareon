@@ -228,6 +228,18 @@ type CapabilitiesPayload struct {
 	OSBuild         string            `json:"osBuild"`
 }
 
+// MarshalJSON writes nil required arrays as [] because the schemas forbid null.
+func (v CapabilitiesPayload) MarshalJSON() ([]byte, error) {
+	type plain CapabilitiesPayload
+	if v.GPUs == nil {
+		v.GPUs = []CapabilitiesGPU{}
+	}
+	if v.CachedModels == nil {
+		v.CachedModels = []ModelRef{}
+	}
+	return marshal(plain(v))
+}
+
 // PolicyDownloadWindow is generated from the protocol schemas.
 type PolicyDownloadWindow struct {
 	StartMinute int64 `json:"startMinute"`
@@ -253,6 +265,18 @@ type Policy struct {
 	ModelAllowlist    []string               `json:"modelAllowlist"`
 	TransparencyMode  PolicyTransparencyMode `json:"transparencyMode"`
 	MaxConcurrentJobs int64                  `json:"maxConcurrentJobs"`
+}
+
+// MarshalJSON writes nil required arrays as [] because the schemas forbid null.
+func (v Policy) MarshalJSON() ([]byte, error) {
+	type plain Policy
+	if v.WeeklySchedule == nil {
+		v.WeeklySchedule = []string{}
+	}
+	if v.ModelAllowlist == nil {
+		v.ModelAllowlist = []string{}
+	}
+	return marshal(plain(v))
 }
 
 // ConfigUpdatePayload is generated from the protocol schemas.
@@ -408,6 +432,15 @@ type JobOfferParams struct {
 	Stop             []string `json:"stop"`
 	Seed             int64    `json:"seed"`
 	Greedy           bool     `json:"greedy"`
+}
+
+// MarshalJSON writes nil required arrays as [] because the schemas forbid null.
+func (v JobOfferParams) MarshalJSON() ([]byte, error) {
+	type plain JobOfferParams
+	if v.Stop == nil {
+		v.Stop = []string{}
+	}
+	return marshal(plain(v))
 }
 
 // JobInputMessageRole is a closed set of wire values.
@@ -586,6 +619,15 @@ type StatusPresence struct {
 	ReasonCodes     []StatusPresenceReasonCode `json:"reasonCodes"`
 }
 
+// MarshalJSON writes nil required arrays as [] because the schemas forbid null.
+func (v StatusPresence) MarshalJSON() ([]byte, error) {
+	type plain StatusPresence
+	if v.ReasonCodes == nil {
+		v.ReasonCodes = []StatusPresenceReasonCode{}
+	}
+	return marshal(plain(v))
+}
+
 // StatusGPU is generated from the protocol schemas.
 type StatusGPU struct {
 	Index      int64 `json:"index"`
@@ -603,6 +645,18 @@ type StatusPayload struct {
 	GPUs              []StatusGPU    `json:"gpus"`
 	RunningAttemptIDs []string       `json:"runningAttemptIds"`
 	MeasuredAt        string         `json:"measuredAt"`
+}
+
+// MarshalJSON writes nil required arrays as [] because the schemas forbid null.
+func (v StatusPayload) MarshalJSON() ([]byte, error) {
+	type plain StatusPayload
+	if v.GPUs == nil {
+		v.GPUs = []StatusGPU{}
+	}
+	if v.RunningAttemptIDs == nil {
+		v.RunningAttemptIDs = []string{}
+	}
+	return marshal(plain(v))
 }
 
 // UpdateAvailablePayload is generated from the protocol schemas.
@@ -724,6 +778,15 @@ type ReleaseManifest struct {
 	MinServerVersion *string                 `json:"minServerVersion,omitempty"`
 	RollbackOf       *string                 `json:"rollbackOf,omitempty"`
 	IssuedAt         string                  `json:"issuedAt"`
+}
+
+// MarshalJSON writes nil required arrays as [] because the schemas forbid null.
+func (v ReleaseManifest) MarshalJSON() ([]byte, error) {
+	type plain ReleaseManifest
+	if v.Files == nil {
+		v.Files = []ReleaseManifestFile{}
+	}
+	return marshal(plain(v))
 }
 
 var messageRegistry = []messageInfo{

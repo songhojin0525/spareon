@@ -90,15 +90,58 @@ func TestEncodeRefusesInvalidMessages(t *testing.T) {
 	if _, err := c.EncodeMessage(NewMessage(TypeHeartbeat, id, ts, nil, &HeartbeatPayload{}), SideServer); err == nil {
 		t.Fatal("server encoded an agent-only message")
 	}
-	// A nil required array marshals to null and must be refused.
-	st := &StatusPayload{State: StatusStateReady, Presence: StatusPresence{ReasonCodes: []StatusPresenceReasonCode{}}, MeasuredAt: ts}
-	if _, err := c.EncodeMessage(NewMessage(TypeStatus, id, ts, nil, st), SideAgent); err == nil {
-		t.Fatal("encoded status with null arrays")
+	// A required array still has to satisfy its schema: a nil weekly schedule becomes [] (minItems 7).
+	policy := &ConfigUpdatePayload{}
+	if _, err := c.EncodeMessage(NewMessage(TypeConfigUpdate, id, ts, nil, policy), SideServer); err == nil {
+		t.Fatal("encoded config.update with an empty policy")
 	}
-	st.GPUs = []StatusGPU{}
-	st.RunningAttemptIDs = []string{}
-	if _, err := c.EncodeMessage(NewMessage(TypeStatus, id, ts, nil, st), SideAgent); err != nil {
-		t.Fatalf("valid status refused: %v", err)
+}
+
+// TestNilRequiredArraysEncodeAsEmpty: the most common status (nothing running, no reason codes) is
+// built with nil slices; generated MarshalJSON methods write them as [] instead of the null that the
+// schemas forbid, nested structs included.
+func TestNilRequiredArraysEncodeAsEmpty(t *testing.T) {
+	c := mustCodec(t)
+	id, ts := "01920000-0000-7000-8000-000000000001", "2026-10-09T04:36:00.000Z"
+	nilStatus := &StatusPayload{State: StatusStateReady, Eligible: true, MeasuredAt: ts}
+	emptyStatus := &StatusPayload{
+		State: StatusStateReady, Eligible: true, MeasuredAt: ts,
+		Presence: StatusPresence{ReasonCodes: []StatusPresenceReasonCode{}},
+		GPUs:     []StatusGPU{}, RunningAttemptIDs: []string{},
+	}
+	got, err := c.EncodeMessage(NewMessage(TypeStatus, id, ts, nil, nilStatus), SideAgent)
+	if err != nil {
+		t.Fatalf("status with nil slices refused: %v", err)
+	}
+	want, err := c.EncodeMessage(NewMessage(TypeStatus, id, ts, nil, emptyStatus), SideAgent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Fatalf("nil slices encode as %s, want %s", got, want)
+	}
+	if bytes.Contains(got, []byte("null")) {
+		t.Fatalf("null on the wire: %s", got)
+	}
+
+	// The capabilities digest must not depend on nil versus empty slices either.
+	m, derr := c.DecodeMessage(readFile(t, filepath.Join(fixtureDir, "valid", "capabilities", "no-gpu.json")), SideServer, DecodeOptions{})
+	if derr != nil {
+		t.Fatal(derr)
+	}
+	caps := *m.Payload.(*CapabilitiesPayload)
+	caps.GPUs, caps.CachedModels = []CapabilitiesGPU{}, []ModelRef{}
+	withEmpty, err := CapabilitiesDigest(&caps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	caps.GPUs, caps.CachedModels = nil, nil
+	withNil, err := CapabilitiesDigest(&caps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if withNil != withEmpty {
+		t.Fatalf("digest with nil slices %s != with empty slices %s", withNil, withEmpty)
 	}
 }
 
