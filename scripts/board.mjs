@@ -341,9 +341,7 @@ function firstSentence(text) {
     .split(/\n+/)
     .map((x) => x.trim())
     .find((x) => x.length > 2);
-  if (!t) return '';
-  const m = t.match(/^(.+?[.!?。]|.+?(?:다|요)\.?)(\s|$)/);
-  return cutText(m ? m[1] : t, 140);
+  return t ? cutText(t, 160) : '';
 }
 
 function readLiveTranscript(file) {
@@ -366,6 +364,7 @@ function readLiveTranscript(file) {
     if (len < st.size) lines.shift();
     const tools = [];
     const done = new Set();
+    const doneAt = {};
     let lastKind = null;
     let lastT = null;
     let intent = '';
@@ -384,7 +383,7 @@ function readLiveTranscript(file) {
         if (e.message?.model && !/synthetic/.test(e.message.model)) model = e.message.model;
         for (const c of content) {
           if (c.type === 'tool_use') {
-            tools.push({ id: c.id, ...describeTool(c.name, c.input), t: e.timestamp });
+            tools.push({ id: c.id, ...describeTool(c.name, c.input), t: e.timestamp, agent: c.name === 'Agent' || c.name === 'Task' ? { description: String(c.input?.description || ''), type: String(c.input?.subagent_type || '') } : null });
             lastKind = 'tool';
           } else if (c.type === 'text' && c.text && c.text.trim()) {
             lastKind = 'text';
@@ -398,7 +397,10 @@ function readLiveTranscript(file) {
         lastT = e.timestamp || lastT;
       } else if (e.type === 'user') {
         const results = content.filter((c) => c.type === 'tool_result');
-        for (const c of results) done.add(c.tool_use_id);
+        for (const c of results) {
+          done.add(c.tool_use_id);
+          doneAt[c.tool_use_id] = e.timestamp;
+        }
         lastT = e.timestamp || lastT;
         if (results.length) lastKind = 'thinking';
       }
@@ -417,7 +419,11 @@ function readLiveTranscript(file) {
     // 의도 문장은 지금 보이는 도구 기록과 같은 흐름일 때만 (지난 대화의 설명은 숨긴다)
     const oldest = recent.length ? recent[recent.length - 1].t : now.since;
     if (intentT && oldest && Date.parse(intentT) < Date.parse(oldest)) intent = '';
-    v = { at: st.mtimeMs, model: modelName(model), now, intent, recent };
+    const agentCalls = tools
+      .filter((x) => x.agent)
+      .slice(-6)
+      .map((x) => ({ t: x.t, doneT: doneAt[x.id] || null, description: cutText(x.agent.description, 60), type: x.agent.type }));
+    v = { at: st.mtimeMs, model: modelName(model), now, intent, recent, agentCalls, pendingAgent: now.kind === 'tool' && !!last.agent };
   } catch {
     v = null;
   } finally {
@@ -496,7 +502,13 @@ function loadLiveAgents(now) {
       const v = fresh(readLiveTranscript(path.join(sd, `agent-${id}.jsonl`)));
       if (!v) continue;
       const bucket = m.agentType === 'adversarial-reviewer' || /review/i.test(m.agentType || '') ? out.reviewers : out.stages;
-      if (!bucket[stage] || bucket[stage].at < v.at) bucket[stage] = { ...v, agentType: m.agentType || null };
+      let startedAt = null;
+      try {
+        startedAt = new Date(fs.statSync(path.join(sd, `agent-${id}.meta.json`)).mtimeMs).toISOString();
+      } catch {
+        /* no meta time */
+      }
+      if (!bucket[stage] || bucket[stage].at < v.at) bucket[stage] = { ...v, agentType: m.agentType || null, startedAt };
     }
   }
   return out;
@@ -540,7 +552,7 @@ function buildAgents(rows, events, runnerState) {
     const lrAll = live.reviewers[id];
     const lr = lrAll && lrAll.live ? lrAll : null;
     const pick = (v) => (v && v.live ? { now: v.now, intent: v.intent, recent: v.recent } : {});
-    if (lr && r.status === 'IN_PROGRESS') reviewer = { state: 'active', text: '적대적 검토 중', ...pick(lr) };
+    if (lr && r.status === 'IN_PROGRESS') reviewer = { state: 'active', text: `${id} 결과물을 공격적으로 검토하는 중`, ...pick(lr), startedAt: lrAll.startedAt };
     else if (r.status === 'IN_PROGRESS' && r.phase === 'review') reviewer = { state: r.stale ? 'alert' : 'active', text: r.activity || '적대적 검토 중' };
     else if (reviewed.has(id) || lrAll) reviewer = { state: 'done', text: '검토 끝' };
     if (reviewer) reviewer.model = lrAll?.model ?? null;
@@ -550,7 +562,10 @@ function buildAgents(rows, events, runnerState) {
       state = 'active'; // 기록은 조용해도 대화 기록이 움직이면 일하는 중이다
       text = r.activity || r.phaseLabel || '';
     }
-    if (lr && r.status === 'IN_PROGRESS' && state === 'active' && !ls) state = 'wait';
+    if (lr && r.status === 'IN_PROGRESS' && state === 'active' && (!ls || ls.pendingAgent)) {
+      state = 'wait'; // 검토자를 띄우고 결과를 기다리는 중
+      text = '적대적 검토 결과 대기';
+    }
     return { id, name: r.name, state, text, reviewer, ...pick(ls), model: lsAll?.model ?? null, pct: r.percent, startedAt: r.startedAt, finishedAt: r.finishedAt, status: r.status };
   });
   const run = rows.find((r) => r.status === 'IN_PROGRESS') || null;
@@ -562,8 +577,20 @@ function buildAgents(rows, events, runnerState) {
   orc.model = live.orc?.model ?? null;
   if (live.orc && live.orc.live) Object.assign(orc, { now: live.orc.now, intent: live.orc.intent, recent: live.orc.recent });
   if (orc.now && orc.now.kind === 'tool' && orc.state !== 'alert') orc.state = 'active';
+  // 대화 기록에서 본 실제 검토 요청·결과: 상태 기록에서 추정한 같은 메시지는 대신한다
+  const seen = [];
+  for (const [id, v] of Object.entries(live.stages)) {
+    for (const c of v.agentCalls || []) {
+      if (!/review/i.test(`${c.type} ${c.description}`)) continue;
+      seen.push({ t: c.t, stage: id, from: id, to: `${id}:review`, text: `검토 요청 · ${c.description}`, inferred: false });
+      if (c.doneT) seen.push({ t: c.doneT, stage: id, from: `${id}:review`, to: id, text: '검토 결과 전달', inferred: false });
+    }
+  }
+  const near = (a, b) => Math.abs(Date.parse(a.t) - Date.parse(b.t)) < 10 * 60_000;
+  const merged = msgs.filter((m) => !(m.inferred && seen.some((x) => x.from === m.from && x.to === m.to && near(x, m)))).concat(seen);
+  merged.sort((a, b) => Date.parse(a.t) - Date.parse(b.t));
   const done = rows.filter((r) => r.status === 'DONE' || r.status === 'DONE_NEEDS_HUMAN').length;
-  return { orc, stages, messages: msgs.slice(-40).reverse(), summary: { done, total: rows.length, run: run ? { id: run.id, pct: run.percent } : null } };
+  return { orc, stages, messages: merged.slice(-40).reverse(), summary: { done, total: rows.length, run: run ? { id: run.id, pct: run.percent } : null } };
 }
 
 // Claude 사용 한도(5시간 세션·주간). scripts/statusline.mjs가 Claude Code 상태줄 입력에서 받아 적어 둔 값이다.
