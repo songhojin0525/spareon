@@ -8,7 +8,7 @@
 //   node scripts/board.mjs --agents        터미널 에이전트 화면: orc ↔ 차수·검토 서브에이전트와 메시지 (보드에서 a 키로 전환)
 //   node scripts/board.mjs --once          한 번만 출력하고 끝 (/status 명령, 로그용)
 //   node scripts/board.mjs --json          상태를 JSON으로 출력
-// 옵션: --port 4545  --interval 2  --ascii (막대·표시가 깨져 보이면)  --no-color  --rows 40 --cols 100 (--once 크기)
+// 옵션: --port 4545  --interval 1  --ascii (막대·표시가 깨져 보이면)  --no-color  --rows 40 --cols 100 (--once 크기)
 //
 // 읽는 것: prompts/STAGES.md(차수 목록·의존), PROGRESS.md(공식 상태), .runner/board/*.json(실시간 진행률),
 //          .runner/events.jsonl(활동 기록), .runner/STATUS, HUMAN_TODO.md, git log,
@@ -239,26 +239,111 @@ function shortPath(p) {
   return parts.length > 2 && rel.length > 28 ? '…/' + parts.slice(-2).join('/') : parts.join('/'); // 좁은 상자에서도 파일 이름이 보이게
 }
 
+function cutText(x, n = 60) {
+  const t = String(x ?? '').replace(/\s+/g, ' ').trim();
+  return t.length > n ? t.slice(0, n - 1) + '…' : t;
+}
+const lineCount = (x) => (typeof x === 'string' && x.length ? x.split('\n').length : 0);
+
+// 도구 호출 하나를 Claude 앱처럼 '진행형 동사 + 대상 + 세부'로 바꾼다. 명령 본문·파일 내용은 넣지 않는다.
 function describeTool(name, input = {}) {
-  const cut = (x, n = 60) => {
-    const t = String(x ?? '').replace(/\s+/g, ' ').trim();
-    return t.length > n ? t.slice(0, n - 1) + '…' : t;
-  };
-  let arg = '';
-  if (name === 'Bash' || name === 'PowerShell') arg = input.description ? cut(input.description) : cut(String(input.command || '').split(/\s+/)[0], 20);
-  else if (['Read', 'Edit', 'Write', 'NotebookEdit', 'MultiEdit'].includes(name)) arg = shortPath(input.file_path || input.notebook_path);
-  else if (name === 'Grep' || name === 'Glob') arg = cut(input.pattern, 40);
-  else if (name === 'Agent' || name === 'Task') arg = cut(input.description, 50);
-  else if (name === 'Skill') arg = cut(input.skill, 30);
-  else if (name === 'WebSearch') arg = cut(input.query, 40);
-  else if (name === 'WebFetch') {
-    try {
-      arg = new URL(input.url).host;
-    } catch {
-      arg = '';
-    }
+  let verb = name;
+  let target = '';
+  let detail = '';
+  switch (name) {
+    case 'Read':
+      verb = '읽는 중';
+      target = shortPath(input.file_path);
+      if (input.offset || input.limit) detail = `${input.offset || 1}–${(input.offset || 1) + (input.limit || 2000) - 1}줄`;
+      if (input.pages) detail = `${input.pages}쪽`;
+      break;
+    case 'Edit':
+      verb = '수정 중';
+      target = shortPath(input.file_path);
+      detail = `+${lineCount(input.new_string)} −${lineCount(input.old_string)}${input.replace_all ? ' 전체' : ''}`;
+      break;
+    case 'MultiEdit':
+      verb = '수정 중';
+      target = shortPath(input.file_path);
+      detail = `${(input.edits || []).length}곳`;
+      break;
+    case 'Write':
+      verb = '작성 중';
+      target = shortPath(input.file_path);
+      detail = `${lineCount(input.content)}줄`;
+      break;
+    case 'NotebookEdit':
+      verb = '노트북 수정 중';
+      target = shortPath(input.notebook_path);
+      break;
+    case 'Bash':
+    case 'PowerShell':
+      verb = '실행 중';
+      target = input.description ? cutText(input.description, 70) : cutText(String(input.command || '').split(/\s+/)[0], 20);
+      if (input.run_in_background) detail = '백그라운드';
+      break;
+    case 'Grep':
+      verb = '검색 중';
+      target = `"${cutText(input.pattern, 40)}"`;
+      if (input.path) detail = shortPath(input.path);
+      else if (input.glob) detail = cutText(input.glob, 24);
+      break;
+    case 'Glob':
+      verb = '파일 찾는 중';
+      target = cutText(input.pattern, 40);
+      break;
+    case 'Agent':
+    case 'Task':
+      verb = '서브에이전트에 맡기는 중';
+      target = cutText(input.description, 50);
+      if (input.subagent_type) detail = input.subagent_type;
+      break;
+    case 'Skill':
+      verb = '스킬 쓰는 중';
+      target = cutText(input.skill, 30);
+      break;
+    case 'WebSearch':
+      verb = '웹 검색 중';
+      target = cutText(input.query, 50);
+      break;
+    case 'WebFetch':
+      verb = '웹 페이지 읽는 중';
+      try {
+        target = new URL(input.url).host;
+      } catch {
+        target = '';
+      }
+      break;
+    case 'TodoWrite':
+    case 'TaskCreate':
+    case 'TaskUpdate':
+      verb = '할 일 정리 중';
+      break;
+    default:
+      break;
   }
-  return arg ? `${name}(${arg})` : name;
+  const short = target ? `${name}(${target})` : name;
+  return { verb, target, detail, label: detail ? `${short} ${detail}` : short };
+}
+
+// 'claude-opus-5-5' → 'Opus 5.5'
+function modelName(id) {
+  const m = String(id || '').match(/claude-([a-z]+)-(\d+)(?:-(\d{1,2}))?(?!\d)/i);
+  if (!m) return id ? String(id) : null;
+  return `${m[1][0].toUpperCase()}${m[1].slice(1)} ${m[2]}${m[3] ? '.' + m[3] : ''}`;
+}
+
+// 에이전트가 도구를 쓰기 직전에 쓴 설명의 첫 문장
+function firstSentence(text) {
+  const t = String(text || '')
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/[#>*_`|]/g, '')
+    .split(/\n+/)
+    .map((x) => x.trim())
+    .find((x) => x.length > 2);
+  if (!t) return '';
+  const m = t.match(/^(.+?[.!?。]|.+?(?:다|요)\.?)(\s|$)/);
+  return cutText(m ? m[1] : t, 140);
 }
 
 function readLiveTranscript(file) {
@@ -274,15 +359,18 @@ function readLiveTranscript(file) {
   let fd;
   try {
     fd = fs.openSync(file, 'r');
-    const len = Math.min(st.size, 512 * 1024);
+    const len = Math.min(st.size, 768 * 1024);
     const buf = Buffer.alloc(len);
     fs.readSync(fd, buf, 0, len, st.size - len);
     const lines = buf.toString('utf8').split('\n');
     if (len < st.size) lines.shift();
-    let lastTool = null;
+    const tools = [];
+    const done = new Set();
     let lastKind = null;
     let lastT = null;
-    const done = new Set();
+    let intent = '';
+    let intentT = null;
+    let model = null;
     for (const l of lines) {
       if (!l.trim()) continue;
       let e;
@@ -293,29 +381,73 @@ function readLiveTranscript(file) {
       }
       const content = Array.isArray(e?.message?.content) ? e.message.content : [];
       if (e.type === 'assistant') {
+        if (e.message?.model && !/synthetic/.test(e.message.model)) model = e.message.model;
         for (const c of content) {
           if (c.type === 'tool_use') {
-            lastTool = { id: c.id, label: describeTool(c.name, c.input), t: e.timestamp };
+            tools.push({ id: c.id, ...describeTool(c.name, c.input), t: e.timestamp });
             lastKind = 'tool';
-          } else if (c.type === 'text' && c.text && c.text.trim()) lastKind = 'text';
-          else if (c.type === 'thinking') lastKind = lastKind === 'tool' ? 'tool' : 'thinking';
+          } else if (c.type === 'text' && c.text && c.text.trim()) {
+            lastKind = 'text';
+            const fs1 = firstSentence(c.text);
+            if (fs1) {
+              intent = fs1;
+              intentT = e.timestamp;
+            }
+          } else if (c.type === 'thinking') lastKind = lastKind === 'tool' ? 'tool' : 'thinking';
         }
         lastT = e.timestamp || lastT;
       } else if (e.type === 'user') {
-        for (const c of content) if (c.type === 'tool_result') done.add(c.tool_use_id);
+        const results = content.filter((c) => c.type === 'tool_result');
+        for (const c of results) done.add(c.tool_use_id);
         lastT = e.timestamp || lastT;
-        if (content.some((c) => c.type === 'tool_result')) lastKind = 'thinking';
+        if (results.length) lastKind = 'thinking';
       }
     }
-    if (lastTool && !done.has(lastTool.id)) v = { kind: 'tool', label: lastTool.label, since: lastTool.t, at: st.mtimeMs };
-    else if (lastKind === 'text') v = { kind: 'text', label: '응답 작성', since: lastT, at: st.mtimeMs };
-    else v = { kind: 'thinking', label: lastTool ? lastTool.label : '생각 중', since: lastT, at: st.mtimeMs };
+    const last = tools[tools.length - 1];
+    let now;
+    if (last && !done.has(last.id)) now = { kind: 'tool', verb: last.verb, target: last.target, detail: last.detail, label: last.label, since: last.t };
+    else if (lastKind === 'text') now = { kind: 'text', verb: '답변 쓰는 중', target: '', detail: '', label: '답변 쓰는 중', since: lastT };
+    else now = { kind: 'thinking', verb: '생각 중', target: '', detail: '', label: last ? last.label : '생각 중', since: lastT };
+    const recent = tools
+      .slice(-5)
+      .reverse()
+      .filter((x) => !(now.kind === 'tool' && x.id === last.id))
+      .slice(0, 3)
+      .map((x) => ({ label: x.label, verb: x.verb, done: done.has(x.id), t: x.t }));
+    // 의도 문장은 지금 보이는 도구 기록과 같은 흐름일 때만 (지난 대화의 설명은 숨긴다)
+    const oldest = recent.length ? recent[recent.length - 1].t : now.since;
+    if (intentT && oldest && Date.parse(intentT) < Date.parse(oldest)) intent = '';
+    v = { at: st.mtimeMs, model: modelName(model), now, intent, recent };
   } catch {
     v = null;
   } finally {
     if (fd !== undefined) fs.closeSync(fd);
   }
   liveCache.set(file, { mtime: st.mtimeMs, size: st.size, v });
+  return v;
+}
+
+// 차수 계획(docs/stages/SNN/PLAN.md)의 체크포인트 표: 번호 → 내용
+const planCache = new Map();
+function planCheckpoints(id) {
+  const file = P('docs', 'stages', id, 'PLAN.md');
+  let m = 0;
+  try {
+    m = fs.statSync(file).mtimeMs;
+  } catch {
+    return {};
+  }
+  const hit = planCache.get(file);
+  if (hit && hit.m === m) return hit.v;
+  const v = {};
+  const md = readText(file) || '';
+  const sec = md.split(/^##\s*체크포인트.*$/m)[1] || '';
+  for (const line of sec.split(/\r?\n/)) {
+    if (/^##\s/.test(line)) break;
+    const mm = line.match(/^\|\s*(\d+)\s*\|\s*([^|]+?)\s*\|/);
+    if (mm) v[Number(mm[1])] = mm[2].replace(/`/g, '');
+  }
+  planCache.set(file, { m, v });
   return v;
 }
 
@@ -333,7 +465,8 @@ function loadLiveAgents(now) {
   } catch {
     return out;
   }
-  if (sessions[0] && now - sessions[0].m < LIVE_MS) out.orc = readLiveTranscript(path.join(dir, sessions[0].f));
+  const fresh = (v) => (v ? { ...v, live: now - v.at < LIVE_MS } : null);
+  if (sessions[0]) out.orc = fresh(readLiveTranscript(path.join(dir, sessions[0].f)));
   for (const s of sessions) {
     const sd = path.join(dir, s.f.replace(/\.jsonl$/, ''), 'subagents');
     let files = [];
@@ -360,10 +493,10 @@ function loadLiveAgents(now) {
     for (const [id, m] of Object.entries(metas)) {
       const stage = stageOf(id);
       if (!stage) continue;
-      const v = readLiveTranscript(path.join(sd, `agent-${id}.jsonl`));
-      if (!v || now - v.at > LIVE_MS) continue;
+      const v = fresh(readLiveTranscript(path.join(sd, `agent-${id}.jsonl`)));
+      if (!v) continue;
       const bucket = m.agentType === 'adversarial-reviewer' || /review/i.test(m.agentType || '') ? out.reviewers : out.stages;
-      if (!bucket[stage] || bucket[stage].at < v.at) bucket[stage] = v;
+      if (!bucket[stage] || bucket[stage].at < v.at) bucket[stage] = { ...v, agentType: m.agentType || null };
     }
   }
   return out;
@@ -398,18 +531,27 @@ function buildAgents(rows, events, runnerState) {
       state = 'done';
       text = r.summary || r.status;
     }
+    const cm = String(text).match(/^checkpoint (\d+)\/(\d+)/);
+    if (cm && r.status === 'IN_PROGRESS') {
+      const cpText = planCheckpoints(id)[Number(cm[1])];
+      if (cpText) text = `${text} · ${cpText}`;
+    }
     let reviewer = null;
-    const lr = live.reviewers[id];
-    if (lr && r.status === 'IN_PROGRESS') reviewer = { state: 'active', text: '적대적 검토 중', now: lr };
+    const lrAll = live.reviewers[id];
+    const lr = lrAll && lrAll.live ? lrAll : null;
+    const pick = (v) => (v && v.live ? { now: v.now, intent: v.intent, recent: v.recent } : {});
+    if (lr && r.status === 'IN_PROGRESS') reviewer = { state: 'active', text: '적대적 검토 중', ...pick(lr) };
     else if (r.status === 'IN_PROGRESS' && r.phase === 'review') reviewer = { state: r.stale ? 'alert' : 'active', text: r.activity || '적대적 검토 중' };
-    else if (reviewed.has(id)) reviewer = { state: 'done', text: '검토 끝' };
-    const ls = r.status === 'IN_PROGRESS' ? live.stages[id] : null;
+    else if (reviewed.has(id) || lrAll) reviewer = { state: 'done', text: '검토 끝' };
+    if (reviewer) reviewer.model = lrAll?.model ?? null;
+    const lsAll = live.stages[id];
+    const ls = r.status === 'IN_PROGRESS' && lsAll && lsAll.live ? lsAll : null;
     if (ls && state === 'alert') {
       state = 'active'; // 기록은 조용해도 대화 기록이 움직이면 일하는 중이다
       text = r.activity || r.phaseLabel || '';
     }
     if (lr && r.status === 'IN_PROGRESS' && state === 'active' && !ls) state = 'wait';
-    return { id, name: r.name, state, text, reviewer, now: ls || null, pct: r.percent, startedAt: r.startedAt, finishedAt: r.finishedAt, status: r.status };
+    return { id, name: r.name, state, text, reviewer, ...pick(ls), model: lsAll?.model ?? null, pct: r.percent, startedAt: r.startedAt, finishedAt: r.finishedAt, status: r.status };
   });
   const run = rows.find((r) => r.status === 'IN_PROGRESS') || null;
   let orc;
@@ -417,8 +559,9 @@ function buildAgents(rows, events, runnerState) {
   else if (runnerState === 'stopped') orc = { state: 'blocked', text: '러너 멈춤' };
   else if (runnerState === 'finished') orc = { state: 'done', text: '모든 차수 완료' };
   else orc = { state: 'standby', text: '다음 차수 고르는 중' };
-  orc.now = live.orc;
-  if (live.orc && live.orc.kind === 'tool' && orc.state !== 'alert') orc.state = 'active';
+  orc.model = live.orc?.model ?? null;
+  if (live.orc && live.orc.live) Object.assign(orc, { now: live.orc.now, intent: live.orc.intent, recent: live.orc.recent });
+  if (orc.now && orc.now.kind === 'tool' && orc.state !== 'alert') orc.state = 'active';
   const done = rows.filter((r) => r.status === 'DONE' || r.status === 'DONE_NEEDS_HUMAN').length;
   return { orc, stages, messages: msgs.slice(-40).reverse(), summary: { done, total: rows.length, run: run ? { id: run.id, pct: run.percent } : null } };
 }
@@ -812,6 +955,14 @@ const agLabel = (id) => (id === 'orc' ? 'orchestrator' : id.endsWith(':review') 
 const AG_SPIN = ASCII ? ['-', '\\', '|', '/'] : ['·', '✢', '✳', '✶', '✻', '✽', '✻', '✶', '✳', '✢'];
 const AG_VERB = { wait: 'Waiting…', standby: 'Idle ·', alert: 'No response ·', blocked: 'Blocked ·', done: 'Done ·' };
 const AG_ACTIVE = { orc: 'Orchestrating…', stage: 'Building…', review: 'Reviewing…' };
+// '실행 중 Run server tests · 백그라운드' — 진행형 문장
+function nowPhrase(n, short = false) {
+  if (!n) return '';
+  if (short && n.kind === 'thinking') return '생각 중';
+  if (n.kind === 'tool') return [n.verb, n.target, n.detail].filter(Boolean).join(' ');
+  if (n.kind === 'text') return '답변 쓰는 중';
+  return n.label && n.label !== '생각 중' ? `생각 중 · 직전 ${n.label}` : '생각 중';
+}
 const agoShort = (ms) => (ms < 60_000 ? `${Math.max(0, Math.round(ms / 1000))}s` : ms < 3_600_000 ? `${Math.round(ms / 60_000)}m` : `${Math.round(ms / 3_600_000)}h`);
 const PKT_MS = 2600; // 메시지 하나가 선을 따라 이동하는 시간
 const FLASH_MS = 1800; // 받은 쪽이 'Received'로 빛나는 시간
@@ -899,7 +1050,7 @@ function agUnit(cv, id, u, x, y, w, sub, view) {
     let nx = cv.text(x + 2, y + h - 2, ASCII ? 'L ' : '⎿ ', gray);
     nx = cv.text(nx, y + h - 2, mark, u.now.kind === 'tool' ? AGC.orc : gray);
     const tail = age ? ` · ${age}` : '';
-    const ex = cv.text(nx, y + h - 2, u.now.label, u.now.kind === 'tool' ? (t) => bold(t) : gray, x + w - 2 - nx - width(tail));
+    const ex = cv.text(nx, y + h - 2, nowPhrase(u.now), u.now.kind === 'tool' ? (t) => bold(t) : gray, x + w - 2 - nx - width(tail));
     if (tail) cv.text(ex, y + h - 2, tail, gray);
   } else if (u.state === 'done' && u.startedAt && u.finishedAt) {
     cv.text(x + 2, y + h - 2, `${ASCII ? 'L v' : '⎿ ✓'} ${dur(u.startedAt, u.finishedAt)} 걸림`, gray);
@@ -917,8 +1068,8 @@ function agUnit(cv, id, u, x, y, w, sub, view) {
   cv.text(x + 2, y + 1, glyph, glyphCol);
   const label = agLabel(id);
   const elapsed = u.state === 'active' && u.startedAt ? ` · ${dur(u.startedAt)}` : '';
-  const want = u.state + elapsed;
-  const right = width(label) + width(want) + 7 <= w ? want : width(label) + width(u.state) + 7 <= w ? u.state : ''; // 좁으면 이름을 살린다
+  const opts = [u.model ? `${u.model} · ${u.state}${elapsed}` : '', u.model ? `${u.model} · ${u.state}` : '', u.state + elapsed, u.model || '', u.state].filter(Boolean);
+  const right = opts.find((o) => width(label) + width(o) + 7 <= w) || ''; // 좁으면 이름을 살린다
   cv.text(x + 4, y + 1, label, u.state === 'done' ? dim : (t) => bold(kc(t)), w - 6);
   if (right) cv.text(x + w - 2 - width(right), y + 1, right, gray);
   let row = y + 2;
@@ -1070,6 +1221,27 @@ function renderAgents(st, cols, rows, view) {
   if (!n) cv.text(2, oy + 7, 'no subagents yet', gray);
   L.push(...cv.lines());
 
+  // 지금 일하는 에이전트: 무엇을 하는지 자세히 (Claude 앱처럼)
+  const liveOnes = [];
+  if (ag.orc.now) liveOnes.push(['orc', ag.orc]);
+  for (const sx of ag.stages) {
+    if (sx.now) liveOnes.push([sx.id, sx]);
+    if (sx.reviewer && sx.reviewer.now) liveOnes.push([`${sx.id}:review`, sx.reviewer]);
+  }
+  if (liveOnes.length) {
+    L.push(gray((ASCII ? '-' : '─').repeat(W)));
+    for (const [id, u] of liveOnes) {
+      const kc = AGC[agKind(id)];
+      const spin = u.now.kind === 'tool' ? AG_SPIN[view.spin % AG_SPIN.length] : u.now.kind === 'text' ? (ASCII ? '~' : '✎') : '…';
+      const age = u.now.since ? gray(` · ${agoShort(view.now - Date.parse(u.now.since))}`) : '';
+      const head = ` ${kc(spin)} ${bold(kc(agLabel(id)))}${u.model ? gray(` (${u.model})`) : ''}  `;
+      const phrase = nowPhrase(u.now, true);
+      L.push(head + (u.now.kind === 'tool' ? bold(AGC.orc(fit(phrase, W - width(head) - 10))) : gray(fit(phrase, W - width(head) - 10))) + age);
+      if (u.intent) L.push(`   ${gray(ASCII ? '"' : '❝')} ${fit(u.intent, W - 7)}`);
+      for (const r of (u.recent || []).slice(0, 2)) L.push(`   ${r.done ? green(ASCII ? 'v' : '✓') : gray('·')} ${gray(fit(r.label, W - 7))}`);
+    }
+  }
+
   L.push(gray((ASCII ? '-' : '─').repeat(W)));
   const room = H - L.length;
   const newest = view.anim ? view.anim.m : null;
@@ -1088,7 +1260,7 @@ function renderAgents(st, cols, rows, view) {
 }
 
 function runTerminal() {
-  const interval = Math.max(1, Number(opt('--interval', 2))) * 1000;
+  const interval = Math.max(1, Number(opt('--interval', 1))) * 1000;
   let mode = has('--agents') ? 'agents' : 'board';
   const view = { spin: 0, now: Date.now(), anim: null, flash: null };
   if (has('--once') || !process.stdout.isTTY) {
@@ -1211,7 +1383,7 @@ function runWeb() {
   const host = lan ? '0.0.0.0' : '127.0.0.1';
   const token = lan ? crypto.randomBytes(12).toString('hex') : null;
   let port = Number(opt('--port', 4545));
-  const pollMs = Math.max(1, Number(opt('--interval', 3))) * 1000;
+  const pollMs = Math.max(1, Number(opt('--interval', 1))) * 1000;
 
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://x');
@@ -1405,7 +1577,18 @@ body{
 .unit .ur .el2{color:var(--faint);margin-left:4px}
 .fchip{display:none;align-items:center;gap:6px;margin:12px 0 0;padding:3px 10px;border:1px solid var(--line2);border-radius:999px;font-size:12px;color:var(--muted);cursor:pointer;width:max-content}
 .fchip.on{display:inline-flex} .fchip b{color:var(--text)}
-.unit .now.idle{color:var(--faint)} .unit .now .mk{flex:none;color:var(--faint)} .unit .now.tool .mk{color:var(--acc)}
+.unit .now.idle{color:var(--faint)}
+.unit .mdl{flex:none;font-size:10.5px;padding:1px 7px;border:1px solid var(--line2);border-radius:999px;color:var(--muted);margin-left:6px;white-space:nowrap}
+.unit .ur{margin-left:auto}
+.unit .now .nl b{color:var(--acc);font-weight:700}
+.shimmer{background:linear-gradient(90deg,var(--text) 0%,var(--text) 40%,var(--acc) 50%,var(--text) 60%,var(--text) 100%);background-size:220% 100%;-webkit-background-clip:text;background-clip:text;color:transparent!important;animation:shimmer 1.8s linear infinite}
+.shimmer b{-webkit-text-fill-color:var(--acc)}
+@keyframes shimmer{from{background-position:100% 0}to{background-position:-120% 0}}
+.unit .intent{margin-top:5px;padding-left:16px;font-size:12px;color:var(--muted);font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative}
+.unit .intent::before{content:'❝';position:absolute;left:2px;color:var(--faint);font-style:normal}
+.unit .hist{margin-top:4px;padding-left:16px;font-size:11.5px;color:var(--faint)}
+.unit .hist .hr{display:flex;gap:6px;min-width:0} .unit .hist .hm{flex:none;width:10px} .unit .hist .hr.ok .hm{color:var(--done)}
+.unit .hist .hl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0} .unit .now .mk{flex:none;color:var(--faint)} .unit .now.tool .mk{color:var(--acc)}
 .arow{display:grid;grid-template-columns:repeat(var(--n,1),minmax(0,1fr));gap:14px;position:relative;z-index:1}
 .arow.root{grid-template-columns:minmax(0,320px);justify-content:center}
 .slot{min-width:0}
@@ -1678,6 +1861,7 @@ body{
     var h = el('div', 'uh');
     h.appendChild(el('span', 'glyph', u.state === 'active' ? SPIN[spinI % SPIN.length] : u.state === 'done' ? '✓' : u.state === 'alert' || u.state === 'blocked' ? '!' : '○'));
     h.appendChild(el('span', 'un', label(id)));
+    if (u.model) h.appendChild(el('span', 'mdl', u.model));
     var ur = el('span', 'ur', u.state);
     if (u.state === 'active' && u.startedAt) { var e2 = el('span', 'el2', '· ' + dur(u.startedAt)); e2.setAttribute('data-from', u.startedAt); ur.appendChild(e2); }
     h.appendChild(ur);
@@ -1691,9 +1875,20 @@ body{
       nw.appendChild(el('span', 'el', '⎿'));
       nw.appendChild(el('span', 'mk', u.now.kind === 'tool' ? '▸' : u.now.kind === 'text' ? '✎' : '…'));
       nw.title = u.now.kind === 'tool' ? '실행 중인 도구' : u.now.kind === 'text' ? '답변 작성 중' : '생각 중 · 직전에 끝난 도구';
-      nw.appendChild(el('span', 'nl ko', u.now.label));
+      var ph = u.now.kind === 'tool' ? [u.now.verb, u.now.target, u.now.detail].filter(Boolean).join(' ') : u.now.kind === 'text' ? '답변 쓰는 중' : (u.now.label && u.now.label !== '생각 중' && !(u.recent && u.recent.length) ? '생각 중 · 직전 ' + u.now.label : '생각 중');
+      var nl = el('span', 'nl ko' + (u.now.kind === 'tool' ? ' shimmer' : ''));
+      if (u.now.kind === 'tool') { nl.appendChild(el('b', null, u.now.verb)); nl.appendChild(document.createTextNode(' ' + [u.now.target, u.now.detail].filter(Boolean).join(' '))); }
+      else nl.textContent = ph;
+      nl.title = ph;
+      nw.appendChild(nl);
       if (u.now.since) { var ag = el('span', 'age', ago(u.now.since)); ag.setAttribute('data-since', u.now.since); nw.appendChild(ag); }
       box.appendChild(nw);
+      if (u.intent) { var it = el('div', 'intent ko', u.intent); it.title = '에이전트가 직전에 남긴 설명'; box.appendChild(it); }
+      if (u.recent && u.recent.length) {
+        var hl = el('div', 'hist');
+        u.recent.slice(0, 3).forEach(function(r){ var row = el('div', 'hr' + (r.done ? ' ok' : '')); row.appendChild(el('span', 'hm', r.done ? '✓' : '·')); row.appendChild(el('span', 'hl', r.label)); hl.appendChild(row); });
+        box.appendChild(hl);
+      }
     } else if (u.state === 'done' && u.startedAt && u.finishedAt) box.appendChild(el('div', 'now idle ko', '⎿ ✓ ' + dur(u.startedAt, u.finishedAt) + ' 걸림'));
     else box.appendChild(el('div', 'now idle', u.state === 'done' ? '⎿ ✓' : '⎿ —'));
     if (u.pct != null && u.status === 'IN_PROGRESS') { var pg = el('div', 'prog'); pg.style.width = Math.max(2, Math.min(100, u.pct)) + '%'; pg.title = u.pct + '%'; box.appendChild(pg); }
@@ -1751,7 +1946,8 @@ body{
         var cur = paths[pr.parent + '>' + pr.child] || pa; var L = cur.getTotalLength();
         var pt = cur.getPointAtLength((rev ? 1 - e : e) * L);
         c.setAttribute('cx', pt.x); c.setAttribute('cy', pt.y);
-        bub.style.left = pt.x + 'px'; bub.style.top = pt.y + 'px';
+        bub.style.left = pt.x + 'px';
+        bub.style.transform = pt.x + 14 + bub.offsetWidth > $('agents').clientWidth ? 'translate(calc(-100% - 14px), -50%)' : 'translate(14px, -50%)'; bub.style.top = pt.y + 'px';
         bub.style.opacity = k > .1 && k < .9 ? '1' : '0';
         fill.style.width = Math.round(k * 100) + '%';
         if (k < 1) { requestAnimationFrame(step); return; }
