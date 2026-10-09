@@ -25,6 +25,13 @@
 4. **기록** — PROGRESS.md '실행 기록'에 한 줄: 시각, 차수, 결과, 소요 시간, 메모.
 5. 다음 반복으로.
 
+## 사용 한도 대비
+서브에이전트가 Claude 사용 한도(429)에 부딪혀 죽고, 한도가 풀린 뒤 지휘자를 깨울 신호가 없어 멈추는 일을 막는다. 사용량은 `scripts/statusline.mjs`가 `.runner/usage.json`에 적는다(Claude Code 창이 열려 있어야 갱신된다).
+1. 차수를 맡길 때 감시를 백그라운드로 켠다: `node scripts/limit-guard.mjs watch --min-left 3` (이미 돌고 있으면 새로 켜지 않는다).
+2. 감시가 `LIMIT_LOW`로 끝나면: 진행 중인 서브에이전트에게 "새 작업을 시작하지 말고 지금 단계에서 멈춰라. 체크포인트가 테스트까지 끝났으면 커밋하고, 아니면 커밋하지 말고 PROGRESS에 어디까지 했는지만 남겨라"를 보낸다. `status.mjs runner "pause: usage low"`를 남긴다. 그다음 `node scripts/limit-guard.mjs wait-reset --window <LIMIT_LOW의 window>`를 백그라운드로 켠다.
+3. `LIMIT_RESET`으로 깨어나면: 멈춘 차수를 새 서브에이전트에게 RESUME 지시로 다시 맡기고, 1번 감시를 다시 켠다.
+4. 서브에이전트가 이미 429로 죽었다면(감시보다 먼저 한도에 닿은 경우): 바로 다시 맡기지 말고 `wait-reset`부터 켠다.
+
 ## 끝내기
 - 다음 중 하나면 멈춘다: 남은 차수 없음 / 시작 가능한 차수 없음(전부 의존 대기 또는 BLOCKED) / 연속 2개 차수 BLOCKED.
 - 멈출 때 `RUN_SUMMARY.md`에 이번 실행 요약을 **덧붙인다**: 시작·종료 시각, 끝낸 차수, 막힌 차수와 이유, 사람이 할 일 상위 3개(HUMAN_TODO에서), 다음 실행 때 시작할 차수.
