@@ -13,7 +13,7 @@ const OUT = path.join(ROOT, '.runner', 'usage.json');
 const color = !process.env.NO_COLOR;
 const c = (code) => (s) => (color ? `\x1b[${code}m${s}\x1b[0m` : String(s));
 const wordmark = () =>
-  color ? '\x1b[1;97mspare\x1b[0m\x1b[1;38;2;45;212;191mon\x1b[0m' : 'spareon'; // 'spare' white, 'on' teal
+  color ? '\x1b[1;97mSpare\x1b[0m\x1b[1;38;2;20;184;106mon\x1b[0m' : 'Spareon'; // 'Spare' white, 'on' brand green (docs/brand)
 const gray = c('90');
 const green = c('32');
 const yellow = c('33');

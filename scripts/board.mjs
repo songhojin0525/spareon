@@ -799,9 +799,9 @@ const red = C('31');
 const cyan = C('36');
 const magenta = C('35');
 const gray = C('90');
-// Brand wordmark: 'spare' white, 'on' bright teal
-const TEAL = (s) => (COLOR ? `\x1b[1;38;2;45;212;191m${s}\x1b[0m` : String(s));
-const wordmark = () => (COLOR ? `\x1b[1;97mspare\x1b[0m` : 'spare') + TEAL('on');
+// Brand wordmark (docs/brand): 'Spare' off-white, 'on' brand green #14B86A
+const BRAND_ON = (s) => (COLOR ? `\x1b[1;38;2;20;184;106m${s}\x1b[0m` : String(s));
+const wordmark = () => (COLOR ? `\x1b[1;97mSpare\x1b[0m` : 'Spare') + BRAND_ON('on');
 
 function charWidth(cp) {
   if (cp < 32 || (cp >= 0x7f && cp < 0xa0)) return 0;
@@ -887,7 +887,7 @@ function renderTerminal(st, cols, rows) {
   const L = [];
   const hr = gray((ASCII ? '-' : '─').repeat(cols));
   const nowTxt = `${hhmm(st.now)} · a agents · q quit`;
-  L.push(` ${wordmark()} ${gray('// mission control')}` + ' '.repeat(Math.max(1, cols - 3 - width('spareon // mission control') - width(nowTxt))) + gray(nowTxt));
+  L.push(` ${wordmark()} ${gray('// mission control')}` + ' '.repeat(Math.max(1, cols - 3 - width('Spareon // mission control') - width(nowTxt))) + gray(nowTxt));
   if (!st.hasStages) {
     L.push(red(' prompts/STAGES.md를 찾지 못했습니다. 저장소 맨 위 폴더에서 실행하세요.'));
     return L.join('\n');
@@ -1240,7 +1240,7 @@ function renderAgents(st, cols, rows, view) {
   if (!(a && now - a.start < PKT_MS) && ag.summary) {
     const sm = ag.summary;
     const pct = sm.total ? Math.round((100 * sm.done) / sm.total) : 0;
-    let bx = cv.text(1, 0, ASCII ? '* ' : '● ', TEAL);
+    let bx = cv.text(1, 0, ASCII ? '* ' : '● ', BRAND_ON);
     bx = cv.text(bx, 0, `done ${sm.done}/${sm.total} `, gray);
     const track = 14;
     const f = Math.round((track * pct) / 100);
@@ -1483,12 +1483,13 @@ const PAGE = String.raw`<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>spareon · Mission Control</title>
+<title>Spareon · Mission Control</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%20width%3D%22100%22%20height%3D%22100%22%3E%3Crect%20width%3D%22100%22%20height%3D%22100%22%20rx%3D%2222%22%20fill%3D%22%230E1A15%22%2F%3E%3Cg%20transform%3D%22translate(1.85%201.13)%20scale(0.96296)%22%20fill%3D%22none%22%20stroke-width%3D%2212.5%22%20stroke-linecap%3D%22butt%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20stroke%3D%22%23F3F6F2%22%20d%3D%22M33.22%2030.13%20A30%2030%200%200%200%2020.89%2047.74%20C19.43%2053.61%2024.81%2057.33%2030.65%2058.9%20L64.81%2068.05%20C70.65%2069.62%2074.57%2073.24%2070.07%2077.29%20A30%2030%200%200%201%2029.93%2077.29%20M66.78%2030.13%20A30%2030%200%200%201%2079.34%2048.76%22%2F%3E%3Cpath%20stroke%3D%22%2314B86A%22%20stroke-linecap%3D%22round%22%20d%3D%22M50%2016.5L50%2040%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E">
 <style nonce="__NONCE__">
 :root,[data-theme="dark"]{
   --bg:#1a1918;--bg2:#222120;--panel:#262624;--panel-solid:#262624;--line:#3a3936;--line2:#4a4844;
   --text:#f5f4ef;--muted:#a8a69d;--faint:#6f6d66;
-  --brand-spare:#ffffff;--brand-on:#2dd4bf;
+  --brand-spare:#f3f6f2;--brand-on:#14b86a;
   --acc:#2dd4bf;--acc-dim:rgba(45,212,191,.16);
   --run:#d97757;--run-dim:rgba(217,119,87,.13);
   --done:#4eba65;--done-dim:rgba(78,186,101,.13);
@@ -1501,7 +1502,7 @@ const PAGE = String.raw`<!doctype html>
 [data-theme="light"]{
   --bg:#faf9f5;--bg2:#f0eee6;--panel:#ffffff;--panel-solid:#fff;--line:#e5e2d9;--line2:#d3cfc3;
   --text:#1f1e1d;--muted:#6b6962;--faint:#a3a097;
-  --brand-spare:#1f1e1d;--brand-on:#0d9488;
+  --brand-spare:#0e1a15;--brand-on:#0a8a4e;
   --acc:#0d9488;--acc-dim:rgba(13,148,136,.12);
   --run:#c6613f;--run-dim:rgba(198,97,63,.10);
   --done:#2c7a3f;--done-dim:rgba(44,122,63,.10);
@@ -1534,6 +1535,8 @@ body{
 .brand b{font-size:15px;letter-spacing:.18em}
 .wordmark{font-family:-apple-system,BlinkMacSystemFont,"Inter","Pretendard","Segoe UI",system-ui,sans-serif;font-size:20px!important;font-weight:700;letter-spacing:-.02em!important;line-height:1}
 .wordmark .w-spare{color:var(--brand-spare)} .wordmark .w-on{color:var(--brand-on)}
+.mark{flex:none;width:22px;height:25px;display:block}
+.mark .mk-s{stroke:var(--brand-spare)} .mark .mk-b{stroke:var(--brand-on)}
 .brand .cap{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .live{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted);white-space:nowrap}
 .pulse{width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 0 0 var(--acc);animation:ping 1.8s infinite}
@@ -1749,7 +1752,7 @@ body{
 <body>
 <div class="wrap">
   <div class="top">
-    <div class="brand"><b class="wordmark" aria-label="spareon"><span class="w-spare">spare</span><span class="w-on">on</span></b><span class="cap" id="proj">mission control</span></div>
+    <div class="brand"><svg class="mark" viewBox="0 0 72.5 81" aria-hidden="true"><g transform="translate(-13.75 -10.25)" fill="none" stroke-width="12.5" stroke-linejoin="round"><path class="mk-s" d="M33.22 30.13 A30 30 0 0 0 20.89 47.74 C19.43 53.61 24.81 57.33 30.65 58.9 L64.81 68.05 C70.65 69.62 74.57 73.24 70.07 77.29 A30 30 0 0 1 29.93 77.29 M66.78 30.13 A30 30 0 0 1 79.34 48.76"/><path class="mk-b" stroke-linecap="round" d="M50 16.5L50 40"/></g></svg><b class="wordmark" aria-label="Spareon"><span class="w-spare">Spare</span><span class="w-on">on</span></b><span class="cap" id="proj">mission control</span></div>
     <div class="usage ko" id="usage" title="Claude 사용 한도 (Claude Code 상태줄에서 받은 값)"></div>
     <div class="live"><span class="pulse" id="pulse"></span><span id="clock">connecting…</span><button class="iconbtn" id="theme" type="button" title="Toggle theme">◐</button></div>
   </div>
