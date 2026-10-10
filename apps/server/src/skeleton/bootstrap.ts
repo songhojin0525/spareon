@@ -1,30 +1,26 @@
 /**
- * Development world for the S04 walking skeleton: one buyer with a recorded test top-up, one verified
- * development store that agents attach to, and a price version for jobs to reference. Idempotent (the
- * `dev.skeleton` setting remembers what was created) and runs with the server's least-privilege role.
+ * The skeleton world every server needs until S08/S10: one verified store that agents attach to (with
+ * its owner and the operator who verified it) and a price version for jobs to reference. Idempotent
+ * (the `dev.skeleton` setting remembers what was created) and runs with the least-privilege role.
+ * Buyers are real accounts with real API keys (S05); development tools create one with ensureDevBuyer.
  *
- * SKELETON(S05): real buyer accounts and API keys replace the single development buyer.
  * SKELETON(S10): store registration and node enrollment replace the single development store.
  */
 import { randomBytes } from 'node:crypto';
 
-import { MICRO_CR_PER_CR } from '@spareon/shared';
 import { eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 
+import { UNUSABLE_PASSWORD_HASH } from '../auth/password.js';
 import { type Db, withTransaction } from '../db/client.js';
 import { models, priceVersions, settings, stores, users } from '../db/schema/index.js';
-import { ensureAccount, type LedgerDeps, postEntry } from '../ledger/skeleton.js';
+import type { LedgerDeps } from '../ledger/skeleton.js';
 
 export const SKELETON_SETTING_KEY = 'dev.skeleton';
-/** Users get an unusable password hash: nobody can log in until S05. */
-const UNUSABLE_PASSWORD_HASH = '!unusable';
-/** Recorded won per CR for the development top-up (dev seed rate, not a real quote). */
-const DEV_KRW_PER_CR = 1_400n;
 
 const worldSchema = z.object({
+  // Version 1 worlds made before S05 also carry a buyerId; it is ignored (zod drops unknown keys).
   version: z.literal(1),
-  buyerId: z.uuid(),
   ownerId: z.uuid(),
   operatorId: z.uuid(),
   storeId: z.uuid(),
@@ -32,17 +28,8 @@ const worldSchema = z.object({
 });
 export type SkeletonWorld = z.infer<typeof worldSchema>;
 
-export interface BootstrapOptions {
-  /** Development top-up for the buyer in whole CR (default 100). Applied once, on first bootstrap. */
-  readonly topupCr?: bigint;
-}
-
 /** Create (once) or load the development world. */
-export async function ensureSkeletonWorld(
-  db: Db,
-  deps: LedgerDeps,
-  options: BootstrapOptions = {},
-): Promise<SkeletonWorld> {
+export async function ensureSkeletonWorld(db: Db, deps: LedgerDeps): Promise<SkeletonWorld> {
   return withTransaction(db, async (tx) => {
     const now = deps.clock.now();
     // Serialize concurrent bootstraps (two server processes on one database).
@@ -54,7 +41,8 @@ export async function ensureSkeletonWorld(
     if (existing !== undefined) return worldSchema.parse(existing.value);
 
     const id = (): string => deps.ids.newId();
-    const user = async (role: 'operator' | 'owner' | 'buyer', name: string): Promise<string> => {
+    // Seed accounts cannot log in (unusable hash); operators log in with accounts made by the CLI.
+    const user = async (role: 'operator' | 'owner', name: string): Promise<string> => {
       const userId = id();
       await tx.insert(users).values({
         id: userId,
@@ -69,7 +57,6 @@ export async function ensureSkeletonWorld(
     };
     const operatorId = await user('operator', '개발용 운영자');
     const ownerId = await user('owner', '개발용 사장님');
-    const buyerId = await user('buyer', '개발용 구매자');
 
     const storeId = id();
     await tx.insert(stores).values({
@@ -98,60 +85,8 @@ export async function ensureSkeletonWorld(
       createdAt: now,
     });
 
-    // Operator TEST_TOPUP (ARCHITECTURE 9.2): recorded won into the reserve, the same value in CR to the
-    // buyer. No real money moves (absolute rule 2).
-    const topupCr = options.topupCr ?? 100n;
-    if (topupCr > 0n) {
-      const topupUcr = topupCr * MICRO_CR_PER_CR;
-      const topupKrw = topupCr * DEV_KRW_PER_CR;
-      await postEntry(tx, deps, {
-        kind: 'TEST_TOPUP',
-        idempotencyKey: `skeleton:topup:${buyerId}`,
-        memo: 'S04 development test top-up (no real money)',
-        postings: [
-          {
-            accountId: await ensureAccount(tx, deps, {
-              kind: 'test_topup_source',
-              ownerId: null,
-              currency: 'KRW',
-            }),
-            currency: 'KRW',
-            amount: -topupKrw,
-          },
-          {
-            accountId: await ensureAccount(tx, deps, {
-              kind: 'reserve',
-              ownerId: null,
-              currency: 'KRW',
-            }),
-            currency: 'KRW',
-            amount: topupKrw,
-          },
-          {
-            accountId: await ensureAccount(tx, deps, {
-              kind: 'fx_conversion',
-              ownerId: null,
-              currency: 'CR',
-            }),
-            currency: 'CR',
-            amount: -topupUcr,
-          },
-          {
-            accountId: await ensureAccount(tx, deps, {
-              kind: 'buyer_wallet',
-              ownerId: buyerId,
-              currency: 'CR',
-            }),
-            currency: 'CR',
-            amount: topupUcr,
-          },
-        ],
-      });
-    }
-
     const world: SkeletonWorld = {
       version: 1,
-      buyerId,
       ownerId,
       operatorId,
       storeId,

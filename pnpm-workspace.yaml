@@ -19,9 +19,11 @@ allowBuilds:
 
 # Single place to pin shared dependency versions. Packages reference them as "catalog:".
 catalog:
+  '@apidevtools/openapi-schemas': 2.1.0
   '@eslint-community/eslint-plugin-eslint-comments': 4.8.1
   '@eslint/js': 10.0.1
   '@fastify/websocket': 11.3.1
+  '@node-rs/argon2': 2.2.1
   '@types/jsdom': 21.1.7
   '@types/node': 22.20.5
   '@types/pg': 8.23.1
@@ -39,6 +41,7 @@ catalog:
   jsdom: 26.1.0
   mermaid: 11.17.2
   pg: 8.23.1
+  pino: 10.4.0
   prettier: 3.9.9
   tsx: 4.23.15
   typescript: 6.0.3

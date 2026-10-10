@@ -14,22 +14,28 @@
     "db:status": "tsx src/bin/db.ts status",
     "db:seed": "tsx src/bin/seed.ts",
     "dev:server": "tsx src/bin/dev-server.ts",
-    "demo": "tsx src/bin/demo.ts"
+    "demo": "tsx src/bin/demo.ts",
+    "cli": "tsx src/bin/cli.ts",
+    "env:example": "tsx src/bin/env-example.ts"
   },
   "dependencies": {
+    "@fastify/websocket": "catalog:",
+    "@node-rs/argon2": "catalog:",
     "@spareon/protocol": "workspace:*",
     "@spareon/shared": "workspace:*",
-    "@fastify/websocket": "catalog:",
     "drizzle-orm": "catalog:",
     "fastify": "catalog:",
     "pg": "catalog:",
+    "pino": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@apidevtools/openapi-schemas": "catalog:",
     "@spareon/testkit": "workspace:*",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
     "@types/ws": "catalog:",
+    "ajv": "catalog:",
     "drizzle-kit": "catalog:",
     "fast-check": "catalog:",
     "tsx": "catalog:",

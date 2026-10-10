@@ -29,8 +29,9 @@ describe('dev:server stack (demo settings never widen by accident)', () => {
       expect((stack.server.app.server.address() as AddressInfo).address).toBe('127.0.0.1');
       expect(stack.lanWsUrls).toEqual([]);
       expect(lines.some((l) => l.includes('HOST is ignored'))).toBe(true);
-      expect(stack.apiKey.trim().length).toBeGreaterThanOrEqual(24);
-      expect(stack.generatedSecrets).toBe(true);
+      expect(stack.apiKey).toMatch(/^sp_test_[0-9A-Za-z]{8}_[0-9A-Za-z]{32}$/);
+      expect(stack.generatedSecrets).toContain('DEV_AGENT_SECRET');
+      expect(stack.generatedSecrets).toContain('SESSION_SECRET');
       // The server's own sessions run as the least-privilege role.
       const who = await stack.app.pool.query<{ u: string }>('SELECT current_user AS u');
       expect(who.rows[0]?.u).toBe('spareon_app');

@@ -14,7 +14,9 @@ import {
   splitCost,
 } from '../../src/ledger/skeleton.js';
 import { createIds } from '../../src/lib/ids.js';
-import { ensureSkeletonWorld, type SkeletonWorld } from '../../src/skeleton/bootstrap.js';
+import { ensureSkeletonWorld } from '../../src/skeleton/bootstrap.js';
+import { ensureDevBuyer } from '../../src/skeleton/dev-buyer.js';
+import type { DevWorld } from '../../src/skeleton/dev-stack.js';
 import { createFactories } from '../../src/testing/factories.js';
 import { openTestDb, type TestDb } from '../support/db.js';
 import { balanceOf, ledgerBalanced } from '../support/ledger.js';
@@ -27,13 +29,16 @@ describe('skeleton ledger (runs as spareon_app)', () => {
   const clock = new FakeClock();
   const random = createSeededRandom('s04-ledger');
   const deps = { clock, ids: createIds(clock, (n) => random.bytes(n)) };
-  let world: SkeletonWorld;
+  const keyDeps = { ...deps, pepper: 'p'.repeat(32), pepperId: 'p1', mode: 'test' as const };
+  let world: DevWorld;
   let f: ReturnType<typeof createFactories>;
 
   beforeAll(async () => {
     testDb = await openTestDb();
     app = createDb({ url: testDb.url, role: 'spareon_app', maxConnections: 4 });
-    world = await ensureSkeletonWorld(app.db, deps, { topupCr: 1n });
+    const skeleton = await ensureSkeletonWorld(app.db, deps);
+    const buyer = await ensureDevBuyer(app.db, keyDeps, { topupCr: 1n });
+    world = { ...skeleton, buyerId: buyer.buyerId };
     f = createFactories({ db: app.db, clock, random });
   });
   afterAll(async () => {
@@ -67,8 +72,9 @@ describe('skeleton ledger (runs as spareon_app)', () => {
   it('bootstraps once: the buyer has the top-up and every currency sums to zero', async () => {
     expect(await balanceOf(testDb, 'buyer_wallet', world.buyerId)).toBe(1n * CR);
     expect(await balanceOf(testDb, 'reserve', null, 'KRW')).toBe(1_400n);
-    const again = await ensureSkeletonWorld(app.db, deps, { topupCr: 50n });
-    expect(again).toEqual(world);
+    expect({ ...(await ensureSkeletonWorld(app.db, deps)), buyerId: world.buyerId }).toEqual(world);
+    const again = await ensureDevBuyer(app.db, keyDeps, { topupCr: 50n });
+    expect(again.buyerId).toBe(world.buyerId);
     expect(await balanceOf(testDb, 'buyer_wallet', world.buyerId)).toBe(1n * CR);
     expect(await ledgerBalanced(testDb)).toBe(true);
   });

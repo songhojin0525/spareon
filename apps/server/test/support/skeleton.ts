@@ -6,19 +6,22 @@ import { FakeAgent, type FakeAgentOptions } from '@spareon/testkit';
 import type pg from 'pg';
 import { expect } from 'vitest';
 
-import { buildServer, type Server } from '../../src/app.js';
-import { parseEnv } from '../../src/config.js';
+import { buildServer, type Server, type ServerDeps } from '../../src/app.js';
+import { parseEnv, type ServerEnv } from '../../src/config.js';
 import { createDb, type DbHandle } from '../../src/db/client.js';
 import type { GatewayConfig } from '../../src/gateway/gateway.js';
 import { systemClock } from '../../src/lib/clock.js';
 import { createIds } from '../../src/lib/ids.js';
+import type { Logger } from '../../src/lib/logger.js';
 import { createPayloadCipher } from '../../src/lib/payload-cipher.js';
 import type { SchedulerConfig } from '../../src/scheduler/scheduler.js';
-import { ensureSkeletonWorld, type SkeletonWorld } from '../../src/skeleton/bootstrap.js';
+import { ensureSkeletonWorld } from '../../src/skeleton/bootstrap.js';
+import { ensureDevBuyer } from '../../src/skeleton/dev-buyer.js';
+import type { DevWorld } from '../../src/skeleton/dev-stack.js';
+import { withGeneratedSecrets } from '../../src/testing/env.js';
 import { openTestDb, type TestDb } from './db.js';
 import { balanceOf, ledgerBalanced } from './ledger.js';
 
-export const TEST_API_KEY = 'test-api-key-0123456789abcdef';
 export const TEST_AGENT_SECRET = 'test-agent-secret-0123456789abcdef';
 
 /** Short timings so lifecycle tests run in seconds (the production values are in DEFAULT_*_CONFIG). */
@@ -33,7 +36,11 @@ export interface Harness {
   readonly db: TestDb;
   readonly app: DbHandle;
   readonly server: Server;
-  readonly world: SkeletonWorld;
+  readonly env: ServerEnv;
+  /** The skeleton world plus the development buyer (a real account with a real API key). */
+  readonly world: DevWorld;
+  /** The development buyer's API key (sp_test_…). */
+  readonly apiKey: string;
   readonly baseUrl: string;
   readonly wsUrl: string;
   agent(name: string, opts?: Partial<FakeAgentOptions>): Promise<FakeAgent>;
@@ -53,6 +60,10 @@ export async function startHarness(
     gateway?: Partial<GatewayConfig>;
     topupCr?: bigint;
     dashboard?: boolean;
+    env?: Record<string, string>;
+    auth?: ServerDeps['auth'];
+    idempotency?: ServerDeps['idempotency'];
+    logger?: Logger;
   } = {},
 ): Promise<Harness> {
   const db = await openTestDb();
@@ -60,17 +71,24 @@ export async function startHarness(
   const app = createDb({ url: db.url, role: 'spareon_app', maxConnections: 8 });
   const clock = systemClock;
   const ids = createIds(clock);
-  const world = await ensureSkeletonWorld(
+  const env = parseEnv(
+    withGeneratedSecrets(
+      {
+        NODE_ENV: 'test',
+        DEV_AGENT_SECRET: TEST_AGENT_SECRET,
+        ...(options.dashboard === true ? { DEV_DASHBOARD: '1' } : {}),
+        ...options.env,
+      },
+      { databaseUrl: db.url },
+    ).env,
+  );
+  const skeleton = await ensureSkeletonWorld(app.db, { clock, ids });
+  const buyer = await ensureDevBuyer(
     app.db,
-    { clock, ids },
+    { clock, ids, pepper: env.API_KEY_PEPPER, pepperId: env.API_KEY_PEPPER_ID, mode: 'test' },
     { topupCr: options.topupCr ?? 10n },
   );
-  const env = parseEnv({
-    NODE_ENV: 'test',
-    DEV_API_KEY: TEST_API_KEY,
-    DEV_AGENT_SECRET: TEST_AGENT_SECRET,
-    ...(options.dashboard === true ? { DEV_DASHBOARD: '1' } : {}),
-  });
+  const world: DevWorld = { ...skeleton, buyerId: buyer.buyerId };
   const cipher = createPayloadCipher(randomBytes(32).toString('hex'), 'test');
   const build = (): Promise<Server> =>
     buildServer({
@@ -82,6 +100,10 @@ export async function startHarness(
       world,
       cipher,
       scheduler: { ...FAST_SCHEDULER, ...options.scheduler },
+      // Failed logins answer after 400 ms in production; tests that measure it pass their own value.
+      auth: { minFailureMs: 0, ...options.auth },
+      ...(options.idempotency === undefined ? {} : { idempotency: options.idempotency }),
+      ...(options.logger === undefined ? {} : { logger: options.logger }),
       ...(options.gateway === undefined ? {} : { gateway: options.gateway }),
     });
   const server = await build();
@@ -94,7 +116,9 @@ export async function startHarness(
     db,
     app,
     server,
+    env,
     world,
+    apiKey: buyer.apiKey,
     baseUrl,
     wsUrl,
     async agent(name, opts = {}) {
@@ -110,7 +134,7 @@ export async function startHarness(
       return a;
     },
     chat(body, init = {}) {
-      const key = init.apiKey === undefined ? TEST_API_KEY : init.apiKey;
+      const key = init.apiKey === undefined ? buyer.apiKey : init.apiKey;
       return fetch(`${baseUrl}/v1/chat/completions`, {
         method: 'POST',
         headers: {

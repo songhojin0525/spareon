@@ -19,9 +19,12 @@ import type { GatewayConfig } from '../gateway/gateway.js';
 import { AGENT_WS_PATH } from '../gateway/gateway.js';
 import type { Clock } from '../lib/clock.js';
 import { createIds } from '../lib/ids.js';
+import { createLogger } from '../lib/logger.js';
 import { createPayloadCipher } from '../lib/payload-cipher.js';
 import type { SchedulerConfig } from '../scheduler/scheduler.js';
+import { withGeneratedSecrets } from '../testing/env.js';
 import { ensureSkeletonWorld, type SkeletonWorld } from './bootstrap.js';
+import { ensureDevBuyer } from './dev-buyer.js';
 
 export interface DevStackOptions {
   readonly env: Readonly<Record<string, string | undefined>>;
@@ -36,10 +39,13 @@ export interface DevStackOptions {
   readonly log?: (line: string) => void;
 }
 
+/** The skeleton world plus the development buyer (real account and API key). */
+export type DevWorld = SkeletonWorld & { readonly buyerId: string };
+
 export interface DevStack {
   readonly server: Server;
   readonly env: ServerEnv;
-  readonly world: SkeletonWorld;
+  readonly world: DevWorld;
   readonly app: DbHandle;
   readonly httpUrl: string;
   readonly wsUrl: string;
@@ -47,7 +53,8 @@ export interface DevStack {
   readonly lanWsUrls: readonly string[];
   readonly apiKey: string;
   readonly agentSecret: string;
-  readonly generatedSecrets: boolean;
+  /** Secrets generated for this run because the environment did not set them. */
+  readonly generatedSecrets: readonly string[];
   readonly temporaryDatabase: boolean;
   readonly adminUrl: string;
   stop(): Promise<void>;
@@ -77,29 +84,20 @@ export async function startDevStack(options: DevStackOptions): Promise<DevStack>
   if (options.env['NODE_ENV'] === 'production') {
     throw new DevStackError('the development server refuses NODE_ENV=production');
   }
-  // Blank counts as unset (as in parseEnv): a fresh key is generated instead of an empty one.
+  // Blank counts as unset (as in parseEnv): a fresh secret is generated instead of an empty one.
   const given = (name: string): string | undefined => {
     const v = options.env[name];
     return v === undefined || v.trim() === '' ? undefined : v;
   };
-  const apiKey = given('DEV_API_KEY') ?? devSecret('dev-key');
   const agentSecret = given('DEV_AGENT_SECRET') ?? devSecret('dev-agent');
-  const generatedSecrets =
-    given('DEV_API_KEY') === undefined || given('DEV_AGENT_SECRET') === undefined;
   if (options.lan !== true && given('HOST') !== undefined) {
     log('HOST is ignored by the development server: it listens on 127.0.0.1 unless --lan is given');
   }
-  const env = parseEnv({
-    ...options.env,
-    NODE_ENV: 'development',
-    DEV_API_KEY: apiKey,
-    DEV_AGENT_SECRET: agentSecret,
-    // Only the explicit --lan flag opens the server to other machines (S04 "하지 말 것").
-    HOST: options.lan === true ? '0.0.0.0' : '127.0.0.1',
-    PORT: String(options.port ?? options.env['PORT'] ?? 8080),
-  });
+  if (given('DEV_API_KEY') !== undefined) {
+    log('DEV_API_KEY is ignored: since S05 the development server creates a real buyer API key');
+  }
 
-  let adminUrl = env.DATABASE_URL;
+  let adminUrl = given('DATABASE_URL');
   let stopDb: () => Promise<void> = () => Promise.resolve();
   const temporaryDatabase = adminUrl === undefined;
   if (adminUrl === undefined) {
@@ -112,6 +110,30 @@ export async function startDevStack(options: DevStackOptions): Promise<DevStack>
       'DATABASE_URL must point at this machine (localhost) for the development server',
     );
   }
+  const port = options.port ?? (given('PORT') === undefined ? 8080 : Number(given('PORT')));
+  const rest = Object.fromEntries(Object.entries(options.env).filter(([k]) => k !== 'DEV_API_KEY'));
+  const filled = withGeneratedSecrets(
+    { ...rest, DATABASE_URL: adminUrl },
+    { databaseUrl: adminUrl, port },
+  );
+  let env: ServerEnv;
+  try {
+    env = parseEnv({
+      ...filled.env,
+      NODE_ENV: 'development',
+      DEV_AGENT_SECRET: agentSecret,
+      // Only the explicit --lan flag opens the server to other machines (S04 "하지 말 것").
+      HOST: options.lan === true ? '0.0.0.0' : '127.0.0.1',
+      PORT: String(port),
+    });
+  } catch (err) {
+    await stopDb();
+    throw err;
+  }
+  const generatedSecrets = [
+    ...filled.generated.filter((k) => k !== 'DATABASE_URL'),
+    ...(given('DEV_AGENT_SECRET') === undefined ? ['DEV_AGENT_SECRET'] : []),
+  ];
 
   let app: DbHandle | undefined;
   let server: Server | undefined;
@@ -126,17 +148,18 @@ export async function startDevStack(options: DevStackOptions): Promise<DevStack>
     app = createDb({ url: adminUrl, role: env.DB_ROLE, applicationName: 'spareon-dev-server' });
     await assertSessionRole(app, env.DB_ROLE);
     const ids = createIds(options.clock);
-    const world = await ensureSkeletonWorld(
-      app.db,
-      { clock: options.clock, ids },
-      {
-        topupCr: options.topupCr ?? 100n,
-      },
-    );
-    let keyHex = env.DATA_ENCRYPTION_KEY;
-    if (keyHex === undefined) {
+    const skeleton = await ensureSkeletonWorld(app.db, { clock: options.clock, ids });
+    const apiKeyDeps = {
+      clock: options.clock,
+      ids,
+      pepper: env.API_KEY_PEPPER,
+      pepperId: env.API_KEY_PEPPER_ID,
+      mode: env.PAYMENTS_MODE,
+    };
+    const buyer = await ensureDevBuyer(app.db, apiKeyDeps, { topupCr: options.topupCr ?? 100n });
+    const world: DevWorld = { ...skeleton, buyerId: buyer.buyerId };
+    if (generatedSecrets.includes('DATA_ENCRYPTION_KEY')) {
       // Ephemeral key: inputs stored before a restart cannot be read after it (harmless for demos).
-      keyHex = randomBytes(32).toString('hex');
       log('DATA_ENCRYPTION_KEY is not set: using a temporary key for this run');
     }
     server = await buildServer({
@@ -146,8 +169,8 @@ export async function startDevStack(options: DevStackOptions): Promise<DevStack>
       db: app.db,
       pool: app.pool,
       world,
-      cipher: createPayloadCipher(keyHex, env.DATA_ENCRYPTION_KEY_ID),
-      logger: options.logger ?? false,
+      cipher: createPayloadCipher(env.DATA_ENCRYPTION_KEY, env.DATA_ENCRYPTION_KEY_ID),
+      ...(options.logger === true ? { logger: createLogger({ level: env.LOG_LEVEL }) } : {}),
       ...(options.scheduler === undefined ? {} : { scheduler: options.scheduler }),
       ...(options.gateway === undefined ? {} : { gateway: options.gateway }),
     });
@@ -169,7 +192,7 @@ export async function startDevStack(options: DevStackOptions): Promise<DevStack>
       lanWsUrls: lan
         ? lanAddresses().map((ip) => `ws://${ip}:${String(port)}${AGENT_WS_PATH}`)
         : [],
-      apiKey,
+      apiKey: buyer.apiKey,
       agentSecret,
       generatedSecrets,
       temporaryDatabase,

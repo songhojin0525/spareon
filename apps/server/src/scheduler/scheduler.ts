@@ -249,6 +249,7 @@ export class Scheduler implements AgentJobSink {
   async submit(
     buyerId: string,
     req: ChatRequest,
+    options: { apiKeyId?: string } = {},
   ): Promise<{ jobId: string; outcome: Promise<JobOutcome> }> {
     const { db, clock, ids, cipher, config } = this.#deps;
     const [model] = await db
@@ -285,6 +286,7 @@ export class Scheduler implements AgentJobSink {
         await tx.insert(jobs).values({
           id: jobId,
           buyerId,
+          apiKeyId: options.apiKeyId ?? null,
           kind: 'chat',
           currency: 'CR',
           modelId: model.id,

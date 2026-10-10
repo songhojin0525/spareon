@@ -21,7 +21,7 @@ if (values.help) {
   out('usage: pnpm dev:server [--lan] [--port 8080]');
   out('  --lan    listen on all network interfaces so other PCs can connect (development only)');
   out(
-    'env: DATABASE_URL (local; default: temporary embedded Postgres), DEV_API_KEY, DEV_AGENT_SECRET',
+    'env: DATABASE_URL (local; default: temporary embedded Postgres), DEV_AGENT_SECRET; other secrets are generated when unset',
   );
   process.exit(0);
 }
@@ -36,14 +36,14 @@ try {
     log: out,
   });
   out();
-  out('=== Spareon S04 개발용 서버가 켜졌습니다 ===');
+  out('=== Spareon 개발용 서버가 켜졌습니다 ===');
   out(`대시보드:      ${stack.httpUrl}/dev`);
   out(`구매자 API:    ${stack.httpUrl}/v1/chat/completions`);
-  out(`API 키:        ${stack.apiKey}`);
+  out(`API 키:        ${stack.apiKey}  (개발용 구매자, 켤 때마다 새 키)`);
   out(`에이전트 비밀: ${stack.agentSecret}`);
-  if (stack.generatedSecrets) {
+  if (stack.generatedSecrets.includes('DEV_AGENT_SECRET')) {
     out(
-      '(키와 비밀은 이번 실행용으로 새로 만들었습니다. 고정하려면 DEV_API_KEY, DEV_AGENT_SECRET 환경변수를 설정하세요.)',
+      '(에이전트 비밀은 이번 실행용으로 새로 만들었습니다. 고정하려면 DEV_AGENT_SECRET 환경변수를 설정하세요.)',
     );
   }
   if (stack.lanWsUrls.length > 0) {
