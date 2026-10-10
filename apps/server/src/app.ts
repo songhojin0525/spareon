@@ -1,6 +1,7 @@
 import websocket from '@fastify/websocket';
 import { LIMITS } from '@spareon/protocol';
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
+import type pg from 'pg';
 
 import { registerChatCompletions } from './buyer-api/chat-completions.js';
 import { devDashboardEnabled, type ServerEnv } from './config.js';
@@ -11,6 +12,7 @@ import { SessionRegistry } from './gateway/session.js';
 import type { Clock } from './lib/clock.js';
 import { createIds, type Ids } from './lib/ids.js';
 import type { PayloadCipher } from './lib/payload-cipher.js';
+import { acquireInstanceLock, type InstanceLock } from './scheduler/instance-lock.js';
 import {
   DEFAULT_SCHEDULER_CONFIG,
   Scheduler,
@@ -43,6 +45,8 @@ export interface ServerDeps extends AppDeps {
   readonly env: ServerEnv;
   /** Database handle running as spareon_app (createDb({ role })). */
   readonly db: Db;
+  /** The pool behind `db` (the scheduler instance lock holds one of its connections). */
+  readonly pool: pg.Pool;
   readonly world: SkeletonWorld;
   readonly cipher: PayloadCipher;
   readonly ids?: Ids;
@@ -101,12 +105,18 @@ export async function buildServer(deps: ServerDeps): Promise<Server> {
     registerDevDashboard(app, { db: deps.db, clock: deps.clock, sessions, world: deps.world });
   }
 
+  // One scheduling process per database (the instance lock): a second one would take the first one's
+  // live jobs for leftovers of a dead process and cancel them. listen() fails when the lock is held.
+  let lock: InstanceLock | undefined;
   app.addHook('onReady', async () => {
+    lock = await acquireInstanceLock(deps.pool, app.log);
     await scheduler.recoverAfterRestart();
     scheduler.start();
   });
   app.addHook('onClose', async () => {
     await scheduler.stop();
+    await lock?.release();
+    lock = undefined;
   });
   return { app, scheduler, sessions };
 }

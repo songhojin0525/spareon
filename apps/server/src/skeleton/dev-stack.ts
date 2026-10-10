@@ -143,6 +143,7 @@ export async function startDevStack(options: DevStackOptions): Promise<DevStack>
       ids,
       env,
       db: app.db,
+      pool: app.pool,
       world,
       cipher: createPayloadCipher(keyHex, env.DATA_ENCRYPTION_KEY_ID),
       logger: options.logger ?? false,

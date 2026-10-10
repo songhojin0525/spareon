@@ -94,6 +94,26 @@ function outcomeError(
       'No node is available for this model right now. Nothing was charged.',
     );
   }
+  if (outcome.code === 'input_unsendable') {
+    // The server found the input itself cannot be carried to a node: a retry fails the same way.
+    // (A node reporting input_invalid is only that node's claim: it stays node_failed below.)
+    return sendError(
+      reply,
+      400,
+      'invalid_request_error',
+      'input_invalid',
+      'The messages cannot be sent to a node as they are. Nothing was charged.',
+    );
+  }
+  if (outcome.code === 'offer_invalid' || outcome.code === 'outcome_lost') {
+    return sendError(
+      reply,
+      500,
+      'server_error',
+      'internal_error',
+      'The server could not process this request. Nothing was charged.',
+    );
+  }
   if (outcome.code === 'deadline') {
     return sendError(
       reply,
@@ -156,17 +176,24 @@ export function registerChatCompletions(app: FastifyInstance, deps: BuyerApiDeps
     for (const m of body.messages) inlineBytes += encoder.encode(m.content).length;
     // JSON escaping can grow the text (control characters become \u00XX): the offer must still fit.
     const escapedBytes = encoder.encode(JSON.stringify(body.messages)).length;
-    if (
-      inlineBytes > LIMITS.maxInlineTextBytes ||
-      escapedBytes > LIMITS.maxMessageBytes - OFFER_OVERHEAD_BYTES
-    ) {
-      // SKELETON(S12): large inputs go through inputRef.
+    // SKELETON(S12): large inputs go through inputRef.
+    if (inlineBytes > LIMITS.maxInlineTextBytes) {
       return sendError(
         reply,
         413,
         'invalid_request_error',
         'input_too_large',
-        `Messages exceed ${String(LIMITS.maxInlineTextBytes)} bytes.`,
+        `Message text exceeds ${String(LIMITS.maxInlineTextBytes)} bytes.`,
+      );
+    }
+    const maxEscaped = LIMITS.maxMessageBytes - OFFER_OVERHEAD_BYTES;
+    if (escapedBytes > maxEscaped) {
+      return sendError(
+        reply,
+        413,
+        'invalid_request_error',
+        'input_too_large',
+        `After JSON escaping, the messages exceed ${String(maxEscaped)} bytes.`,
       );
     }
     const req: ChatRequest = {

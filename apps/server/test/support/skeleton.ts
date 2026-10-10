@@ -39,6 +39,11 @@ export interface Harness {
   agent(name: string, opts?: Partial<FakeAgentOptions>): Promise<FakeAgent>;
   chat(body: unknown, init?: { apiKey?: string | null; signal?: AbortSignal }): Promise<Response>;
   query<T extends pg.QueryResultRow>(text: string, values?: unknown[]): Promise<T[]>;
+  /**
+   * Build another server process on the same database (same world, keys and settings), not yet
+   * listening: restart and second-instance tests. The caller closes it.
+   */
+  anotherServer(): Promise<Server>;
   close(): Promise<void>;
 }
 
@@ -66,16 +71,20 @@ export async function startHarness(
     DEV_AGENT_SECRET: TEST_AGENT_SECRET,
     ...(options.dashboard === true ? { DEV_DASHBOARD: '1' } : {}),
   });
-  const server = await buildServer({
-    clock,
-    ids,
-    env,
-    db: app.db,
-    world,
-    cipher: createPayloadCipher(randomBytes(32).toString('hex'), 'test'),
-    scheduler: { ...FAST_SCHEDULER, ...options.scheduler },
-    ...(options.gateway === undefined ? {} : { gateway: options.gateway }),
-  });
+  const cipher = createPayloadCipher(randomBytes(32).toString('hex'), 'test');
+  const build = (): Promise<Server> =>
+    buildServer({
+      clock,
+      ids,
+      env,
+      db: app.db,
+      pool: app.pool,
+      world,
+      cipher,
+      scheduler: { ...FAST_SCHEDULER, ...options.scheduler },
+      ...(options.gateway === undefined ? {} : { gateway: options.gateway }),
+    });
+  const server = await build();
   await server.app.listen({ host: '127.0.0.1', port: 0 });
   const { port } = server.app.server.address() as AddressInfo;
   const baseUrl = `http://127.0.0.1:${String(port)}`;
@@ -114,6 +123,7 @@ export async function startHarness(
     },
     query: async <T extends pg.QueryResultRow>(text: string, values?: unknown[]) =>
       (await db.pool.query<T>(text, values)).rows,
+    anotherServer: build,
     async close() {
       await Promise.all(agents.map((a) => a.kill()));
       await server.app.close();

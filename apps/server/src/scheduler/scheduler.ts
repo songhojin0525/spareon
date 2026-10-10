@@ -16,11 +16,12 @@
  */
 import { createHash, randomInt } from 'node:crypto';
 
-import type {
-  JobCompletePayload,
-  JobFailPayload,
-  JobPreemptedPayload,
-  JobRejectPayload,
+import {
+  defaultCodec,
+  type JobCompletePayload,
+  type JobFailPayload,
+  type JobPreemptedPayload,
+  type JobRejectPayload,
 } from '@spareon/protocol';
 import { and, asc, desc, eq, inArray, lte, sql } from 'drizzle-orm';
 import type { FastifyBaseLogger } from 'fastify';
@@ -66,6 +67,11 @@ export interface SchedulerConfig {
   readonly payloadRetentionMs: number;
   /** How often sweep() runs; 0 = only when called (tests). */
   readonly sweepIntervalMs: number;
+  /**
+   * A waiting buyer request is answered at the latest this long after the job deadline, even if no
+   * rule ended the job (a backstop: the deadline sweep normally ends it first).
+   */
+  readonly waiterSlackMs: number;
 }
 
 export const DEFAULT_SCHEDULER_CONFIG: SchedulerConfig = {
@@ -77,6 +83,7 @@ export const DEFAULT_SCHEDULER_CONFIG: SchedulerConfig = {
   holdGraceMs: 15 * 60_000,
   payloadRetentionMs: 24 * 60 * 60_000,
   sweepIntervalMs: 250,
+  waiterSlackMs: 30_000,
 };
 
 export interface ChatMessage {
@@ -146,7 +153,11 @@ const safeCode = (code: string): string => (CODE_RE.test(code) ? code : 'unknown
 export class Scheduler implements AgentJobSink {
   readonly #deps: SchedulerDeps;
   readonly #ledger: LedgerDeps;
-  readonly #waiters = new Map<string, (outcome: JobOutcome) => void>();
+  /** Buyer requests waiting in this process, by job id, each with its backstop timer. */
+  readonly #waiters = new Map<
+    string,
+    { readonly resolve: (outcome: JobOutcome) => void; timer?: NodeJS.Timeout }
+  >();
   #dispatching = false;
   #dispatchAgain = false;
   #timer: NodeJS.Timeout | undefined;
@@ -184,11 +195,27 @@ export class Scheduler implements AgentJobSink {
       .select({ id: jobs.id })
       .from(jobs)
       .where(inArray(jobs.status, ['queued', 'offered', 'running']));
-    for (const j of open) await this.#finalize(j.id, 'canceled', 'server_restart');
-    if (open.length > 0) {
-      this.#deps.log.warn({ jobs: open.length }, 'released jobs left unfinished by a previous run');
+    // One broken job must not keep the server from starting (and every other hold tied up): each one
+    // is isolated. A job left open here is never offered (dispatch only offers jobs a buyer in this
+    // process waits for) and the deadline sweep ends it later.
+    let failed = 0;
+    for (const j of open) {
+      await this.#isolated('restart recovery', async () => {
+        try {
+          await this.#finalize(j.id, 'canceled', 'server_restart');
+        } catch (err) {
+          failed++;
+          throw err;
+        }
+      });
     }
-    return open.length;
+    if (open.length > 0) {
+      this.#deps.log.warn(
+        { jobs: open.length, failed },
+        'released jobs left unfinished by a previous run',
+      );
+    }
+    return open.length - failed;
   }
 
   async stop(): Promise<void> {
@@ -227,7 +254,7 @@ export class Scheduler implements AgentJobSink {
       greedy: req.temperatureMilli === 0,
     };
     const outcome = new Promise<JobOutcome>((resolve) => {
-      this.#waiters.set(jobId, resolve);
+      this.#waiters.set(jobId, { resolve });
     });
     try {
       await withTransaction(db, async (tx) => {
@@ -270,6 +297,15 @@ export class Scheduler implements AgentJobSink {
     } catch (err) {
       this.#waiters.delete(jobId);
       throw err;
+    }
+    const waiter = this.#waiters.get(jobId);
+    if (waiter !== undefined) {
+      waiter.timer = setTimeout(() => {
+        void this.#backstop(jobId).catch((err: unknown) => {
+          this.#deps.log.error({ jobId, err: safeErrorText(err) }, 'waiter backstop failed');
+        });
+      }, config.jobDeadlineMs + config.waiterSlackMs);
+      waiter.timer.unref();
     }
     this.kick();
     return { jobId, outcome };
@@ -316,12 +352,14 @@ export class Scheduler implements AgentJobSink {
     const free = sessions
       .list()
       .filter((s) => !s.closed && s.eligible && s.busyAttemptId === null && s.models.size > 0);
-    if (free.length === 0) return;
+    if (free.length === 0 || this.#waiters.size === 0) return;
+    // Only jobs a buyer in this process waits for: a job nobody waits for (left by a previous process)
+    // would be charged for an answer nobody receives.
     const queued = await db
       .select({ id: jobs.id, model: models.slug })
       .from(jobs)
       .innerJoin(models, eq(models.id, jobs.modelId))
-      .where(eq(jobs.status, 'queued'))
+      .where(and(eq(jobs.status, 'queued'), inArray(jobs.id, [...this.#waiters.keys()])))
       .orderBy(desc(jobs.priority), asc(jobs.createdAt), asc(jobs.id))
       .limit(64);
     if (queued.length === 0) return;
@@ -411,7 +449,20 @@ export class Scheduler implements AgentJobSink {
       seed: number;
       greedy: boolean;
     };
-    const sha = session.models.get(modelSlug) ?? '';
+    const sha = session.models.get(modelSlug);
+    if (sha === undefined) {
+      // The node's capabilities changed while the offer was prepared (it no longer has the model):
+      // nothing was sent, so the attempt times out at once and the job goes back to the queue.
+      await this.#endAttempt({
+        attemptId,
+        nodeId: session.nodeId,
+        from: 'offered',
+        to: 'timed_out',
+        code: 'model_missing',
+        retryable: true,
+      });
+      return;
+    }
     const sent = session.send('job.offer', {
       attemptId,
       jobKind: 'chat',
@@ -423,8 +474,15 @@ export class Scheduler implements AgentJobSink {
       leaseTtlMs: config.leaseMs,
     });
     if (sent === 'invalid') {
-      // The input breaks the protocol (it would fail on every node): end the job now, without charging.
-      await this.#finalize(jobId, 'failed', 'input_invalid');
+      // The offer breaks the protocol, so it would fail on every node: end the job now, without
+      // charging. input_unsendable only when the buyer's input itself is what the protocol refuses;
+      // anything else is a server-side defect (offer_invalid). (A node's own job.fail input_invalid
+      // is only the node's claim and stays a node failure.)
+      const inputOk = defaultCodec().decodeJobInput(
+        JSON.stringify({ messages: input.messages }),
+        'chat',
+      ).ok;
+      await this.#finalize(jobId, 'failed', inputOk ? 'offer_invalid' : 'input_unsendable');
     } else if (sent === 'closed') {
       // The connection is gone; the close handler or the offer timeout puts the job back.
       this.#deps.log.warn({ jobId, nodeId: session.nodeId }, 'offer not sent');
@@ -891,7 +949,32 @@ export class Scheduler implements AgentJobSink {
     const waiter = this.#waiters.get(outcome.jobId);
     if (waiter === undefined) return;
     this.#waiters.delete(outcome.jobId);
-    waiter(outcome);
+    clearTimeout(waiter.timer);
+    waiter.resolve(outcome);
+  }
+
+  /**
+   * Backstop for a buyer still waiting well after the job deadline: end the job if it is still open
+   * (that answers the buyer), otherwise answer from the job's final status in the database. Without
+   * this a job ended where this process could not see it would leave the HTTP request hanging forever.
+   */
+  async #backstop(jobId: string): Promise<void> {
+    if (!this.#waiters.has(jobId)) return;
+    await this.#finalize(jobId, 'expired', 'deadline');
+    if (!this.#waiters.has(jobId)) return;
+    const [job] = await this.#deps.db
+      .select({ status: jobs.status, failureCode: jobs.failureCode })
+      .from(jobs)
+      .where(eq(jobs.id, jobId));
+    const status = job?.status;
+    const ended = status === 'failed' || status === 'expired' || status === 'canceled';
+    // A completed job whose result never reached this process cannot be delivered from here.
+    this.#deps.log.error({ jobId, status }, 'buyer request answered by the backstop');
+    this.#resolve({
+      status: ended ? status : 'failed',
+      jobId,
+      code: ended ? (job?.failureCode ?? 'unknown') : 'outcome_lost',
+    });
   }
 }
 
