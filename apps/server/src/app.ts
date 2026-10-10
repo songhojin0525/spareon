@@ -122,7 +122,8 @@ export function buildApp(deps: AppDeps): FastifyInstance {
       req.log.info({ code: client.code, status: client.httpStatus }, 'request rejected');
       return sendAppError(req, reply, client);
     }
-    req.log.error({ err: safeErrorText(err) }, 'request failed');
+    // The error serializer (lib/logger.ts) keeps a log-safe message and the stack; never the request.
+    req.log.error({ err }, 'request failed');
     return sendAppError(req, reply, internalError());
   });
   app.setNotFoundHandler((req, reply) =>

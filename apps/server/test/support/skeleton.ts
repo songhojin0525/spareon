@@ -63,6 +63,7 @@ export async function startHarness(
     env?: Record<string, string>;
     auth?: ServerDeps['auth'];
     idempotency?: ServerDeps['idempotency'];
+    limiter?: ServerDeps['limiter'];
     logger?: Logger;
   } = {},
 ): Promise<Harness> {
@@ -103,6 +104,7 @@ export async function startHarness(
       // Failed logins answer after 400 ms in production; tests that measure it pass their own value.
       auth: { minFailureMs: 0, ...options.auth },
       ...(options.idempotency === undefined ? {} : { idempotency: options.idempotency }),
+      ...(options.limiter === undefined ? {} : { limiter: options.limiter }),
       ...(options.logger === undefined ? {} : { logger: options.logger }),
       ...(options.gateway === undefined ? {} : { gateway: options.gateway }),
     });

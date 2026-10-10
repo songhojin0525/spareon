@@ -34,7 +34,7 @@ describe('buildApp', () => {
     throw new AppError('custom_code', 418, 'Short and stout.', { fields: ['a'] });
   });
   app.post('/test/crash', () => {
-    throw new Error(`database said: ${MARKER}`);
+    throw new Error('internal detail for operators');
   });
   app.post('/test/zod', (req) => {
     const r = z.object({ n: z.number() }).safeParse(req.body);
@@ -77,12 +77,17 @@ describe('buildApp', () => {
     });
   });
 
-  it('hides unexpected errors behind 500 internal_error', async () => {
-    const res = await app.inject({ method: 'POST', url: '/test/crash' });
+  it('hides unexpected errors behind 500 internal_error (the log keeps the message for operators)', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/test/crash',
+      headers: { authorization: `Bearer ${MARKER}`, cookie: `s=${MARKER}` },
+      payload: { messages: [{ role: 'user', content: MARKER }] },
+    });
     expect(res.statusCode).toBe(500);
     expect(res.json<{ error: { code: string } }>().error.code).toBe('internal_error');
-    expect(res.body).not.toContain(MARKER);
-    expect(res.body).not.toContain('database said');
+    expect(res.body).not.toContain('internal detail');
+    expect(logs.text()).toContain('internal detail for operators');
   });
 
   it('reports validation failures by path only, never by value', async () => {
