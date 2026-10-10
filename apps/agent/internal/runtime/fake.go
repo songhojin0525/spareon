@@ -23,6 +23,7 @@ type Fake struct {
 
 	releases     atomic.Int64
 	releasesDone atomic.Int64
+	canceled     atomic.Int64
 }
 
 // Release implements Runtime: the fake holds no GPU memory; it only counts calls (for tests).
@@ -43,6 +44,9 @@ func (f *Fake) Release(ctx context.Context) error {
 
 // Releases is how many times Release was called.
 func (f *Fake) Releases() int64 { return f.releases.Load() }
+
+// Canceled is how many generations were stopped by their context before they finished.
+func (f *Fake) Canceled() int64 { return f.canceled.Load() }
 
 // ReleasesDone is how many Release calls have returned (with ReleaseDelay, later than Releases).
 func (f *Fake) ReleasesDone() int64 { return f.releasesDone.Load() }
@@ -68,6 +72,7 @@ func (f *Fake) Generate(ctx context.Context, req Request) (Result, error) {
 		select {
 		case <-ctx.Done():
 			t.Stop()
+			f.canceled.Add(1)
 			return Result{}, fmt.Errorf("fake runtime: %w", ctx.Err())
 		case <-t.C:
 		}

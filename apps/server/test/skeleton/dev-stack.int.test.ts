@@ -1,4 +1,4 @@
-import type { AddressInfo } from 'node:net';
+import net, { type AddressInfo } from 'node:net';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -36,6 +36,38 @@ describe('dev:server stack (demo settings never widen by accident)', () => {
       expect(who.rows[0]?.u).toBe('spareon_app');
     } finally {
       await stack.stop();
+    }
+  });
+
+  it('fails fast and cleans up when the port is taken (no hang on the held instance lock)', async () => {
+    const blocker = net.createServer();
+    await new Promise<void>((resolve) => blocker.listen(0, '127.0.0.1', resolve));
+    const { port } = blocker.address() as AddressInfo;
+    try {
+      const started = performance.now();
+      await expect(
+        startDevStack({
+          env: { DATABASE_URL: db.url },
+          clock: systemClock,
+          port,
+          log: () => undefined,
+        }),
+      ).rejects.toThrow(/EADDRINUSE/);
+      expect(performance.now() - started).toBeLessThan(20_000);
+      // The lock was released: a stack on a free port starts on the same database.
+      const stack = await startDevStack({
+        env: { DATABASE_URL: db.url },
+        clock: systemClock,
+        port: 0,
+        log: () => undefined,
+      });
+      await stack.stop();
+    } finally {
+      await new Promise<void>((resolve) =>
+        blocker.close(() => {
+          resolve();
+        }),
+      );
     }
   });
 });

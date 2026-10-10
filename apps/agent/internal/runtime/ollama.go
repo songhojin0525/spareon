@@ -130,6 +130,11 @@ func (o *Ollama) loaded(ctx context.Context) (map[string]bool, error) {
 	if err != nil {
 		return nil, fmt.Errorf("list loaded models: %w", err)
 	}
+	if resp.StatusCode == http.StatusNotFound {
+		// Without /api/ps the agent cannot tell which models hold GPU memory, and unloading blindly
+		// could load one: nothing is unloaded and Ollama frees the memory on its own after 5 minutes.
+		return nil, errors.New("list loaded models: this Ollama has no /api/ps (too old) — update Ollama so the agent can free GPU memory at once")
+	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("list loaded models: ollama answered HTTP %d", resp.StatusCode)
 	}

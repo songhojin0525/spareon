@@ -169,27 +169,6 @@ func (c *serverConn) expect(t *testing.T, msgType string, within time.Duration) 
 	}
 }
 
-// expectOneOf waits for the next message of any of the given types (others are skipped).
-func (c *serverConn) expectOneOf(t *testing.T, within time.Duration, types ...string) *protocol.Message {
-	t.Helper()
-	deadline := time.After(within)
-	for {
-		select {
-		case m, ok := <-c.recv:
-			if !ok {
-				t.Fatalf("connection closed while waiting for one of %v", types)
-			}
-			for _, ty := range types {
-				if m.Type == ty {
-					return m
-				}
-			}
-		case <-deadline:
-			t.Fatalf("none of %v within %s", types, within)
-		}
-	}
-}
-
 // never fails if a message of the given type arrives within d.
 func (c *serverConn) never(t *testing.T, msgType string, d time.Duration) {
 	t.Helper()
@@ -479,35 +458,26 @@ func TestPauseAnswersWhileTheRuntimeReleases(t *testing.T) {
 	if st := c.expect(t, "status", 300*time.Millisecond).Payload.(*protocol.StatusPayload); st.Eligible {
 		t.Fatalf("status = %+v", st)
 	}
-	// A quick resume does not let a job start while GPU memory is still being freed.
+	// A quick resume does not let a job start while GPU memory is still being freed: the node says it
+	// is not eligible yet, and an offer that comes anyway is rejected as busy.
 	c.send("control.resume", nil, protocol.ControlResumePayload{Scope: protocol.ControlScopeNode, Reason: protocol.ControlReasonOperatorRequest})
 	c.expect(t, "ack", 300*time.Millisecond)
+	if st := c.expect(t, "status", 300*time.Millisecond).Payload.(*protocol.StatusPayload); st.Eligible {
+		t.Fatalf("status during release = %+v", st)
+	}
 	_, _ = c.offer("fake-echo")
 	if r := c.expect(t, "job.reject", 300*time.Millisecond).Payload.(*protocol.JobRejectPayload); r.Reason != protocol.JobRejectReasonBusy {
 		t.Fatalf("reject during release = %+v", r)
 	}
-	// Releases counts calls as they start; wait until the slow unload has actually returned.
-	deadline := time.Now().Add(3 * time.Second)
-	for rt.ReleasesDone() < 1 && time.Now().Before(deadline) {
-		time.Sleep(5 * time.Millisecond)
+	// When the unload is over the agent says so by itself, and takes work again.
+	if st := c.expect(t, "status", 3*time.Second).Payload.(*protocol.StatusPayload); !st.Eligible {
+		t.Fatalf("status after release = %+v", st)
 	}
 	if rt.Releases() != 1 || rt.ReleasesDone() != 1 {
 		t.Fatalf("releases started %d, done %d; want 1 and 1", rt.Releases(), rt.ReleasesDone())
 	}
-	// The agent clears its releasing flag right after Release returns. An offer that lands in that
-	// instant is still (correctly) busy, so offer again until one is accepted, within a short bound.
-	acceptBy := time.Now().Add(time.Second)
-	for {
-		_, _ = c.offer("fake-echo")
-		m := c.expectOneOf(t, time.Second, "job.accept", "job.reject")
-		if m.Type == "job.accept" {
-			break
-		}
-		if m.Type != "job.reject" || m.Payload.(*protocol.JobRejectPayload).Reason != protocol.JobRejectReasonBusy || time.Now().After(acceptBy) {
-			t.Fatalf("after the release, offer got %s %+v", m.Type, m.Payload)
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+	_, _ = c.offer("fake-echo")
+	c.expect(t, "job.accept", time.Second)
 }
 
 func TestConnectionLossStopsWorkAndReleases(t *testing.T) {
@@ -526,5 +496,8 @@ func TestConnectionLossStopsWorkAndReleases(t *testing.T) {
 	}
 	if rt.Releases() < 1 {
 		t.Fatal("connection loss did not release the runtime's GPU memory")
+	}
+	if rt.Canceled() != 1 {
+		t.Fatalf("connection loss canceled %d generations, want 1", rt.Canceled())
 	}
 }

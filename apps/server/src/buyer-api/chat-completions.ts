@@ -105,13 +105,41 @@ function outcomeError(
       'The messages cannot be sent to a node as they are. Nothing was charged.',
     );
   }
-  if (outcome.code === 'offer_invalid' || outcome.code === 'outcome_lost') {
+  if (outcome.code === 'offer_invalid') {
     return sendError(
       reply,
       500,
       'server_error',
       'internal_error',
       'The server could not process this request. Nothing was charged.',
+    );
+  }
+  if (outcome.code === 'result_undelivered') {
+    // The job completed and was charged, but its result never reached this server process.
+    return sendError(
+      reply,
+      500,
+      'server_error',
+      'result_undelivered',
+      'The request completed and was charged, but the server lost the result. Please contact the operator.',
+    );
+  }
+  if (outcome.code === 'outcome_unknown') {
+    return sendError(
+      reply,
+      500,
+      'server_error',
+      'outcome_unknown',
+      'The server lost track of this request. Please contact the operator.',
+    );
+  }
+  if (outcome.code === 'server_restart') {
+    return sendError(
+      reply,
+      503,
+      'server_error',
+      'server_restarted',
+      'The server restarted before the request finished. Nothing was charged.',
     );
   }
   if (outcome.code === 'deadline') {

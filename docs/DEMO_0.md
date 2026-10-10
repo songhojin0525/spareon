@@ -14,7 +14,7 @@
 |---|---|---|
 | 이 저장소, Node.js 22 이상, pnpm(`corepack enable`) | 내 PC(서버) | `pnpm install`을 한 번 해 둔다 |
 | Go(최신 안정 버전) | 내 PC | 친구 PC용 `spareon-agent.exe`를 만드는 데만 쓴다 |
-| Ollama | 친구 PC마다 | <https://ollama.com> 에서 설치 |
+| Ollama | 친구 PC마다 | <https://ollama.com> 에서 설치. `ollama ps` 명령이 되는 버전이어야 한다(안 되는 옛 버전이면 에이전트가 멈출 때 GPU 메모리를 바로 비우지 못한다 — 새로 설치) |
 | 가벼운 채팅 모델 아무거나 하나 | 친구 PC마다 | 예: `qwen2.5:0.5b`. 이름은 예시일 뿐이다. 모든 PC가 같은 모델을 받으면 비교하기 쉽다 |
 
 PC 사양 메모: GPU가 없어도 된다. Ollama가 GPU를 가속하지 못하면 CPU로 돈다(5.3절).

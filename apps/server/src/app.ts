@@ -109,9 +109,19 @@ export async function buildServer(deps: ServerDeps): Promise<Server> {
   // live jobs for leftovers of a dead process and cancel them. listen() fails when the lock is held.
   let lock: InstanceLock | undefined;
   app.addHook('onReady', async () => {
-    lock = await acquireInstanceLock(deps.pool, app.log);
-    await scheduler.recoverAfterRestart();
-    scheduler.start();
+    lock = await acquireInstanceLock(deps.pool, app.log, () => {
+      // Without the lock another process may start and cancel our jobs as leftovers: stop scheduling.
+      scheduler.halt();
+    });
+    try {
+      await scheduler.recoverAfterRestart();
+      scheduler.start();
+    } catch (err) {
+      await scheduler.stop();
+      await lock.release();
+      lock = undefined;
+      throw err;
+    }
   });
   app.addHook('onClose', async () => {
     await scheduler.stop();

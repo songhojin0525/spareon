@@ -68,6 +68,8 @@ export function createDb(config: DbConfig): DbHandle {
     statement_timeout: config.statementTimeoutMs ?? 30_000,
     idle_in_transaction_session_timeout: config.idleInTransactionTimeoutMs ?? 60_000,
     connectionTimeoutMillis: config.connectionTimeoutMs ?? 10_000,
+    // TCP keepalive: long-idle connections (the scheduler instance lock) survive NAT and notice death.
+    keepAlive: true,
   });
   pool.on('error', (err) => {
     config.onIdleClientError?.(err);

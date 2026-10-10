@@ -218,10 +218,25 @@ export class Scheduler implements AgentJobSink {
     return open.length - failed;
   }
 
-  async stop(): Promise<void> {
+  /**
+   * Stop scheduling (no dispatch, no sweeps) but keep answering: results still arriving are recorded,
+   * and every waiting buyer is still answered by its backstop. Used when the instance lock is lost.
+   */
+  halt(): void {
     this.#stopped = true;
     if (this.#timer !== undefined) clearInterval(this.#timer);
     this.#timer = undefined;
+  }
+
+  /** False after halt() or stop(). */
+  get running(): boolean {
+    return !this.#stopped;
+  }
+
+  /** The server is closing: halt, wait for a running sweep, and drop the backstop timers. */
+  async stop(): Promise<void> {
+    this.halt();
+    for (const w of this.#waiters.values()) clearTimeout(w.timer);
     await this.#sweeping;
   }
 
@@ -968,12 +983,17 @@ export class Scheduler implements AgentJobSink {
       .where(eq(jobs.id, jobId));
     const status = job?.status;
     const ended = status === 'failed' || status === 'expired' || status === 'canceled';
-    // A completed job whose result never reached this process cannot be delivered from here.
     this.#deps.log.error({ jobId, status }, 'buyer request answered by the backstop');
+    if (ended) {
+      this.#resolve({ status, jobId, code: job?.failureCode ?? 'unknown' });
+      return;
+    }
+    // Completed (and charged) but the result never reached this process: it cannot be delivered from
+    // here, and the buyer must not be told that nothing was charged.
     this.#resolve({
-      status: ended ? status : 'failed',
+      status: 'failed',
       jobId,
-      code: ended ? (job?.failureCode ?? 'unknown') : 'outcome_lost',
+      code: status === 'completed' ? 'result_undelivered' : 'outcome_unknown',
     });
   }
 }

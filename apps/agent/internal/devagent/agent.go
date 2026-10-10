@@ -79,6 +79,14 @@ type Agent struct {
 	caps    protocol.CapabilitiesPayload
 	digest  string
 	models  map[string]bool
+
+	// releasing counts GPU releases in flight (any session, sync or background). While it is above 0
+	// the node is not eligible and offers are rejected as busy, so nothing loads while memory is freed.
+	releasing atomic.Int32
+	// asyncRelease guards against piling up background releases.
+	asyncRelease atomic.Bool
+	// releaseDone wakes the main loop when a release finishes, so it reports the new status.
+	releaseDone chan struct{}
 }
 
 // AuthError is an auth.fail from the server.
@@ -103,7 +111,10 @@ func New(cfg Config) (*Agent, error) {
 	if err != nil {
 		return nil, fmt.Errorf("devagent: %w", err)
 	}
-	a := &Agent{cfg: cfg, id: id, codec: codec, started: time.Now(), models: map[string]bool{}}
+	a := &Agent{
+		cfg: cfg, id: id, codec: codec, started: time.Now(), models: map[string]bool{},
+		releaseDone: make(chan struct{}, 1),
+	}
 	var cached []protocol.ModelRef
 	for _, m := range cfg.Runtime.Models() {
 		a.models[m] = true
@@ -197,8 +208,6 @@ type session struct {
 	outer context.Context
 	// writeTimeout bounds each write; shutdown lowers it to ShutdownGrace.
 	writeTimeout time.Duration
-	// releasing is set while a background release (pause, kill, fail-safe pause) is in flight.
-	releasing atomic.Bool
 }
 
 func (s *session) send(msgType string, corr *string, payload any) error {
@@ -286,7 +295,8 @@ func (s *session) handshake(ctx context.Context) error {
 
 func (s *session) status() error {
 	a := s.a
-	eligible := a.cfg.AlwaysAvailable && !s.paused
+	// While GPU memory is being freed the node takes no work (it would load a model meanwhile).
+	eligible := a.cfg.AlwaysAvailable && !s.paused && a.releasing.Load() == 0
 	state := protocol.StatusStateReady
 	switch {
 	case s.paused:
@@ -406,6 +416,10 @@ func (s *session) serve(ctx context.Context, in <-chan inbound) error {
 	silence := time.NewTicker(min(time.Second, a.cfg.ServerSilenceLimit/4))
 	defer silence.Stop()
 	lastServer := time.Now()
+	// Ctrl+C starts freeing GPU memory at once, even if the loop is blocked in a write to a stalled
+	// connection; shutdown() then waits for its own release as before.
+	stopRelease := context.AfterFunc(ctx, s.releaseAsync)
+	defer stopRelease()
 
 	for {
 		// Ctrl+C wins over everything else. select picks among ready cases at random, and Ctrl+C itself
@@ -424,6 +438,11 @@ func (s *session) serve(ctx context.Context, in <-chan inbound) error {
 				continue // the result of a generation Ctrl+C stopped: shutdown reports it as preempted
 			}
 			if err := s.finish(r); err != nil {
+				return err
+			}
+		case <-a.releaseDone:
+			// A release finished: report that the node may be eligible again.
+			if err := s.status(); err != nil {
 				return err
 			}
 		case <-heartbeat.C:
@@ -560,7 +579,7 @@ func (s *session) onOffer(offerID string, p *protocol.JobOfferPayload) error {
 		return reject(protocol.JobRejectReasonPolicy)
 	case !a.cfg.AlwaysAvailable:
 		return reject(protocol.JobRejectReasonNotIdle)
-	case s.job != nil, s.releasing.Load():
+	case s.job != nil, a.releasing.Load() > 0:
 		return reject(protocol.JobRejectReasonBusy)
 	case !a.models[p.Model.ID]:
 		return reject(protocol.JobRejectReasonModelMissing)
@@ -657,26 +676,46 @@ func (s *session) stopJob(reason protocol.JobPreemptedReason) {
 
 // release asks the runtime to free GPU memory (bounded by ReleaseTimeout). A failure is logged: the
 // job is already stopped, and there is nothing else the agent can do about the runtime.
-func (s *session) release() {
-	ctx, cancel := context.WithTimeout(context.Background(), s.a.cfg.ReleaseTimeout)
+func (s *session) release() { s.a.release() }
+
+func (a *Agent) release() {
+	a.releasing.Add(1)
+	defer a.releaseEnded()
+	a.unload()
+}
+
+// releaseEnded uncounts a release and wakes the main loop to report the new status.
+func (a *Agent) releaseEnded() {
+	a.releasing.Add(-1)
+	select {
+	case a.releaseDone <- struct{}{}:
+	default:
+	}
+}
+
+func (a *Agent) unload() {
+	ctx, cancel := context.WithTimeout(context.Background(), a.cfg.ReleaseTimeout)
 	defer cancel()
-	if err := s.a.cfg.Runtime.Release(ctx); err != nil {
-		s.a.cfg.Logf("GPU 메모리 해제 실패: %v", err)
+	if err := a.cfg.Runtime.Release(ctx); err != nil {
+		a.cfg.Logf("GPU 메모리 해제 실패: %v", err)
 	}
 }
 
 // releaseAsync starts release in the background so the main loop keeps answering (ack, status,
 // heartbeat) while the runtime unloads — a slow runtime must not make the agent look silent to the
-// server. The job is already stopped and the node paused; offers are rejected as busy until the
-// release finishes (even after a quick control.resume), so nothing new loads meanwhile. A release
-// already in flight covers a second request.
+// server. The job is already stopped and the node paused; until the release finishes (even after a
+// quick control.resume, and in a new session after a reconnect) the node reports itself not eligible
+// and rejects offers as busy, so nothing new loads meanwhile. Safe from any goroutine.
 func (s *session) releaseAsync() {
-	if !s.releasing.CompareAndSwap(false, true) {
+	a := s.a
+	if !a.asyncRelease.CompareAndSwap(false, true) {
 		return
 	}
+	a.releasing.Add(1) // counted before the goroutine runs: no window where an offer slips in
 	go func() {
-		defer s.releasing.Store(false)
-		s.release()
+		defer a.releaseEnded()
+		defer a.asyncRelease.Store(false)
+		a.unload()
 	}()
 }
 

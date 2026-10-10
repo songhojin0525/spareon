@@ -8,6 +8,7 @@ import { SessionRegistry } from '../../src/gateway/session.js';
 import { systemClock } from '../../src/lib/clock.js';
 import { createIds } from '../../src/lib/ids.js';
 import { createPayloadCipher } from '../../src/lib/payload-cipher.js';
+import { INSTANCE_LOCK_KEYS } from '../../src/scheduler/instance-lock.js';
 import {
   type ChatRequest,
   DEFAULT_SCHEDULER_CONFIG,
@@ -179,8 +180,16 @@ describe('walking skeleton: time limits and races', () => {
     const t = h;
     const before = await balanceOf(h.db, 'buyer_wallet', h.world.buyerId);
     const stuck = await h.agent('stuck-1', { behavior: { run: 'silent', delayMs: 0 } });
+    // The agent's model becomes callable once the server has processed its capabilities.
+    await waitFor(
+      async () =>
+        (await t.query<{ status: string }>("SELECT status FROM models WHERE slug = 'fake-echo'"))[0]
+          ?.status === 'active',
+      5_000,
+      'model registered',
+    );
     // The buyer waits inside the first process; that wait dies with the process.
-    void h.server.scheduler.submit(h.world.buyerId, chatRequest('orphan'));
+    await h.server.scheduler.submit(h.world.buyerId, chatRequest('orphan'));
     await waitFor(() => stuck.stats.accepted === 1, 5_000, 'job accepted');
     await h.server.app.close();
     // A new process on the same database: buildServer -> listen runs the recovery before dispatching.
@@ -222,6 +231,40 @@ describe('walking skeleton: time limits and races', () => {
     await expectSettled(h);
   });
 
+  it('stops scheduling when the instance lock connection dies (when unsure, stop)', async () => {
+    h = await startHarness();
+    const t = h;
+    expect(h.server.scheduler.running).toBe(true);
+    // Kill the database session that holds the lock (a DB restart or failover looks the same).
+    const [holder] = await h.query<{ pid: number }>(
+      `SELECT pid FROM pg_locks
+        WHERE locktype = 'advisory' AND classid = $1 AND objid = $2 AND objsubid = 2 AND granted`,
+      [...INSTANCE_LOCK_KEYS],
+    );
+    expect(holder).toBeDefined();
+    await h.query('SELECT pg_terminate_backend($1)', [holder?.pid]);
+    await waitFor(() => !t.server.scheduler.running, 5_000, 'scheduler halted');
+    // No new work is handed out; the buyer who asks is not left hanging (here: they give up).
+    const idle = await h.agent('after-loss-1');
+    const abort = new AbortController();
+    const pending = h.chat(chatBody('after the lock was lost'), { signal: abort.signal });
+    await new Promise((r) => setTimeout(r, 1_000));
+    expect(idle.stats.offers).toBe(0);
+    abort.abort();
+    await pending.catch(() => undefined);
+    await waitFor(
+      async () =>
+        (
+          await t.query<{ n: number }>(
+            `SELECT count(*)::int AS n FROM jobs WHERE status IN ('queued', 'offered', 'running')`,
+          )
+        )[0]?.n === 0,
+      5_000,
+      'abandoned job canceled',
+    );
+    await expectSettled(h);
+  });
+
   it('answers a buyer still waiting after the deadline when no rule ended the job (backstop)', async () => {
     // Sweeps off: nothing but the backstop ends the job.
     h = await startHarness({
@@ -257,8 +300,8 @@ describe('walking skeleton: time limits and races', () => {
     });
     expect(await other.recoverAfterRestart()).toBe(1);
     const res = await pending;
-    expect(res.status).toBe(502);
-    expect(((await res.json()) as ChatErr).error.code).toBe('node_failed');
+    expect(res.status).toBe(503);
+    expect(((await res.json()) as ChatErr).error.code).toBe('server_restarted');
     const [job] = await t.query<{ status: string; failure_code: string }>(
       'SELECT status, failure_code FROM jobs ORDER BY created_at DESC LIMIT 1',
     );

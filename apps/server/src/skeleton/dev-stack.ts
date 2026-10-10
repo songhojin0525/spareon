@@ -114,6 +114,7 @@ export async function startDevStack(options: DevStackOptions): Promise<DevStack>
   }
 
   let app: DbHandle | undefined;
+  let server: Server | undefined;
   try {
     await migrate({
       url: adminUrl,
@@ -138,7 +139,7 @@ export async function startDevStack(options: DevStackOptions): Promise<DevStack>
       keyHex = randomBytes(32).toString('hex');
       log('DATA_ENCRYPTION_KEY is not set: using a temporary key for this run');
     }
-    const server = await buildServer({
+    server = await buildServer({
       clock: options.clock,
       ids,
       env,
@@ -150,10 +151,13 @@ export async function startDevStack(options: DevStackOptions): Promise<DevStack>
       ...(options.scheduler === undefined ? {} : { scheduler: options.scheduler }),
       ...(options.gateway === undefined ? {} : { gateway: options.gateway }),
     });
+    // listen() runs onReady (instance lock, recovery, sweeps) before it opens the port: when the port
+    // is taken, the catch below must close the server or the held lock keeps the pool from closing.
     await server.app.listen({ host: env.HOST, port: env.PORT });
     const { port } = server.app.server.address() as AddressInfo;
     const local = `127.0.0.1:${String(port)}`;
     const appHandle = app;
+    const started = server;
     const lan = isNonLoopbackHost(env.HOST);
     return {
       server,
@@ -171,12 +175,13 @@ export async function startDevStack(options: DevStackOptions): Promise<DevStack>
       temporaryDatabase,
       adminUrl,
       async stop() {
-        await server.app.close();
+        await started.app.close();
         await appHandle.close();
         await stopDb();
       },
     };
   } catch (err) {
+    await server?.app.close();
     await app?.close();
     await stopDb();
     throw err;
