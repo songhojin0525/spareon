@@ -41,7 +41,7 @@ export type StaleDecision =
  * Inspects an unfinished claim: `attached` is what the claim recorded (undefined: nothing yet), `stale`
  * whether it is older than `staleAfterMs` (its request should be over by now).
  */
-export type ClaimResolver = (attached: unknown, stale: boolean) => Promise<StaleDecision>;
+export type ClaimResolver = (attached: unknown, stale: boolean, tx: Tx) => Promise<StaleDecision>;
 
 export interface IdempotencyConfig {
   /** How long a finished key is remembered (default 24 h, T27). */
@@ -81,6 +81,14 @@ export function requestHash(key: Uint8Array, value: unknown): Buffer {
 
 const defaultResolver: ClaimResolver = (_attached, stale) =>
   Promise.resolve(stale ? { kind: 'take_over' } : { kind: 'in_progress' });
+
+/** attach() found the claim no longer ours (taken over): the work it was about to record must not happen. */
+export class IdempotencyClaimLostError extends Error {
+  constructor() {
+    super('the idempotency claim was taken over');
+    this.name = 'IdempotencyClaimLostError';
+  }
+}
 
 export class Idempotency {
   constructor(
@@ -139,7 +147,9 @@ export class Idempotency {
         return { kind: 'replay', status: row.responseStatus ?? 200, response: row.response };
       }
       const stale = now.getTime() - row.createdAt.getTime() >= this.config.staleAfterMs;
-      const decision = await resolve(row.response ?? undefined, stale);
+      // The resolver reads through this transaction's connection: borrowing a second pooled
+      // connection while holding the row lock could exhaust the pool under concurrent retries.
+      const decision = await resolve(row.response ?? undefined, stale, tx);
       if (decision.kind === 'take_over') return takeOver();
       if (decision.kind === 'in_progress') return { kind: 'in_progress' };
       await tx

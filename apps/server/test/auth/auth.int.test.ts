@@ -351,25 +351,35 @@ describe('per-IP and parallel limits (production rules: login 30/15 min per IP, 
     expect((await b.login(u.email, u.password)).status).toBe(429);
   });
 
-  it('limits login attempts per IP across different accounts', async () => {
-    const b = Browser.of(h);
-    await b.primeCsrf();
-    // 30 per 15 minutes from one IP; the earlier test used 13 of them.
-    const statuses: number[] = [];
-    for (let i = 0; i < 20; i++) {
-      const res = await b.request('POST', '/api/auth/login', {
-        body: { email: `ip-${String(i)}@test.spareon`, password: 'whatever-password-1' },
-      });
-      statuses.push(res.status);
+  it('limits login attempts per IP across different accounts; a refused IP touches no account counter', async () => {
+    const limiter = new MemoryRateLimiter({ clock: new FakeClock() });
+    const own = await startHarness({ limiter });
+    try {
+      const victim = await createTestUser(own, 'owner');
+      const b = Browser.of(own);
+      await b.primeCsrf();
+      const statuses: number[] = [];
+      for (let i = 0; i < 30; i++) {
+        const res = await b.request('POST', '/api/auth/login', {
+          body: { email: `ip-${String(i)}@test.spareon`, password: 'whatever-password-1' },
+        });
+        statuses.push(res.status);
+      }
+      expect(statuses.every((s) => s === 401)).toBe(true);
+      for (let i = 0; i < 10; i++) {
+        const res = await b.request('POST', '/api/auth/login', {
+          body: { email: victim.email, password: 'whatever-password-1' },
+        });
+        expect(res.status).toBe(429);
+        expect(Number(res.headers.get('retry-after'))).toBeGreaterThan(0);
+      }
+      // The blocked IP neither locked the victim nor created a counter for it.
+      expect(
+        (await limiter.peek(`login:account:${victim.email}`, { limit: 5, windowMs: 1 })).count,
+      ).toBe(0);
+    } finally {
+      await own.close();
     }
-    expect(statuses.slice(0, 17).every((s) => s === 401)).toBe(true);
-    const limited = statuses.slice(17);
-    expect(limited).toEqual([429, 429, 429]);
-    const again = await b.request('POST', '/api/auth/login', {
-      body: { email: 'another@test.spareon', password: 'whatever-password-1' },
-    });
-    expect(again.status).toBe(429);
-    expect(Number(again.headers.get('retry-after'))).toBeGreaterThan(0);
   });
 
   it('limits sign-ups per IP to 10 an hour', async () => {

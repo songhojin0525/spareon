@@ -1029,7 +1029,7 @@ DB가 강제하는 부분(트리거·제약·최소 권한 역할 `spareon_app`)
 | `EXTERNAL_PROVIDERS` | `mock` | `mock` 말고는 S16 전까지 시작 거부 | 환경변수 | S05, S16 |
 | `auth.signup_enabled` | 켜짐 | 끄면 웹 가입 403 `signup_closed`(운영자 계정은 언제나 CLI로만) | DB 설정(`settings`, 레지스트리 키만 변경 가능) | S05 |
 | `api_keys.default_rpm` / `api_keys.default_concurrency` | 60 / 4 | 키별 분당 요청·동시 요청 한도(키에 `rate_limit_rpm`이 있으면 그 값. 구매자는 기본값 이하로만 정할 수 있고, 올리는 것은 운영자 CLI) | DB 설정 | S05 |
-| `buyers.rpm` / `buyers.concurrency` | 120 / 8 | 구매자 한 명의 모든 키를 합친 분당 요청·동시 요청 한도 | DB 설정 | S05 |
+| `buyers.rpm` / `buyers.concurrency` | 120 / 8 | 구매자 한 명의 모든 키를 합친 분당 요청·동시 요청 한도. 키별 한도와 함께 적용되므로 실제 한도는 둘 중 작은 쪽이다(운영자가 CLI로 키의 rpm을 올려도 `buyers.rpm`을 넘지 못한다. 구매자별 예외 설정은 아직 없다) | DB 설정 | S05 |
 | `HOST` | `127.0.0.1` | `0.0.0.0`이면 LAN에 열림. 개발 서버(`pnpm dev:server`)는 `HOST`를 무시하고 `--lan` 플래그로만 연다 | 환경변수 | S04, S30 |
 | `DB_ROLE` | `spareon_app` | 다른 값이면 시작 거부. 연결 URL에 `options`가 있으면 역할 옵션이 덮어써지므로 거부하고, 개발 서버는 시작할 때 `current_user`가 `spareon_app`인지 확인한다 | 환경변수 | S03, S04 |
 | `--always-available` | 없음 | 개발 콘솔에서만, 서비스 모드에서는 거부 | 에이전트 플래그 | S18 |

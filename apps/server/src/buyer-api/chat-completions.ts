@@ -23,6 +23,7 @@ import {
   type ClaimToken,
   type Idempotency,
   IDEMPOTENCY_KEY_RE,
+  IdempotencyClaimLostError,
   requestHash,
 } from '../lib/idempotency.js';
 import { safeErrorText } from '../lib/safe-error.js';
@@ -269,7 +270,7 @@ export async function handleChatCompletion(
     scope,
     header,
     requestHash(deps.idempotencyHashKey, body),
-    resolverFor(deps),
+    resolveUnfinishedClaim,
   );
   if (claim.kind === 'mismatch') {
     throw conflict(
@@ -309,34 +310,32 @@ const attachedSchema = z.object({ jobId: z.uuid() });
  * but never recorded (the process died or the record failed after the charge) → answer that it was
  * charged and the result is lost, never run it a second time.
  */
-function resolverFor(deps: BuyerApiDeps): ClaimResolver {
-  return async (attached, stale) => {
-    const parsed = attachedSchema.safeParse(attached);
-    if (!parsed.success) return stale ? { kind: 'take_over' } : { kind: 'in_progress' };
-    const [job] = await deps.payloads.db
-      .select({ status: jobs.status })
-      .from(jobs)
-      .where(eq(jobs.id, parsed.data.jobId));
-    if (job === undefined || ['failed', 'expired', 'canceled'].includes(job.status)) {
-      return { kind: 'take_over' };
-    }
-    if (job.status === 'completed' && stale) {
-      const err = outcomeError({
-        status: 'failed',
-        jobId: parsed.data.jobId,
-        code: 'result_undelivered',
-      });
-      const record: ReplayRecord = {
-        kind: 'error',
-        code: err.code,
-        status: err.httpStatus,
-        message: err.publicMessage,
-      };
-      return { kind: 'complete', status: err.httpStatus, response: record };
-    }
-    return { kind: 'in_progress' };
-  };
-}
+const resolveUnfinishedClaim: ClaimResolver = async (attached, stale, tx) => {
+  const parsed = attachedSchema.safeParse(attached);
+  if (!parsed.success) return stale ? { kind: 'take_over' } : { kind: 'in_progress' };
+  const [job] = await tx
+    .select({ status: jobs.status })
+    .from(jobs)
+    .where(eq(jobs.id, parsed.data.jobId));
+  if (job === undefined || ['failed', 'expired', 'canceled'].includes(job.status)) {
+    return { kind: 'take_over' };
+  }
+  if (job.status === 'completed' && stale) {
+    const err = outcomeError({
+      status: 'failed',
+      jobId: parsed.data.jobId,
+      code: 'result_undelivered',
+    });
+    const record: ReplayRecord = {
+      kind: 'error',
+      code: err.code,
+      status: err.httpStatus,
+      message: err.publicMessage,
+    };
+    return { kind: 'complete', status: err.httpStatus, response: record };
+  }
+  return { kind: 'in_progress' };
+};
 
 async function run(
   deps: BuyerApiDeps,
@@ -382,7 +381,11 @@ async function run(
               // The claim learns its job id in the job's own transaction (no window where a job
               // exists that the claim does not know about).
               onCreate: async (tx, jobId) => {
-                await deps.idempotency.attach(tx, idem.scope, idem.key, idem.token, { jobId });
+                const ours = await deps.idempotency.attach(tx, idem.scope, idem.key, idem.token, {
+                  jobId,
+                });
+                // Taken over meanwhile: roll the job (and its hold) back rather than run it twice.
+                if (!ours) throw new IdempotencyClaimLostError();
               },
             }),
       });
@@ -393,6 +396,12 @@ async function run(
           'model_not_found',
           404,
           `The model ${body.model} does not exist or no node has offered it yet.`,
+        );
+      }
+      if (err instanceof IdempotencyClaimLostError) {
+        throw conflict(
+          'idempotency_in_progress',
+          'Another request with this Idempotency-Key took over. Nothing was charged here.',
         );
       }
       if (err instanceof InsufficientCreditError) {

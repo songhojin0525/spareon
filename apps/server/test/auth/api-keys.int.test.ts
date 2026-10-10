@@ -229,4 +229,41 @@ describe('buyer API keys', () => {
       h.server.http.settings.invalidate();
     }
   });
+
+  it('per-buyer concurrency spans keys, and a rate-limit refusal gives its slot back', async () => {
+    const u = await createTestUser(h, 'buyer');
+    const b = await loggedIn(h, u);
+    const make = async (body: Record<string, unknown>) =>
+      ((await (await b.request('POST', '/api/api-keys', { body })).json()) as KeyOut).key ?? '';
+    const k1 = await make({ name: 'one', rateLimitRpm: 1 });
+    const k2 = await make({ name: 'two' });
+    const setTo = async (key: string, value: number) => {
+      await h.query(
+        `INSERT INTO settings (key, value, updated_at) VALUES ($1, $2::jsonb, now())
+         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+        [key, JSON.stringify(value)],
+      );
+      h.server.http.settings.invalidate();
+    };
+    await setTo('buyers.concurrency', 1);
+    try {
+      expect((await h.chat(chatBody('a'), { apiKey: k1 })).status).toBe(402); // uses k1's 1 rpm
+      // Refused for rate: must release the buyer's only slot.
+      for (let i = 0; i < 3; i++)
+        expect(await codeOf(await h.chat(chatBody('b'), { apiKey: k1 }))).toBe('rate_limited');
+      expect((await h.chat(chatBody('c'), { apiKey: k2 })).status).toBe(402);
+      // The dev buyer has credit: its request waits in the queue (no agent) and holds its only
+      // per-buyer slot (its per-key limit is 64 in this database).
+      const before = await jobCount();
+      const devFirst = h.chat(chatBody('hold the slot'), { apiKey: h.apiKey });
+      await waitFor(async () => (await jobCount()) > before, 10_000, 'the dev buyer job');
+      // Its next request is refused by the per-buyer limit, not the per-key one.
+      const second = await h.chat(chatBody('second'), { apiKey: h.apiKey });
+      expect(second.status).toBe(429);
+      expect(await codeOf(second)).toBe('concurrency_limited');
+      expect((await devFirst).status).toBe(503);
+    } finally {
+      await setTo('buyers.concurrency', 64);
+    }
+  });
 });

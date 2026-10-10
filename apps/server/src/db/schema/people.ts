@@ -125,7 +125,7 @@ export const idempotencyKeys = pgTable(
     /** Who and what the key is for, e.g. `buyer:<userId>:chat`. Keys are unique per scope. */
     scope: text('scope').notNull(),
     key: text('key').notNull(),
-    /** SHA-256 of the canonical request, so the same key with a different body is rejected. */
+    /** HMAC-SHA256 (server key) of the canonical request, so the same key with a different body is rejected. */
     requestHash: bytea('request_hash').notNull(),
     status: text('status', { enum: IDEMPOTENCY_STATUSES }).notNull(),
     responseStatus: integer('response_status'),

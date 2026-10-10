@@ -1,6 +1,7 @@
 import { type FakeAgent, FakeClock } from '@spareon/testkit';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { withTransaction } from '../../src/db/client.js';
 import { Idempotency, requestHash } from '../../src/lib/idempotency.js';
 import {
   chatBody,
@@ -243,6 +244,11 @@ describe('Idempotency-Key on POST /v1/chat/completions (BUY-02)', () => {
     await idem.release(scope, 'k', a.token);
     await idem.complete(scope, 'k', a.token, 200, { from: 'a' });
     expect((await idem.claim(scope, 'k', hash)).kind).toBe('in_progress');
+    // The late owner can no longer attach work to the key either.
+    const attachedLate = await withTransaction(h.app.db, (tx) =>
+      idem.attach(tx, scope, 'k', a.token, { jobId: '00000000-0000-7000-8000-000000000001' }),
+    );
+    expect(attachedLate).toBe(false);
     await idem.complete(scope, 'k', b.token, 200, { from: 'b' });
     expect(await idem.claim(scope, 'k', hash)).toEqual({
       kind: 'replay',

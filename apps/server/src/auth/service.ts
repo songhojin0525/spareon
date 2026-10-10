@@ -96,18 +96,17 @@ export class AuthService {
     const start = performance.now();
     const { db, limiter, config } = this.deps;
     const ip = await limiter.hit(`login:ip:${input.ipHash}`, config.loginIpRule);
+    if (!ip.allowed) {
+      // A refused IP touches no account counter: it can neither lock accounts nor create limiter keys.
+      await this.#padFrom(start);
+      return { kind: 'limited', retryAfterMs: ip.retryAfterMs };
+    }
     // Every attempt counts before the password is checked, so parallel guesses cannot all slip past
     // the limit (a success clears the count).
     const account = await limiter.hit(accountKey(input.email), config.loginAccountRule);
-    if (!ip.allowed || !account.allowed) {
+    if (!account.allowed) {
       await this.#padFrom(start);
-      return {
-        kind: 'limited',
-        retryAfterMs: Math.max(
-          ip.allowed ? 0 : ip.retryAfterMs,
-          account.allowed ? 0 : account.retryAfterMs,
-        ),
-      };
+      return { kind: 'limited', retryAfterMs: account.retryAfterMs };
     }
     const user = await findUserByEmail(db, input.email);
     const usable = user?.disabledAt === null && user.passwordHash.startsWith('$argon2');

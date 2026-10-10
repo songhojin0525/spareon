@@ -68,7 +68,7 @@ export const envSchema = z.object({
     .meta({ description: 'Database role every session runs as. Only spareon_app is accepted.' }),
   SESSION_SECRET: secret(32, 'session secret').meta({
     description:
-      'Secret for CSRF tokens and IP hashes (32+ printable characters). Changing it invalidates CSRF tokens.',
+      'Secret for CSRF tokens, IP hashes and idempotency request hashes (32+ printable characters). Changing it invalidates CSRF tokens and makes idempotency keys of the last 24 h answer 409 instead of replaying.',
     example: "generate: node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\"",
   }),
   SESSION_IDLE_DAYS: days(7, 90).meta({

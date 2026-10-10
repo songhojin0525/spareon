@@ -54,7 +54,7 @@ export interface AppDeps {
   readonly trustProxy?: string[] | false;
   /**
    * close() waits this long for in-flight responses (e.g. a client that stops reading a large body),
-   * then destroys the remaining connections so shutdown always ends (default 10 s).
+   * then destroys the remaining connections so shutdown always ends (default 30 s = T32 server drain).
    */
   readonly closeDrainMs?: number;
 }
@@ -115,7 +115,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     drainTimer = setTimeout(() => {
       app.log.warn('closing: destroying connections still open after the drain time');
       app.server.closeAllConnections();
-    }, deps.closeDrainMs ?? 10_000);
+    }, deps.closeDrainMs ?? 30_000);
     drainTimer.unref();
     done();
   });
