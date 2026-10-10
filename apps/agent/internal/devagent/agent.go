@@ -17,6 +17,7 @@ import (
 	"fmt"
 	goruntime "runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/coder/websocket"
@@ -196,6 +197,8 @@ type session struct {
 	outer context.Context
 	// writeTimeout bounds each write; shutdown lowers it to ShutdownGrace.
 	writeTimeout time.Duration
+	// releasing is set while a background release (pause, kill, fail-safe pause) is in flight.
+	releasing atomic.Bool
 }
 
 func (s *session) send(msgType string, corr *string, payload any) error {
@@ -381,6 +384,21 @@ func (a *Agent) session(ctx context.Context) (bool, error) {
 		}
 	}()
 
+	err = s.serve(ctx, in)
+	if err != nil {
+		// The connection is gone (closed, read or write error, server silence). Without the server the
+		// agent cannot receive a kill switch (T13), so it stops working and frees the GPU before it
+		// reconnects — the same as for server silence.
+		s.stopJob("")
+		s.release()
+	}
+	return true, err
+}
+
+// serve is the main loop of an authenticated connection. It returns nil after a Ctrl+C shutdown and
+// the reason the connection ended otherwise.
+func (s *session) serve(ctx context.Context, in <-chan inbound) error {
+	a := s.a
 	heartbeat := time.NewTicker(a.cfg.HeartbeatInterval)
 	defer heartbeat.Stop()
 	progress := time.NewTicker(a.cfg.ProgressInterval)
@@ -390,54 +408,59 @@ func (a *Agent) session(ctx context.Context) (bool, error) {
 	lastServer := time.Now()
 
 	for {
+		// Ctrl+C wins over everything else. select picks among ready cases at random, and Ctrl+C itself
+		// makes the generation return (context.Canceled) through the AfterFunc in onOffer: without this
+		// check the loop could report that result as a runtime failure, or accept a new offer, before
+		// it notices the shutdown.
+		if ctx.Err() != nil {
+			s.shutdown()
+			return nil
+		}
 		select {
 		case <-ctx.Done():
-			s.shutdown()
-			return true, nil
+			continue // shut down at the top of the loop
 		case r := <-s.results:
+			if ctx.Err() != nil {
+				continue // the result of a generation Ctrl+C stopped: shutdown reports it as preempted
+			}
 			if err := s.finish(r); err != nil {
-				s.stopJob("")
-				return true, err
+				return err
 			}
 		case <-heartbeat.C:
 			if err := s.send("heartbeat", nil, protocol.HeartbeatPayload{}); err != nil {
-				s.stopJob("")
-				return true, err
+				return err
 			}
 		case <-progress.C:
 			if s.job != nil {
 				// SKELETON(S19): the runtime does not report tokens while generating (TokensSoFar 0).
 				if err := s.send("job.progress", nil, protocol.JobProgressPayload{AttemptID: s.job.attemptID, TokensSoFar: 0}); err != nil {
-					s.stopJob("")
-					return true, err
+					return err
 				}
 			}
 		case <-silence.C:
 			if time.Since(lastServer) > a.cfg.ServerSilenceLimit {
 				// T13: without the server we cannot receive a kill switch — stop working, free the GPU.
-				s.stopJob("")
-				s.release()
-				return true, ErrServerSilent
+				return ErrServerSilent
 			}
 		case m, ok := <-in:
+			if ctx.Err() != nil {
+				continue // shutting down: do not act on (for example accept) anything new
+			}
 			if !ok {
-				s.stopJob("")
-				return true, errors.New("connection closed")
+				return errors.New("connection closed")
 			}
 			if m.err != nil {
-				s.stopJob("")
-				return true, m.err
+				return m.err
 			}
 			lastServer = time.Now()
 			if m.bad != nil {
 				if err := s.onInvalid(m.bad); err != nil {
-					return true, err
+					return err
 				}
 				continue
 			}
 			if err := s.handle(m.msg); err != nil {
-				s.stopJob("")
-				return true, err
+				return err
 			}
 		}
 	}
@@ -449,7 +472,7 @@ func (s *session) onInvalid(de *protocol.DecodeError) error {
 		s.a.cfg.Logf("서버가 보낸 잘못된 메시지(%s): 안전을 위해 멈춥니다", de.Code)
 		s.stopJob(protocol.JobPreemptedReasonPause)
 		s.paused = true
-		s.release()
+		s.releaseAsync()
 		if err := s.status(); err != nil {
 			return err
 		}
@@ -486,7 +509,7 @@ func (s *session) handle(msg *protocol.Message) error {
 	case *protocol.ControlPausePayload:
 		s.stopJob(protocol.JobPreemptedReasonPause)
 		s.paused = true
-		s.release()
+		s.releaseAsync()
 		a.cfg.Logf("일시정지 (%s)", p.Reason)
 		if err := s.ack(msg.ID, ""); err != nil {
 			return err
@@ -495,7 +518,7 @@ func (s *session) handle(msg *protocol.Message) error {
 	case *protocol.ControlKillPayload:
 		s.stopJob(protocol.JobPreemptedReasonKill)
 		s.paused = true
-		s.release()
+		s.releaseAsync()
 		a.cfg.Logf("킬스위치 (%s)", p.Reason)
 		if err := s.ack(msg.ID, ""); err != nil {
 			return err
@@ -537,7 +560,7 @@ func (s *session) onOffer(offerID string, p *protocol.JobOfferPayload) error {
 		return reject(protocol.JobRejectReasonPolicy)
 	case !a.cfg.AlwaysAvailable:
 		return reject(protocol.JobRejectReasonNotIdle)
-	case s.job != nil:
+	case s.job != nil, s.releasing.Load():
 		return reject(protocol.JobRejectReasonBusy)
 	case !a.models[p.Model.ID]:
 		return reject(protocol.JobRejectReasonModelMissing)
@@ -640,6 +663,21 @@ func (s *session) release() {
 	if err := s.a.cfg.Runtime.Release(ctx); err != nil {
 		s.a.cfg.Logf("GPU 메모리 해제 실패: %v", err)
 	}
+}
+
+// releaseAsync starts release in the background so the main loop keeps answering (ack, status,
+// heartbeat) while the runtime unloads — a slow runtime must not make the agent look silent to the
+// server. The job is already stopped and the node paused; offers are rejected as busy until the
+// release finishes (even after a quick control.resume), so nothing new loads meanwhile. A release
+// already in flight covers a second request.
+func (s *session) releaseAsync() {
+	if !s.releasing.CompareAndSwap(false, true) {
+		return
+	}
+	go func() {
+		defer s.releasing.Store(false)
+		s.release()
+	}()
 }
 
 // shutdown is Ctrl+C: stop the job, free the GPU, tell the server (within ShutdownGrace), close.

@@ -51,8 +51,9 @@ type Runtime interface {
 	Models() []string
 	Generate(ctx context.Context, req Request) (Result, error)
 	// Release frees the GPU memory the runtime holds (unloads its models). The agent calls it whenever
-	// work stops for the customer or the operator (Ctrl+C, pause, kill, server silence), not after a
-	// normal completion. It must be safe to call at any time and more than once.
+	// work stops for the customer or the operator (Ctrl+C, pause, kill, server silence or a lost
+	// connection), not after a normal completion. It must be safe to call at any time, more than
+	// once and concurrently (a background pause release can overlap a Ctrl+C release).
 	Release(ctx context.Context) error
 }
 

@@ -169,6 +169,27 @@ func (c *serverConn) expect(t *testing.T, msgType string, within time.Duration) 
 	}
 }
 
+// expectOneOf waits for the next message of any of the given types (others are skipped).
+func (c *serverConn) expectOneOf(t *testing.T, within time.Duration, types ...string) *protocol.Message {
+	t.Helper()
+	deadline := time.After(within)
+	for {
+		select {
+		case m, ok := <-c.recv:
+			if !ok {
+				t.Fatalf("connection closed while waiting for one of %v", types)
+			}
+			for _, ty := range types {
+				if m.Type == ty {
+					return m
+				}
+			}
+		case <-deadline:
+			t.Fatalf("none of %v within %s", types, within)
+		}
+	}
+}
+
 // never fails if a message of the given type arrives within d.
 func (c *serverConn) never(t *testing.T, msgType string, d time.Duration) {
 	t.Helper()
@@ -279,7 +300,26 @@ func TestCtrlCReportsPreemptedAndExits(t *testing.T) {
 	_, attemptID := c.offer("fake-echo")
 	c.expect(t, "job.accept", time.Second)
 	h.cancel()
-	p := c.expect(t, "job.preempted", time.Second).Payload.(*protocol.JobPreemptedPayload)
+	// Ctrl+C cancels the generation at once; that canceled result must never be reported as a node
+	// failure (job.fail runtime_crash): the server is told the job was preempted for shutdown.
+	var p *protocol.JobPreemptedPayload
+	deadline := time.After(time.Second)
+	for p == nil {
+		select {
+		case m, ok := <-c.recv:
+			if !ok {
+				t.Fatal("connection closed before job.preempted")
+			}
+			switch m.Type {
+			case "job.fail":
+				t.Fatalf("Ctrl+C was reported as a failure: %+v", m.Payload)
+			case "job.preempted":
+				p = m.Payload.(*protocol.JobPreemptedPayload)
+			}
+		case <-deadline:
+			t.Fatal("no job.preempted within 1s")
+		}
+	}
 	if p.AttemptID != attemptID || p.Reason != protocol.JobPreemptedReasonShutdown || p.LastSeq != -1 {
 		t.Fatalf("preempted = %+v", p)
 	}
@@ -313,9 +353,7 @@ func TestInvalidKillPausesUntilResume(t *testing.T) {
 	if st.Eligible || st.State != protocol.StatusStatePaused {
 		t.Fatalf("status = %+v", st)
 	}
-	if rt.Releases() != 1 {
-		t.Fatalf("fail-safe pause released the runtime %d times, want 1", rt.Releases())
-	}
+	waitReleases(t, rt, 1)
 	_, _ = c.offer("fake-echo")
 	if r := c.expect(t, "job.reject", time.Second).Payload.(*protocol.JobRejectPayload); r.Reason != protocol.JobRejectReasonPolicy {
 		t.Fatalf("reject = %+v", r)
@@ -409,5 +447,84 @@ func TestNewRejectsBadInput(t *testing.T) {
 	}
 	if _, err := New(Config{Secret: "", Name: "pc", Runtime: &runtime.Fake{}}); !errors.Is(err, devauth.ErrInvalid) {
 		t.Fatalf("empty secret: %v", err)
+	}
+}
+
+// waitReleases waits until the runtime was released exactly n times (release runs in the background).
+func waitReleases(t *testing.T, rt *runtime.Fake, n int64) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for rt.Releases() < n && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
+	}
+	if got := rt.Releases(); got != n {
+		t.Fatalf("runtime released %d times, want %d", got, n)
+	}
+}
+
+func TestPauseAnswersWhileTheRuntimeReleases(t *testing.T) {
+	// The runtime takes 1.5s to unload. The agent must still ack and report status at once (a blocked
+	// main loop would go silent towards the server), and take no work until the unload is over.
+	rt := &runtime.Fake{ModelIDs: []string{"fake-echo"}, Delay: time.Hour, ReleaseDelay: 1500 * time.Millisecond}
+	_, c := start(t, Config{AlwaysAvailable: true, Runtime: rt, ReleaseTimeout: 3 * time.Second})
+	_, attemptID := c.offer("fake-echo")
+	c.expect(t, "job.accept", time.Second)
+	pauseID := c.send("control.pause", nil, protocol.ControlPausePayload{Scope: protocol.ControlScopeNode, Reason: protocol.ControlReasonOperatorRequest})
+	if p := c.expect(t, "job.preempted", 300*time.Millisecond).Payload.(*protocol.JobPreemptedPayload); p.AttemptID != attemptID || p.Reason != protocol.JobPreemptedReasonPause {
+		t.Fatalf("preempted = %+v", p)
+	}
+	if ack := c.expect(t, "ack", 300*time.Millisecond); ack.Corr == nil || *ack.Corr != pauseID {
+		t.Fatalf("ack = %+v", ack)
+	}
+	if st := c.expect(t, "status", 300*time.Millisecond).Payload.(*protocol.StatusPayload); st.Eligible {
+		t.Fatalf("status = %+v", st)
+	}
+	// A quick resume does not let a job start while GPU memory is still being freed.
+	c.send("control.resume", nil, protocol.ControlResumePayload{Scope: protocol.ControlScopeNode, Reason: protocol.ControlReasonOperatorRequest})
+	c.expect(t, "ack", 300*time.Millisecond)
+	_, _ = c.offer("fake-echo")
+	if r := c.expect(t, "job.reject", 300*time.Millisecond).Payload.(*protocol.JobRejectPayload); r.Reason != protocol.JobRejectReasonBusy {
+		t.Fatalf("reject during release = %+v", r)
+	}
+	// Releases counts calls as they start; wait until the slow unload has actually returned.
+	deadline := time.Now().Add(3 * time.Second)
+	for rt.ReleasesDone() < 1 && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
+	}
+	if rt.Releases() != 1 || rt.ReleasesDone() != 1 {
+		t.Fatalf("releases started %d, done %d; want 1 and 1", rt.Releases(), rt.ReleasesDone())
+	}
+	// The agent clears its releasing flag right after Release returns. An offer that lands in that
+	// instant is still (correctly) busy, so offer again until one is accepted, within a short bound.
+	acceptBy := time.Now().Add(time.Second)
+	for {
+		_, _ = c.offer("fake-echo")
+		m := c.expectOneOf(t, time.Second, "job.accept", "job.reject")
+		if m.Type == "job.accept" {
+			break
+		}
+		if m.Type != "job.reject" || m.Payload.(*protocol.JobRejectPayload).Reason != protocol.JobRejectReasonBusy || time.Now().After(acceptBy) {
+			t.Fatalf("after the release, offer got %s %+v", m.Type, m.Payload)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func TestConnectionLossStopsWorkAndReleases(t *testing.T) {
+	rt := &runtime.Fake{ModelIDs: []string{"fake-echo"}, Delay: time.Hour}
+	h, c := start(t, Config{AlwaysAvailable: true, Runtime: rt})
+	_, _ = c.offer("fake-echo")
+	c.expect(t, "job.accept", time.Second)
+	// The server goes away without a word (crash, restart): the agent cannot receive a kill switch
+	// any more, so it stops the job and frees GPU memory before reconnecting.
+	_ = c.ws.CloseNow()
+	select {
+	case c2 := <-h.server.conns:
+		c2.expect(t, "status", time.Second)
+	case <-time.After(3 * time.Second):
+		t.Fatal("agent did not reconnect")
+	}
+	if rt.Releases() < 1 {
+		t.Fatal("connection loss did not release the runtime's GPU memory")
 	}
 }

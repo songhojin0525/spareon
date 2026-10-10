@@ -18,18 +18,34 @@ type Fake struct {
 	ModelIDs []string
 	// Delay simulates generation time (canceled immediately by ctx).
 	Delay time.Duration
+	// ReleaseDelay simulates a slow unload (bounded by ctx).
+	ReleaseDelay time.Duration
 
-	releases atomic.Int64
+	releases     atomic.Int64
+	releasesDone atomic.Int64
 }
 
 // Release implements Runtime: the fake holds no GPU memory; it only counts calls (for tests).
-func (f *Fake) Release(context.Context) error {
+func (f *Fake) Release(ctx context.Context) error {
 	f.releases.Add(1)
+	defer f.releasesDone.Add(1)
+	if f.ReleaseDelay > 0 {
+		t := time.NewTimer(f.ReleaseDelay)
+		defer t.Stop()
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("fake runtime release: %w", ctx.Err())
+		case <-t.C:
+		}
+	}
 	return nil
 }
 
 // Releases is how many times Release was called.
 func (f *Fake) Releases() int64 { return f.releases.Load() }
+
+// ReleasesDone is how many Release calls have returned (with ReleaseDelay, later than Releases).
+func (f *Fake) ReleasesDone() int64 { return f.releasesDone.Load() }
 
 // Name implements Runtime.
 func (f *Fake) Name() string { return "fake" }
