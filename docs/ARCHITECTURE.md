@@ -146,7 +146,8 @@ flowchart BT
 아웃박스 이벤트(같은 트랜잭션에서 기록 → 커밋 뒤 전달, 최소 1회, 구독자는 멱등):
 `kill.changed`, `policy.changed`, `node.quarantined`, `node.state_changed`, `job.enqueued`, `release.rollout_changed`, `ledger.frozen`, `notification.created`.
 
-- 이 방향은 S05에서 import 경계 검사(테스트 또는 린트 규칙)로 강제한다. 위반은 게이트 실패.
+- 이 방향은 `apps/server/src/architecture.test.ts`가 강제한다(S05). 폴더 → 모듈 대응: `lib`·`db`·`config.ts` = lib, `api-keys` = apiKeys, `buyer-api` = buyerApi, 나머지는 이름 그대로. 조립 루트(`http`, `app.ts`, `main.ts`, `bin`, `skeleton`, `dev`, `testing`, `db/seed.ts`)는 무엇이든 가져다 쓸 수 있지만 다른 모듈은 루트를 가져다 쓸 수 없다. 위반은 테스트 실패 = 게이트 실패.
+- HTTP 라우트는 조립 루트의 `Router.add({ action })`로만 등록한다(`apps/server/src/http/router.ts`). 래퍼가 인증(세션 쿠키·API 키), [권한 표](PERMISSIONS.md), CSRF, zod 입력 검증, API 키별 한도를 핸들러보다 먼저 적용한다. 에러는 `AppError(code, httpStatus, publicMessage, details?)` 하나로, 응답은 `{ "error": { "code", "message", "requestId" } }`(구매자 API는 OpenAI 호환 `type`을 더함). 요청 ID는 서버가 만든 UUIDv7(`x-request-id`). 결정 근거는 ADR 0021.
 - `ledger`는 다른 도메인을 모른다. 금액·분할·멱등 키는 호출자가 계산해 넘긴다(S06 API).
 
 ## 3. 에이전트 모듈
@@ -809,6 +810,7 @@ flowchart LR
 | 프롬프트(대화형) | 구매자 → 서버 전송 | 전송 중 | TLS | S14, S30 |
 | 프롬프트(대화형) | 서버 메모리 | 요청 처리 중 | 프로세스 메모리 | S14 |
 | 프롬프트·출력(포털 플레이그라운드) | 웹 호스팅 rewrite 프록시(예: Vercel) | 전송 중. 호스팅의 요청 로그·버퍼 보존은 확인 필요 | TLS. 본문이 호스팅 로그에 남지 않는지 S23이 확인하고, 남으면 플레이그라운드는 브라우저 → 서버 직접 호출로 바꾼다 | S23, S30 |
+| 출력(멱등 재생용, S05) | DB `job_payloads`(kind `output`) | 구매자가 `Idempotency-Key`를 보낸 요청만, 24시간. 키가 없으면 출력은 DB에 쓰지 않는다. `idempotency_keys`에는 메타데이터만 | AES-256-GCM(입력과 같은 키) | S05, S12 |
 | 프롬프트·출력(대화형) | DB `job_payloads` | 결과 전달 후 24시간. 검증 표본이면 판정까지 최대 48시간. `x-spareon-retention: none`이면 작업 종료까지(이 작업은 중복 실행 표본에서 빠진다, 노드는 모름) | AES-256-GCM, 키는 DB 밖(`DATA_ENCRYPTION_KEY`, 키 ID로 교체) | S12, S13 |
 | 프롬프트 | 서버 → 에이전트 | 전송 중. 256 KiB 초과분은 `inputRef`(단기 서명 토큰, 목표 5분) | TLS | S11, S12 |
 | 프롬프트·출력 | 에이전트 프로세스 메모리 | 시도 동안 | 디스크 쓰기 금지(정적 검사 + 통합 테스트) | S17, S22 |
@@ -821,7 +823,10 @@ flowchart LR
 | 중복 실행 출력 | 서버 메모리 | 비교 직후 폐기, 점수·해시·길이만 남김 | — | S13 |
 | 카나리아 정답 | DB | 무기한(우리가 만든 합성 데이터) | 노드에 정답 노출 금지 | S13 |
 | 외부 모델 요청 | 서버 메모리 → 제공사 | 우리 쪽 저장 없음(`external_usage`는 메타데이터) | TLS, 구매자 문서에 제공사 전달 명시 | S16 |
-| 로그·지표·에러 리포트 | 서버·에이전트 | 로그 보존 기간 | 콘텐츠 0회(편집 경로 + 테스트), 지표 라벨 금지 목록 | S05, S17, S29 |
+| 로그·지표·에러 리포트 | 서버·에이전트 | 로그 보존 기간 | 콘텐츠 0회. 서버 요청 줄은 메서드·라우트·상태·시간만(헤더·본문 없음), 그 위에 편집 경로(`lib/logger.ts`), 4xx는 코드만, JSON 파싱 오류 문구 폐기. 표식 문자열 테스트(`test/auth/log-redaction.int.test.ts`). 지표 라벨 금지 목록 | S05, S17, S29 |
+| 비밀번호 | DB `users.password_hash` | 계정 수명 | argon2id m=19 MiB·t=2·p=1(OWASP 최소 권장) | S05 |
+| 웹 세션 토큰 | 브라우저 쿠키 / DB | 유휴 7일·절대 30일, 만료·폐기 행은 10분마다 정리 | DB에는 SHA-256만. httpOnly·SameSite=Lax(https면 Secure·`__Host-`) | S05 |
+| 감사 기록 | DB `audit_log` | 무기한(추가 전용) | 메타데이터만(키는 prefix, IP는 HMAC) | S05 |
 | 백업 | 백업 저장소 | 백업 보존 기간(목표 7일) | 암호문만, 키는 별도 | S29 |
 | 하드웨어 지문 원본 | 에이전트 메모리 | 등록 계산 동안 | 서버에는 HMAC 두 개만 | S10, S20 |
 | 손님 존재 구간 | DB `presence_intervals` | 목표 90일(안정성 예측용, 이후 집계만) | 시각만, 입력 내용·화면 없음 | S10, S12 |
@@ -1019,7 +1024,11 @@ DB가 강제하는 부분(트리거·제약·최소 권한 역할 `spareon_app`)
 | `peg_basket` | 꺼짐 | 바스켓 페그 API·계산 허용(실험) | DB 플래그 | S08 |
 | `issuanceMode` | `marketplace` | 다른 값이면 시작 거부(발행형은 시뮬레이터 전용) | 설정 | S07, S08 |
 | 킬스위치 | 꺼짐 | 범위 안 노드 즉시 멈춤·오퍼 금지 | DB(`kill_switches`) | S10, S11 |
-| `DEV_API_KEY`, `DEV_AGENT_SECRET`, `DEV_DASHBOARD` | 없음 | 운영(`NODE_ENV=production`, `NODE_ENV`가 없을 때 포함)에서 설정돼 있으면 시작 거부 | 환경변수 | S04, S05 |
+| `DEV_AGENT_SECRET`, `DEV_DASHBOARD` | 없음 | 운영(`NODE_ENV=production`, `NODE_ENV`가 없을 때 포함)에서 설정돼 있으면 시작 거부 | 환경변수 | S04, S05 |
+| `DEV_API_KEY` | 없음 | S05에서 없어졌다. 설정돼 있으면 어느 환경에서든 시작 거부(구매자 키는 CLI `key:create` 또는 웹에서 만든다) | 환경변수 | S05 |
+| `EXTERNAL_PROVIDERS` | `mock` | `mock` 말고는 S16 전까지 시작 거부 | 환경변수 | S05, S16 |
+| `auth.signup_enabled` | 켜짐 | 끄면 웹 가입 403 `signup_closed`(운영자 계정은 언제나 CLI로만) | DB 설정(`settings`, 레지스트리 키만 변경 가능) | S05 |
+| `api_keys.default_rpm` / `api_keys.default_concurrency` | 60 / 4 | 키별 분당 요청·동시 요청 한도(키에 `rate_limit_rpm`이 있으면 그 값) | DB 설정 | S05 |
 | `HOST` | `127.0.0.1` | `0.0.0.0`이면 LAN에 열림. 개발 서버(`pnpm dev:server`)는 `HOST`를 무시하고 `--lan` 플래그로만 연다 | 환경변수 | S04, S30 |
 | `DB_ROLE` | `spareon_app` | 다른 값이면 시작 거부. 연결 URL에 `options`가 있으면 역할 옵션이 덮어써지므로 거부하고, 개발 서버는 시작할 때 `current_user`가 `spareon_app`인지 확인한다 | 환경변수 | S03, S04 |
 | `--always-available` | 없음 | 개발 콘솔에서만, 서비스 모드에서는 거부 | 에이전트 플래그 | S18 |

@@ -32,7 +32,9 @@ pnpm verify --only=go    # Go 단계만 (--only=ts 는 TS·문서 단계만)
 ## 자주 쓰는 명령
 | 명령 | 설명 |
 |---|---|
-| `pnpm --filter @spareon/server dev` | 서버 개발 실행 (기본 `127.0.0.1:8080`, `HOST`·`PORT` 환경변수) |
+| `pnpm --filter @spareon/server dev` | 서버 실행(watch). 필요한 환경변수는 `apps/server/.env.example`(없거나 틀리면 무엇이 잘못됐는지 출력하고 종료). 개발용으로는 `pnpm dev:server`가 비밀을 만들어 준다 |
+| `pnpm --filter @spareon/server cli <명령>` | 운영자 CLI: `user:create`(운영자 계정은 이것으로만), `user:disable`, `user:set-password`, `key:create`, `key:revoke`, `settings:get/set`, `audit:tail`. 모든 쓰기는 감사 기록 |
+| `pnpm --filter @spareon/server env:example` | `apps/server/.env.example`을 설정 스키마에서 다시 만든다 |
 | `pnpm --filter @spareon/server db:migrate` · `db:status` · `db:rollback --yes` | DB 마이그레이션(`DATABASE_URL`). 스키마·불변식은 [docs/DB.md](docs/DB.md) |
 | `pnpm --filter @spareon/server db:seed` | 개발용 시드(로컬 DB만, 두 번 실행해도 그대로) |
 | `pnpm --filter @spareon/server db:generate` | 스키마(TS)에서 새 마이그레이션 SQL 생성(drizzle-kit) 후 사람이 검토 |

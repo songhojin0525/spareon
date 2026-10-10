@@ -1,3 +1,4 @@
+import type { FakeAgent } from '@spareon/testkit';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { chatBody, expectSettled, type Harness, startHarness } from '../support/skeleton.js';
@@ -15,6 +16,7 @@ const freshKey = (): string => `idem-${String(++n)}-${String(Date.now())}`;
 
 describe('Idempotency-Key on POST /v1/chat/completions (BUY-02)', () => {
   let h: Harness;
+  let fast: FakeAgent;
 
   beforeAll(async () => {
     h = await startHarness({ topupCr: 10n });
@@ -42,7 +44,7 @@ describe('Idempotency-Key on POST /v1/chat/completions (BUY-02)', () => {
     )[0]?.n ?? 0;
 
   it('same key + same body → the same response, one job, one charge', async () => {
-    await h.agent('idem-a');
+    fast = await h.agent('idem-a');
     const key = freshKey();
     const before = await captures();
     const first = await call(chatBody('hello idempotency'), key);
@@ -81,7 +83,9 @@ describe('Idempotency-Key on POST /v1/chat/completions (BUY-02)', () => {
   });
 
   it('same key while the first request runs → 409 idempotency_in_progress', async () => {
-    const slow = await h.agent('idem-slow', { behavior: { delayMs: 1_000, progressEveryMs: 200 } });
+    // Only a slow node is connected, so the first request is surely still running at the second.
+    await fast.kill();
+    const slow = await h.agent('idem-slow', { behavior: { delayMs: 1_500, progressEveryMs: 200 } });
     const key = freshKey();
     const first = call(chatBody('slow one'), key);
     await new Promise((r) => setTimeout(r, 300));
@@ -90,6 +94,7 @@ describe('Idempotency-Key on POST /v1/chat/completions (BUY-02)', () => {
     expect(((await second.json()) as ErrorBody).error.code).toBe('idempotency_in_progress');
     expect((await first).status).toBe(200);
     await slow.kill();
+    fast = await h.agent('idem-b');
   });
 
   it('a failure that charged nothing frees the key for a retry', async () => {

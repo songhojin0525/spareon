@@ -29,16 +29,14 @@ pnpm demo
 ## 4. 서버 켜기 (내 PC)
 
 ### 4.1 키 정하기 (선택)
-서버는 개발용 키 두 개를 쓴다. 정하지 않으면 켤 때마다 새로 만들어 화면에 보여 준다.
-- `DEV_API_KEY`: 질문을 보낼 때 쓰는 구매자 API 키
-- `DEV_AGENT_SECRET`: 친구 PC의 에이전트가 서버에 붙을 때 쓰는 비밀값
-
-고정하고 싶으면(24자 이상, 공백 없이) PowerShell에서:
+- 구매자 API 키(`sp_test_…`): 개발 서버가 켤 때마다 개발용 구매자 계정의 **새 키**를 만들어 화면에 보여 준다(DB에는 해시만 남으므로 이전 키는 다시 볼 수 없고, 이전 개발용 키는 폐기된다). S05부터 `DEV_API_KEY` 환경변수는 없다. 설정돼 있으면 무시하고 안내만 한다.
+- `DEV_AGENT_SECRET`: 친구 PC의 에이전트가 서버에 붙을 때 쓰는 비밀값. 정하지 않으면 켤 때마다 새로 만든다. 고정하고 싶으면(24자 이상, 공백 없이) PowerShell에서:
 ```powershell
-$env:DEV_API_KEY = "dev-key-내가-정한-충분히-긴-문자열"
-$env:DEV_AGENT_SECRET = "dev-agent-내가-정한-다른-긴-문자열"
+$env:DEV_AGENT_SECRET = "dev-agent-내가-정한-긴-문자열"
 ```
-이 값은 개발용이다. 운영 설정(`NODE_ENV=production`)에서는 서버가 이 값들을 거부하고 켜지지 않는다.
+- 서버 비밀(`SESSION_SECRET`, `API_KEY_PEPPER`, `DATA_ENCRYPTION_KEY`)도 정하지 않으면 이번 실행용으로 만든다. 운영 설정은 `apps/server/.env.example`을 본다.
+
+이 값들은 개발용이다. 운영 설정(`NODE_ENV=production`)에서는 서버가 `DEV_AGENT_SECRET`을 거부하고 켜지지 않는다.
 
 ### 4.2 켜기
 연결 방법에 따라 고른다.
@@ -133,7 +131,7 @@ $env:SPAREON_DEV_AGENT_SECRET = "서버 화면에 나온 에이전트 비밀값"
 | 에이전트 화면에 "작업 실패: runtime_start_failed", 질문은 `502 node_failed` 또는 `503` | 친구 PC에서 Ollama가 꺼져 있다 → Ollama 앱을 켜거나 `ollama serve`. 실패한 질문은 같은 PC에 다시 맡기지 않고 다른 PC로 넘긴다. 세 PC에서 실패하면 `502`, 넘길 PC가 30초 안에 없으면 `503`으로 끝나고, 어느 쪽이든 과금되지 않는다 |
 | 에이전트에 "작업 실패: model_load_failed" | 그 PC에 모델이 없다 → `ollama pull <모델 이름>` |
 | 답이 아주 느림 | CPU로 돌고 있다(5.3절 `ollama ps`). 더 작은 모델을 쓰거나 `max_tokens`를 줄인다 |
-| `401 invalid_api_key` | `Authorization: Bearer <API 키>`가 서버 화면의 API 키와 다르다 |
+| `401 invalid_api_key` | `Authorization: Bearer <API 키>`가 이번에 켠 서버 화면의 API 키와 다르다(서버를 다시 켜면 키가 바뀐다) |
 | 서버를 다시 켰더니 장부가 비었다 | 기본 DB가 임시 Postgres다. 계속 쓰려면 로컬 Postgres를 `DATABASE_URL`로 지정 |
 
 ## 8. 끝내기
