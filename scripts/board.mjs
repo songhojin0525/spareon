@@ -801,7 +801,60 @@ const magenta = C('35');
 const gray = C('90');
 // Brand wordmark (docs/brand): 'Spare' off-white, 'on' brand green #14B86A
 const BRAND_ON = (s) => (COLOR ? `\x1b[1;38;2;20;184;106m${s}\x1b[0m` : String(s));
-const wordmark = () => (COLOR ? `\x1b[1;97mSpare\x1b[0m` : 'Spare') + BRAND_ON('on');
+// Logo pill: green power cap + dark-green plate with the wordmark
+function logoBadge() {
+  if (!COLOR) return ASCII ? '[S| Spareon]' : '[⏻ Spareon]';
+  const icon = ASCII ? 'S' : '⏻';
+  return `\x1b[48;2;20;184;106;1;38;2;14;26;21m ${icon} \x1b[0m\x1b[48;2;24;52;40;1;97m Spare\x1b[38;2;20;184;106mon \x1b[0m`;
+}
+// Korea time, always Asia/Seoul whatever the machine's zone: '10.10(토) 10:14:32'
+const KST_FMT = new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
+function kstClock(ms) {
+  const p = Object.fromEntries(KST_FMT.formatToParts(new Date(ms)).map((x) => [x.type, x.value]));
+  return `${p.month}.${p.day}(${p.weekday}) ${p.hour}:${p.minute}:${p.second}`;
+}
+const HOT = rgbFg(255, 196, 61); // a real message on the move
+const PULSE = rgbFg(52, 120, 88); // idle "line is connected" pulse
+function rgbFg(r, g, b) {
+  return (s) => (COLOR ? `\x1b[38;2;${r};${g};${b}m${s}\x1b[0m` : String(s));
+}
+// One usage gauge: '5시간 ██████░░░░ 62% ↻2h10m'
+function usageGauge(label, w, barW) {
+  const left = 100 - w.usedPct;
+  const tone = w.usedPct >= 85 ? red : w.usedPct >= 60 ? yellow : green;
+  return `${gray(label)} ${bar(left, barW, tone)} ${bold(tone(`${String(left).padStart(2)}%`))}${w.resetsAt ? gray(` ↻${untilShort(w.resetsAt)}`) : ''}`;
+}
+// Boxed header shared by both terminal views: logo pill, live dot, Korea time, usage gauges, key hints
+function brandHeader(st, W, title, hint, view) {
+  const hz = ASCII ? '-' : '─';
+  const [tl, tr, bl, br, vt] = ASCII ? ['+', '+', '+', '+', '|'] : ['╭', '╮', '╰', '╯', '│'];
+  const border = rgbFg(44, 92, 70);
+  const now = view?.now ?? Date.now();
+  const beat = Math.floor(now / 500) % 2 === 0;
+  const live = COLOR ? (beat ? (t) => bold(BRAND_ON(t)) : PULSE)(ASCII ? '*' : '●') : '*';
+  const left = `${logoBadge()} ${live} ${gray(title)}   ${cyan(ASCII ? '@' : '◷')} ${bold(kstClock(now))} ${gray('KST')}`;
+  const u = st.usage;
+  const gauges = [];
+  if (u?.fiveHour) gauges.push(['5시간', u.fiveHour]);
+  if (u?.sevenDay) gauges.push(['주간', u.sevenDay]);
+  const inner = W - 4;
+  // widest layout that fits: bars 12 → 8 → 5, then drop the hint, then the weekly gauge
+  let right = '';
+  const tries = [];
+  for (const bw of [12, 8, 5]) tries.push({ bw, hint: true, n: 2 }, { bw, hint: false, n: 2 });
+  tries.push({ bw: 5, hint: false, n: 1 }, { bw: 0, hint: false, n: 0 });
+  for (const t of tries) {
+    const parts = gauges.slice(0, t.n).map(([l, w]) => usageGauge(l, w, t.bw));
+    if (!gauges.length && t.n) parts.push(gray('사용량 정보 없음'));
+    const r = [...parts, t.hint ? gray(hint) : ''].filter(Boolean).join(gray('   '));
+    if (width(left) + 2 + width(r) <= inner) {
+      right = r;
+      break;
+    }
+  }
+  const mid = `${border(vt)} ${left}${' '.repeat(Math.max(1, inner - width(left) - width(right)))}${right} ${border(vt)}`;
+  return [border(tl + hz.repeat(W - 2) + tr), mid, border(bl + hz.repeat(W - 2) + br)];
+}
 
 function charWidth(cp) {
   if (cp < 32 || (cp >= 0x7f && cp < 0xa0)) return 0;
@@ -848,6 +901,17 @@ function bar(pct, w, color) {
   const n = Math.round((Math.max(0, Math.min(100, pct)) / 100) * w);
   return color(full.repeat(n)) + gray(empty.repeat(w - n));
 }
+// Running bar: a bright cell sweeps through the unfinished part so a live stage visibly moves
+function runBar(pct, w, color, now) {
+  const full = ASCII ? '#' : '█';
+  const n = Math.round((Math.max(0, Math.min(100, pct)) / 100) * w);
+  const rest = w - n;
+  if (rest <= 0) return color(full.repeat(n));
+  const pos = Math.floor(now / 150) % (rest + 3);
+  let tail = '';
+  for (let i = 0; i < rest; i++) tail += i === pos ? color(ASCII ? '>' : '▓') : i === pos - 1 ? dim(color(ASCII ? '-' : '▒')) : gray(ASCII ? '-' : '░');
+  return color(full.repeat(n)) + tail;
+}
 
 const CHIP = {
   DONE: { t: 'done', c: green },
@@ -862,7 +926,7 @@ function chipOf(r) {
   return CHIP[r.status] ?? CHIP.WAIT;
 }
 
-function stageLine(r, cols) {
+function stageLine(r, cols, view) {
   const chip = chipOf(r);
   const nameW = Math.max(14, Math.min(34, cols - 62));
   const barW = cols >= 90 ? 12 : 8;
@@ -879,15 +943,15 @@ function stageLine(r, cols) {
   const color = r.status === 'BLOCKED' ? red : r.status === 'DONE_NEEDS_HUMAN' ? yellow : r.status === 'IN_PROGRESS' ? (r.stale ? yellow : cyan) : green;
   const id = r.status === 'IN_PROGRESS' ? bold(cyan(r.id)) : r.status === 'TODO' ? gray(r.id) : r.id;
   const name = r.status === 'TODO' && !r.ready ? gray(fit(r.name, nameW)) : fit(r.name, nameW);
-  return ` ${id} ${name} ${r.status === 'TODO' ? gray((ASCII ? '.' : '·').repeat(barW)) : bar(r.percent, barW, color)} ${pct} ${chip.c(fit(chip.t, 8))} ${dim(fit(detail, detailW))}`;
+  const gauge = r.status === 'TODO' ? gray((ASCII ? '.' : '·').repeat(barW)) : r.status === 'IN_PROGRESS' && view && !r.stale ? runBar(r.percent, barW, color, view.now) : bar(r.percent, barW, color);
+  return ` ${id} ${name} ${gauge} ${pct} ${chip.c(fit(chip.t, 8))} ${dim(fit(detail, detailW))}`;
 }
 
-function renderTerminal(st, cols, rows) {
+function renderTerminal(st, cols, rows, view) {
   cols = Math.max(60, Math.min(cols || 100, 160));
   const L = [];
   const hr = gray((ASCII ? '-' : '─').repeat(cols));
-  const nowTxt = `${hhmm(st.now)} · a agents · q quit`;
-  L.push(` ${wordmark()} ${gray('// mission control')}` + ' '.repeat(Math.max(1, cols - 3 - width('Spareon // mission control') - width(nowTxt))) + gray(nowTxt));
+  L.push(...brandHeader(st, cols, 'mission control', 'a agents · q quit', view));
   if (!st.hasStages) {
     L.push(red(' prompts/STAGES.md를 찾지 못했습니다. 저장소 맨 위 폴더에서 실행하세요.'));
     return L.join('\n');
@@ -896,8 +960,8 @@ function renderTerminal(st, cols, rows) {
   L.push(` overall ${bar(st.overall, 24, green)} ${bold(st.overall + '%')}  ${green('done ' + (c.DONE + c.DONE_NEEDS_HUMAN) + '/' + st.total)}${c.DONE_NEEDS_HUMAN ? yellow(` (확인필요 ${c.DONE_NEEDS_HUMAN})`) : ''} · ${cyan('running ' + c.IN_PROGRESS)} · ${c.BLOCKED ? red('blocked ' + c.BLOCKED) : 'blocked 0'} · left ${c.TODO}`);
   const rc = st.runner.state === 'working' ? cyan : st.runner.state === 'stalled' ? yellow : st.runner.state === 'finished' ? green : gray;
   L.push(` orchestrator ${rc((ASCII ? '* ' : '● ') + st.runner.label)}${st.runner.lastActivity ? gray(' · last activity ' + agoEn(st.runner.lastActivity)) : ''}`);
-  const ub = usageBits(st.usage, { bars: true });
-  L.push(' claude       ' + (ub.length ? ub.join(gray('  ·  ')) : gray('사용량 정보 없음 — Claude Code 상태줄이 아직 기록하지 않았어요 (scripts/statusline.mjs)')));
+  if (!st.usage) L.push(' claude       ' + gray('사용량 정보 없음 — Claude Code 상태줄이 아직 기록하지 않았어요 (scripts/statusline.mjs)'));
+  else if (Date.now() - Date.parse(st.usage.at) > 15 * 60_000) L.push(' claude       ' + gray(`사용량은 ${hhmm(st.usage.at)} 기준`));
   if (st.workers.length) {
     L.push(' workers      ' + st.workers.map((w) => `${w.worker}${gray(' › ')}${cyan(w.stage)} ${w.percent}%${w.stale ? yellow(' (멈춘 듯)') : ''}`).join(gray('  |  ')));
   }
@@ -931,7 +995,7 @@ function renderTerminal(st, cols, rows) {
     list = keep;
     if (hidden.length) list.push({ text: ' ' + gray(`+${hidden.length} waiting (${hidden[0]}${ASCII ? '..' : '…'}${hidden[hidden.length - 1]})`) });
   }
-  for (const x of list) L.push(x.text ?? stageLine(x.r, cols));
+  for (const x of list) L.push(x.text ?? stageLine(x.r, cols, view));
   L.push(hr);
 
   const room = Math.max(3, (rows || 60) - L.length - 1);
@@ -951,7 +1015,7 @@ function renderTerminal(st, cols, rows) {
   return L.slice(0, Math.max(10, rows || L.length)).map((l) => l.replace(/\s+$/, '')).join('\n');
 }
 
-// 사용 한도 한 조각: '5시간 77% 남음 ↻2h10m'
+// 초기화까지 남은 시간: '2h10m'
 function untilShort(iso) {
   if (!iso) return '';
   const ms = Date.parse(iso) - Date.now();
@@ -960,20 +1024,6 @@ function untilShort(iso) {
   if (m < 60) return `${m}m`;
   const h = Math.floor(m / 60);
   return h < 24 ? `${h}h${pad2(m % 60)}m` : `${Math.floor(h / 24)}d${h % 24}h`;
-}
-function usageBits(u, { bars = false } = {}) {
-  if (!u) return [];
-  const out = [];
-  for (const [label, w] of [['5시간', u.fiveHour], ['주간', u.sevenDay]]) {
-    if (!w) continue;
-    const left = 100 - w.usedPct;
-    const tone = w.usedPct >= 85 ? red : w.usedPct >= 60 ? yellow : green;
-    const b = bars ? ' ' + bar(left, 10, tone) : '';
-    out.push(`${gray(label)}${b} ${tone(`${left}% 남음`)}${w.resetsAt ? gray(` ↻${untilShort(w.resetsAt)}`) : ''}`);
-  }
-  const age = Date.now() - Date.parse(u.at);
-  if (out.length && age > 15 * 60_000) out.push(gray(`(${hhmm(u.at)} 기준)`));
-  return out;
 }
 
 // ───────────────────────── 터미널 에이전트 화면 ─────────────────────────
@@ -1108,7 +1158,7 @@ function agUnit(cv, id, u, x, y, w, sub, view) {
   const received = flashing && view.flash.m;
   if (sending || received) {
     const m = sending ? view.anim.m : view.flash.m;
-    const vx = cv.text(x + 2, row, sending ? `Sending → ${agLabel(m.to)}` : `Received ${ASCII ? 'v' : '✓'}`, (t) => bold(AGC.orc(t)), w - 4);
+    const vx = cv.text(x + 2, row, sending ? `Sending → ${agLabel(m.to)}` : `Received ${ASCII ? 'v' : '✓'}`, (t) => bold(HOT(t)), w - 4);
     cv.text(vx + 1, row, m.text, null, x + w - 2 - (vx + 1));
     return h;
   }
@@ -1150,10 +1200,7 @@ function renderAgents(st, cols, rows, view) {
   const H = Math.max(20, rows || 40);
   const ag = st.agents;
   const now = view.now;
-  const head = ` ${wordmark()} ${bold('agents')} ${gray('· orchestrator ↔ subagents')}`;
-  const ub = usageBits(st.usage);
-  const right = (ub.length ? ub.join(gray(' · ')) + gray('   ') : '') + gray(`${hhmm(st.now)} · a board · q quit`);
-  const L = [head + ' '.repeat(Math.max(1, W - width(head) - width(right) - 1)) + right];
+  const L = brandHeader(st, W, 'agents', 'a board · q quit', view);
   if (!ag) return L.join('\n');
 
   const n = ag.stages.length;
@@ -1207,14 +1254,31 @@ function renderAgents(st, cols, rows, view) {
       joint(sx._c, ry, true);
     }
   }
-  // 전송 중인 메시지: 지나온 길은 굵은 선, 남은 길은 점선, 그 사이를 ● 가 움직인다
+  // 연결된 선(아직 끝나지 않은 에이전트): 흐린 점이 위아래로 천천히 오가며 '연결됨'을 보여 준다. 실제 메시지와 색이 다르다
+  const linkLive = (u) => u && u.state !== 'done';
+  for (const sx of ag.stages) {
+    const pairs = [[paths[`orc>${sx.id}`], linkLive(sx)]];
+    if (sx.reviewer) pairs.push([paths[`${sx.id}>${sx.id}:review`], linkLive(sx.reviewer)]);
+    for (const [pts, live] of pairs) {
+      if (!pts || !live) continue;
+      const span = pts.length + 4;
+      const down = Math.floor(now / 140) % span;
+      const up = (Math.floor(now / 140) + Math.floor(span / 2)) % span;
+      if (down < pts.length) cv.put(pts[down][0], pts[down][1], ASCII ? 'v' : '•', PULSE);
+      if (up < pts.length) {
+        const [ux, uy] = pts[pts.length - 1 - up];
+        cv.put(ux, uy, ASCII ? '^' : '•', PULSE);
+      }
+    }
+  }
+  // 전송 중인 메시지: 다른 색(HOT)으로 강조. 지나온 길은 굵은 선, 남은 길은 점선, 그 사이를 ● 가 움직인다
   const a = view.anim;
   if (a && now - a.start < PKT_MS) {
     const k = (now - a.start) / PKT_MS;
     const child = a.m.from === 'orc' ? a.m.to : a.m.to === 'orc' ? a.m.from : a.m.from.endsWith(':review') ? a.m.from : a.m.to;
     const parent = child.endsWith(':review') ? child.slice(0, 3) : 'orc';
     let pts = paths[`${parent}>${child}`];
-    const pc = AGC[agKind(a.m.from)];
+    const pc = HOT;
     if (pts) {
       if (a.m.from === child) pts = [...pts].reverse();
       const idx = Math.min(pts.length - 1, Math.floor(k * pts.length));
@@ -1231,7 +1295,7 @@ function renderAgents(st, cols, rows, view) {
     const pos = Math.min(track - 1, Math.floor(k * track));
     let bar = '';
     for (let j = 0; j < track; j++) bar += j < pos ? (ASCII ? '=' : '━') : j === pos ? (ASCII ? '@' : '●') : ASCII ? '.' : '┄';
-    let bx = cv.text(1, 0, ASCII ? '>> ' : '⇢ ', (t) => bold(AGC.orc(t)));
+    let bx = cv.text(1, 0, ASCII ? '>> ' : '⇢ ', (t) => bold(HOT(t)));
     bx = cv.text(bx, 0, agLabel(a.m.from), (t) => bold(pc(t)));
     bx = cv.text(bx + 1, 0, bar, pc);
     bx = cv.text(bx + 1, 0, agLabel(a.m.to), (t) => bold(AGC[agKind(a.m.to)](t)));
@@ -1280,10 +1344,10 @@ function renderAgents(st, cols, rows, view) {
     const kc = AGC[agKind(m.from)];
     const isNew = newest && m.t === newest.t && m.from === newest.from && m.to === newest.to;
     const t = hhmm(m.t);
-    const left = ` ${kc(ASCII ? '*' : '⏺')} ${bold(kc(agLabel(m.from)))} ${gray('→')} ${agLabel(m.to)}${m.inferred ? '' : gray(' · msg')}`;
+    const left = ` ${isNew ? bold(HOT(ASCII ? '>' : '▶')) : kc(ASCII ? '*' : '⏺')} ${bold(kc(agLabel(m.from)))} ${gray('→')} ${agLabel(m.to)}${m.inferred ? '' : gray(' · msg')}`;
     L.push(left + ' '.repeat(Math.max(1, W - width(left) - width(t) - 1)) + gray(t));
     const body = fit(m.text, W - 7);
-    L.push(`   ${gray(ASCII ? 'L' : '⎿')}  ${isNew ? bold(body) : body}`);
+    L.push(`   ${gray(ASCII ? 'L' : '⎿')}  ${isNew ? bold(HOT(body)) : body}`);
   }
   if (!ag.messages.length && room > 1) L.push(gray('  no messages yet'));
   return L.slice(0, H).map((l) => l.replace(/\s+$/, '')).join('\n');
@@ -1361,13 +1425,14 @@ function runTerminal() {
     let frame;
     try {
       if (st.error) throw new Error(st.error);
-      frame = mode === 'agents' ? renderAgents(st, out.columns, out.rows, view) : renderTerminal(st, out.columns, out.rows);
+      frame = mode === 'agents' ? renderAgents(st, out.columns, out.rows, view) : renderTerminal(st, out.columns, out.rows, view);
     } catch (e) {
       frame = red(` 보드 오류: ${e?.message ?? e}`);
     }
     if (frame === last) return;
     last = frame;
-    out.write('\x1b[H\x1b[2J' + frame);
+    // Overwrite in place (clear each line's tail, then everything below) instead of clearing the screen: no flicker at animation speed
+    out.write('\x1b[H' + frame.split('\n').map((l) => l + '\x1b[K').join('\n') + '\x1b[J');
   }
   out.on('resize', () => {
     last = '';
@@ -1379,10 +1444,10 @@ function runTerminal() {
     refresh();
     draw();
   }, interval);
-  // 스피너와 날아가는 메시지는 에이전트 화면에서만 빠르게 다시 그린다
+  // 스피너·흐르는 점·시계: 에이전트 화면은 120ms, 보드 화면은 240ms마다 다시 그린다 (상태 읽기는 위 interval에서만)
   setInterval(() => {
     view.spin++;
-    if (mode === 'agents') draw();
+    if (mode === 'agents' || view.spin % 2 === 0) draw();
   }, 120);
 }
 
