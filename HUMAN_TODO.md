@@ -28,7 +28,7 @@
 
 ## 이름 변경(binjari → spareon, ADR 0020)에서 추가
 - [ ] GitHub 저장소 이름을 `BINjari` → `spareon`으로 바꾼다(GitHub 저장소 Settings → General → Repository name). 왜: 코드·문서는 이미 spareon이다. GitHub가 옛 주소를 새 주소로 자동 연결하므로 push는 그대로 된다. 결과: 바꾼 뒤 `git remote set-url origin <새 주소>`(Claude에게 맡겨도 된다).
-- [ ] 저장소 폴더 `C:injari` → `C:\spareon`. 절차: 진행 중인 차수가 없을 때 Claude Code를 모두 닫는다 → 폴더 이름 바꾸기 → 새 폴더에서 Claude Code 열기. 주의: Claude Code의 프로젝트 기록(메모리)은 폴더 경로별로 저장되므로, 바꾸기 전에 Claude에게 "메모리를 새 폴더용으로 옮겨 줘"라고 하면 옮길 방법을 안내한다.
+- [x] 저장소 폴더 `C:injari` → `C:spareon`. 절차: 진행 중인 차수가 없을 때 Claude Code를 모두 닫는다 → 폴더 이름 바꾸기 → 새 폴더에서 Claude Code 열기. 주의: Claude Code의 프로젝트 기록(메모리)은 폴더 경로별로 저장되므로, 바꾸기 전에 Claude에게 "메모리를 새 폴더용으로 옮겨 줘"라고 하면 옮길 방법을 안내한다. — 완료(2026-10-10): 폴더를 바꿨고 메모리를 옮겼다. 새 폴더에서 `pnpm install`을 다시 했다(node_modules 연결이 옛 경로를 가리켰다).
 
 ## 나중에 (차수가 진행되면 각 차수가 구체적인 절차를 추가한다)
 - [ ] Windows PC + GPU에서 실기 확인 (S18~S22, `docs/manual-tests/`). 지금은 AMD RX 5700 XT 1대로 Vulkan 경로를 확인한다(ADR 0019). CUDA 경로(세션 0 CUDA K1, nvidia-smi 전력 K8)는 NVIDIA PC가 생기면 확인한다. 보고할 때 GPU·백엔드를 함께 적는다.
