@@ -8,7 +8,7 @@ import { randomBytes } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
 import { networkInterfaces } from 'node:os';
 
-import { startTestDatabase } from '@binjari/testkit';
+import { startTestDatabase } from '@spareon/testkit';
 
 import { buildServer, type Server } from '../app.js';
 import { isNonLoopbackHost, parseEnv, type ServerEnv } from '../config.js';
@@ -122,7 +122,7 @@ export async function startDevStack(options: DevStackOptions): Promise<DevStack>
       },
     });
     // The server itself always runs with the least-privilege role (S03).
-    app = createDb({ url: adminUrl, role: env.DB_ROLE, applicationName: 'binjari-dev-server' });
+    app = createDb({ url: adminUrl, role: env.DB_ROLE, applicationName: 'spareon-dev-server' });
     await assertSessionRole(app, env.DB_ROLE);
     const ids = createIds(options.clock);
     const world = await ensureSkeletonWorld(

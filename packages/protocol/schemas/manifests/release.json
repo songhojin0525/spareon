@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schemas.binjari.invalid/protocol/manifests/release.json",
+  "$id": "https://schemas.spareon.invalid/protocol/manifests/release.json",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema", "version", "platform", "files", "issuedAt"],
   "properties": {
     "schema": {
       "type": "string",
-      "const": "binjari.release-manifest/1"
+      "const": "spareon.release-manifest/1"
     },
     "version": {
       "$ref": "../defs/common.json#/$defs/semver"

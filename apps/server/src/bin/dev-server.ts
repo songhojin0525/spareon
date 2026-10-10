@@ -36,7 +36,7 @@ try {
     log: out,
   });
   out();
-  out('=== 빈자리 S04 개발용 서버가 켜졌습니다 ===');
+  out('=== Spareon S04 개발용 서버가 켜졌습니다 ===');
   out(`대시보드:      ${stack.httpUrl}/dev`);
   out(`구매자 API:    ${stack.httpUrl}/v1/chat/completions`);
   out(`API 키:        ${stack.apiKey}`);

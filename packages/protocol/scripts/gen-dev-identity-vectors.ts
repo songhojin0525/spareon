@@ -1,5 +1,5 @@
 // Writes fixtures/vectors/dev-identity.json (the Go devauth tests read the same file).
-// Run: pnpm --filter @binjari/protocol exec tsx scripts/gen-dev-identity-vectors.ts
+// Run: pnpm --filter @spareon/protocol exec tsx scripts/gen-dev-identity-vectors.ts
 import { writeFileSync } from 'node:fs';
 
 import {

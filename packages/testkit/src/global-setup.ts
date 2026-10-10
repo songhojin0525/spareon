@@ -43,7 +43,7 @@ export function createTestDatabaseSetup(options: TestDatabaseSetupOptions = {}):
       throw err;
     }
     const info: TestDatabaseInfo = { adminUrl: db.adminUrl, template, runId };
-    project.provide('binjariTestDb', info);
+    project.provide('spareonTestDb', info);
 
     return async () => {
       const problems: string[] = [];

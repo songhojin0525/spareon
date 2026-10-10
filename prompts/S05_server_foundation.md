@@ -20,7 +20,7 @@ S04 뼈대의 서버를 운영 가능한 기반으로 바꾼다: 검증된 설�
 - `apps/server/src/lib/{clock,ids,errors,logger,crypto}.ts`
 - 인증·세션, API 키, 권한, 감사, 멱등성, 속도 제한 모듈
 - `docs/PERMISSIONS.md` — 역할 × 동작 권한 표(이 표에서 테스트를 생성한다)
-- `/api/openapi.json`, 운영자 CLI(`pnpm --filter @binjari/server cli <명령>`)
+- `/api/openapi.json`, 운영자 CLI(`pnpm --filter @spareon/server cli <명령>`)
 - `/healthz`(살아 있음), `/readyz`(DB 연결 확인)
 
 ## 상세 요구사항

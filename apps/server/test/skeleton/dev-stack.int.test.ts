@@ -33,7 +33,7 @@ describe('dev:server stack (demo settings never widen by accident)', () => {
       expect(stack.generatedSecrets).toBe(true);
       // The server's own sessions run as the least-privilege role.
       const who = await stack.app.pool.query<{ u: string }>('SELECT current_user AS u');
-      expect(who.rows[0]?.u).toBe('binjari_app');
+      expect(who.rows[0]?.u).toBe('spareon_app');
     } finally {
       await stack.stop();
     }

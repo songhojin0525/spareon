@@ -799,6 +799,9 @@ const red = C('31');
 const cyan = C('36');
 const magenta = C('35');
 const gray = C('90');
+// Brand wordmark: 'spare' white, 'on' bright teal
+const TEAL = (s) => (COLOR ? `\x1b[1;38;2;45;212;191m${s}\x1b[0m` : String(s));
+const wordmark = () => (COLOR ? `\x1b[1;97mspare\x1b[0m` : 'spare') + TEAL('on');
 
 function charWidth(cp) {
   if (cp < 32 || (cp >= 0x7f && cp < 0xa0)) return 0;
@@ -884,7 +887,7 @@ function renderTerminal(st, cols, rows) {
   const L = [];
   const hr = gray((ASCII ? '-' : '─').repeat(cols));
   const nowTxt = `${hhmm(st.now)} · a agents · q quit`;
-  L.push(` ${bold(cyan('BINJARI'))} ${gray('// mission control · ' + st.project)}` + ' '.repeat(Math.max(1, cols - 4 - width('BINJARI // mission control · ' + st.project) - width(nowTxt))) + gray(nowTxt));
+  L.push(` ${wordmark()} ${gray('// mission control')}` + ' '.repeat(Math.max(1, cols - 3 - width('spareon // mission control') - width(nowTxt))) + gray(nowTxt));
   if (!st.hasStages) {
     L.push(red(' prompts/STAGES.md를 찾지 못했습니다. 저장소 맨 위 폴더에서 실행하세요.'));
     return L.join('\n');
@@ -1147,7 +1150,7 @@ function renderAgents(st, cols, rows, view) {
   const H = Math.max(20, rows || 40);
   const ag = st.agents;
   const now = view.now;
-  const head = ` ${AGC.orc((ASCII ? '* ' : '✻ ') + 'binjari')} ${bold('agents')} ${gray('· orchestrator ↔ subagents')}`;
+  const head = ` ${wordmark()} ${bold('agents')} ${gray('· orchestrator ↔ subagents')}`;
   const ub = usageBits(st.usage);
   const right = (ub.length ? ub.join(gray(' · ')) + gray('   ') : '') + gray(`${hhmm(st.now)} · a board · q quit`);
   const L = [head + ' '.repeat(Math.max(1, W - width(head) - width(right) - 1)) + right];
@@ -1237,7 +1240,7 @@ function renderAgents(st, cols, rows, view) {
   if (!(a && now - a.start < PKT_MS) && ag.summary) {
     const sm = ag.summary;
     const pct = sm.total ? Math.round((100 * sm.done) / sm.total) : 0;
-    let bx = cv.text(1, 0, ASCII ? '* ' : '✻ ', AGC.orc);
+    let bx = cv.text(1, 0, ASCII ? '* ' : '● ', TEAL);
     bx = cv.text(bx, 0, `done ${sm.done}/${sm.total} `, gray);
     const track = 14;
     const f = Math.round((track * pct) / 100);
@@ -1462,7 +1465,7 @@ function runWeb() {
   server.on('listening', () => {
     const q = token ? `/?t=${token}` : '/';
     const local = `http://127.0.0.1:${port}${q}`;
-    console.log(`\n  빈자리 진행 보드가 열렸습니다 (읽기 전용)\n`);
+    console.log(`\n  Spareon 진행 보드가 열렸습니다 (읽기 전용)\n`);
     console.log(`  이 컴퓨터:  ${local}`);
     if (lan) {
       for (const ip of lanAddresses()) console.log(`  휴대폰(같은 와이파이):  http://${ip}:${port}${q}`);
@@ -1480,12 +1483,13 @@ const PAGE = String.raw`<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>BINJARI · Mission Control</title>
+<title>spareon · Mission Control</title>
 <style nonce="__NONCE__">
 :root,[data-theme="dark"]{
   --bg:#1a1918;--bg2:#222120;--panel:#262624;--panel-solid:#262624;--line:#3a3936;--line2:#4a4844;
   --text:#f5f4ef;--muted:#a8a69d;--faint:#6f6d66;
-  --acc:#d97757;--acc-dim:rgba(217,119,87,.16);
+  --brand-spare:#ffffff;--brand-on:#2dd4bf;
+  --acc:#2dd4bf;--acc-dim:rgba(45,212,191,.16);
   --run:#d97757;--run-dim:rgba(217,119,87,.13);
   --done:#4eba65;--done-dim:rgba(78,186,101,.13);
   --warn:#ffc107;--warn-dim:rgba(255,193,7,.12);
@@ -1497,7 +1501,8 @@ const PAGE = String.raw`<!doctype html>
 [data-theme="light"]{
   --bg:#faf9f5;--bg2:#f0eee6;--panel:#ffffff;--panel-solid:#fff;--line:#e5e2d9;--line2:#d3cfc3;
   --text:#1f1e1d;--muted:#6b6962;--faint:#a3a097;
-  --acc:#c6613f;--acc-dim:rgba(198,97,63,.12);
+  --brand-spare:#1f1e1d;--brand-on:#0d9488;
+  --acc:#0d9488;--acc-dim:rgba(13,148,136,.12);
   --run:#c6613f;--run-dim:rgba(198,97,63,.10);
   --done:#2c7a3f;--done-dim:rgba(44,122,63,.10);
   --warn:#9a6700;--warn-dim:rgba(154,103,0,.10);
@@ -1527,6 +1532,8 @@ body{
 .brand{display:flex;align-items:center;gap:12px;min-width:0}
 .logo{flex:none;color:var(--acc);font-size:22px;line-height:1;width:22px;text-align:center}
 .brand b{font-size:15px;letter-spacing:.18em}
+.wordmark{font-family:-apple-system,BlinkMacSystemFont,"Inter","Pretendard","Segoe UI",system-ui,sans-serif;font-size:20px!important;font-weight:700;letter-spacing:-.02em!important;line-height:1}
+.wordmark .w-spare{color:var(--brand-spare)} .wordmark .w-on{color:var(--brand-on)}
 .brand .cap{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .live{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted);white-space:nowrap}
 .pulse{width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 0 0 var(--acc);animation:ping 1.8s infinite}
@@ -1742,7 +1749,7 @@ body{
 <body>
 <div class="wrap">
   <div class="top">
-    <div class="brand"><span class="logo" aria-hidden="true">✻</span><b>BINJARI</b><span class="cap" id="proj">mission control</span></div>
+    <div class="brand"><b class="wordmark" aria-label="spareon"><span class="w-spare">spare</span><span class="w-on">on</span></b><span class="cap" id="proj">mission control</span></div>
     <div class="usage ko" id="usage" title="Claude 사용 한도 (Claude Code 상태줄에서 받은 값)"></div>
     <div class="live"><span class="pulse" id="pulse"></span><span id="clock">connecting…</span><button class="iconbtn" id="theme" type="button" title="Toggle theme">◐</button></div>
   </div>

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schemas.binjari.invalid/protocol/http/enroll.complete.response.json",
+  "$id": "https://schemas.spareon.invalid/protocol/http/enroll.complete.response.json",
   "type": "object",
   "additionalProperties": false,
   "required": ["nodeId", "state", "reattached"],

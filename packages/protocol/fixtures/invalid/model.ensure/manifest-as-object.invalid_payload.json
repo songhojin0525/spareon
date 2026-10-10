@@ -6,7 +6,7 @@
   "payload": {
     "manifest": {
       "manifest": {
-        "schema": "binjari.model-manifest/1",
+        "schema": "spareon.model-manifest/1",
         "modelId": "qwen2.5-7b-instruct-q4_k_m",
         "revision": 1,
         "format": "gguf",

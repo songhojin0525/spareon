@@ -30,7 +30,7 @@ CREATE INDEX "holds_active_account_idx" ON "holds" USING btree ("buyer_account_i
 -- the transaction's highest id; (2) a posting whose ledger transaction was not yet visible (created by
 -- another, uncommitted DB transaction) skipped the same-transaction check.
 -- ===================================================================================
-CREATE OR REPLACE FUNCTION binjari_ledger_posting_same_xact() RETURNS trigger
+CREATE OR REPLACE FUNCTION spareon_ledger_posting_same_xact() RETURNS trigger
 LANGUAGE plpgsql AS $$
 DECLARE
   tx_xid xid8;
@@ -61,7 +61,7 @@ $$;
 -- Money records start in their initial state (review finding: M10 was only checked on UPDATE, so an
 -- INSERT could create an already linked or settled record and skip the matured step).
 -- ===================================================================================
-CREATE FUNCTION binjari_money_record_insert_guard() RETURNS trigger
+CREATE FUNCTION spareon_money_record_insert_guard() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
   IF TG_TABLE_NAME = 'holds' THEN
@@ -86,11 +86,11 @@ END
 $$;
 --> statement-breakpoint
 CREATE TRIGGER holds_insert_guard BEFORE INSERT ON holds
-  FOR EACH ROW EXECUTE FUNCTION binjari_money_record_insert_guard();
+  FOR EACH ROW EXECUTE FUNCTION spareon_money_record_insert_guard();
 CREATE TRIGGER earnings_insert_guard BEFORE INSERT ON earnings
-  FOR EACH ROW EXECUTE FUNCTION binjari_money_record_insert_guard();
+  FOR EACH ROW EXECUTE FUNCTION spareon_money_record_insert_guard();
 CREATE TRIGGER payout_records_insert_guard BEFORE INSERT ON payout_records
-  FOR EACH ROW EXECUTE FUNCTION binjari_money_record_insert_guard();
+  FOR EACH ROW EXECUTE FUNCTION spareon_money_record_insert_guard();
 ALTER TABLE holds ENABLE ALWAYS TRIGGER holds_insert_guard;
 ALTER TABLE earnings ENABLE ALWAYS TRIGGER earnings_insert_guard;
 ALTER TABLE payout_records ENABLE ALWAYS TRIGGER payout_records_insert_guard;

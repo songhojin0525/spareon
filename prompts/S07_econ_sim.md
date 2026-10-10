@@ -55,7 +55,7 @@ PC방 몫 비율, 준비금 비율, 성숙 기간, 검증 비율, 가격 — 이
 
 ## 수용 기준
 1. `pnpm verify` 통과
-2. `pnpm --filter @binjari/econ-sim run all`이 보고서와 차트를 다시 만든다(같은 시드면 바이트 동일)
+2. `pnpm --filter @spareon/econ-sim run all`이 보고서와 차트를 다시 만든다(같은 시드면 바이트 동일)
 3. 예시 재현 테스트와 보존 법칙 테스트 통과
 4. `assumptions.json`의 모든 항목에 출처 또는 '가정' + 교체 계획
 5. 보고서 맨 앞에 "가장 영향이 큰 가정 3개"와 "추천 기본값 표"가 있다

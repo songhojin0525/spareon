@@ -74,7 +74,7 @@ describe('runCommand with real processes', () => {
 
   it('reports a missing executable as an error, not a pass', async () => {
     const r = await runCommand({
-      cmd: { command: 'binjari-definitely-missing-cmd', prefixArgs: [] },
+      cmd: { command: 'spareon-definitely-missing-cmd', prefixArgs: [] },
       args: [],
     });
     expect(r.error).toBeInstanceOf(Error);
@@ -179,7 +179,7 @@ describe('Go steps', () => {
 
   it('fail gofmt when files need formatting', async () => {
     const { runner } = fakeRunner((s) =>
-      s.cmd.command === 'gofmt' ? ok('cmd/binjari-agent/main.go\n') : ok('go version go1.27.0'),
+      s.cmd.command === 'gofmt' ? ok('cmd/spareon-agent/main.go\n') : ok('go version go1.27.0'),
     );
     const r = await runGo({}, runner);
     expect(r.find((x) => x.name === 'go:gofmt')?.status).toBe('FAIL');
@@ -254,12 +254,12 @@ describe('runAll', () => {
     const quick = fakeRunner(() => ok());
     await runAll({ only: 'ts', quick: true, help: false }, { env: {}, runner: quick.runner, pnpm });
     expect(quick.calls.find((c) => c.args.includes('test'))?.env).toEqual({
-      BINJARI_TEST_QUICK: '1',
+      SPAREON_TEST_QUICK: '1',
     });
     const full = fakeRunner(() => ok());
     await runAll({ only: 'ts', quick: false, help: false }, { env: {}, runner: full.runner, pnpm });
     expect(full.calls.find((c) => c.args.includes('test'))?.env).toEqual({
-      BINJARI_TEST_QUICK: '0',
+      SPAREON_TEST_QUICK: '0',
     });
   });
 
@@ -336,7 +336,7 @@ describe('resolvePnpm', () => {
 });
 
 describe('verify.mjs as a process', () => {
-  const emptyDir = mkdtempSync(path.join(tmpdir(), 'binjari-nopath-'));
+  const emptyDir = mkdtempSync(path.join(tmpdir(), 'spareon-nopath-'));
   afterAll(() => {
     rmSync(emptyDir, { recursive: true, force: true });
   });

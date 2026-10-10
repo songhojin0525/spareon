@@ -164,16 +164,16 @@ flowchart BT
 | `policy` | 적격 판정 순수 함수(진리표 테스트), 데드맨 스위치용 '적격 임대' | S18 |
 | `gpu` | `nvidia`(nvidia-smi 질의·파서) · `windows`(제조사 무관: DXGI 어댑터, 성능 카운터 `GPU Process Memory`로 프로세스별 VRAM — AMD 시험 노드, ADR 0019), 온도·전력(AMD는 '모름') | S19 |
 | `cache` | 아티팩트 내려받기(이어받기·검증·LRU·대역폭), LAN 캐시 서버·클라이언트 | S19, S20 |
-| `update` | 업데이트 매니페스트 검증, `binjari-updater`와 협력(버전 폴더·포인터·롤백) | S21 |
+| `update` | 업데이트 매니페스트 검증, `spareon-updater`와 협력(버전 폴더·포인터·롤백) | S21 |
 | `metrics` | 구조화 로그(콘텐츠 금지·회전), 지표(상태 체류, 선점 지연 3구간), `status`로 서버 보고 | S17 |
 | `svc` | Windows 서비스 래퍼(SCM, 세션 변경 알림), 다른 OS에선 '지원 안 함' | S18, S21 |
 
-실행 파일: `binjari-agent`(서비스·콘솔), `binjari-helper`(사용자 세션), `binjari-updater`(교체·롤백), `nodesim`(시뮬레이터).
+실행 파일: `spareon-agent`(서비스·콘솔), `spareon-helper`(사용자 세션), `spareon-updater`(교체·롤백), `nodesim`(시뮬레이터).
 
 ```mermaid
 flowchart LR
   subgraph user["사용자 세션 (사용자 권한)"]
-    h["binjari-helper<br/>GetLastInputInfo 100ms"]
+    h["spareon-helper<br/>GetLastInputInfo 100ms"]
   end
   subgraph svc["서비스 (세션 0)"]
     pres["presence<br/>파이프 수신 · PID 확인"]
@@ -223,7 +223,7 @@ sequenceDiagram
   W->>F: POST /api/stores/:id/enroll-codes
   F->>DB: 코드 해시·종류·만료 저장
   F-->>O: 8자 코드(한 번만 표시)
-  Note over A: msiexec ENROLL_CODE=... PERSIST_DIR=D:\Binjari<br/>image 모드면 키를 만들지 않고 코드만 설정에 둔다
+  Note over A: msiexec ENROLL_CODE=... PERSIST_DIR=D:\Spareon<br/>image 모드면 키를 만들지 않고 코드만 설정에 둔다
   A->>A: 영구 폴더 점검(S20), 신원 없음 확인
   A->>F: HTTPS enroll.start(code)
   F->>DB: 코드 해시 조회, 만료·폐기·시도 횟수 확인
@@ -505,7 +505,7 @@ sequenceDiagram
   participant S as 서버 registry
   participant G as S gateway
   participant A as 에이전트(새 버전 대상)
-  participant U as binjari-updater
+  participant U as spareon-updater
   CI->>S: 빌드 산출물 업로드(버전, 파일, SHA-256) - release draft
   OP->>OP: 오프라인 키로 매니페스트 서명
   OP->>S: 서명된 매니페스트 등록 → 서버가 공개키로 검증 → signed
@@ -809,7 +809,7 @@ flowchart LR
 | 프롬프트(대화형) | 구매자 → 서버 전송 | 전송 중 | TLS | S14, S30 |
 | 프롬프트(대화형) | 서버 메모리 | 요청 처리 중 | 프로세스 메모리 | S14 |
 | 프롬프트·출력(포털 플레이그라운드) | 웹 호스팅 rewrite 프록시(예: Vercel) | 전송 중. 호스팅의 요청 로그·버퍼 보존은 확인 필요 | TLS. 본문이 호스팅 로그에 남지 않는지 S23이 확인하고, 남으면 플레이그라운드는 브라우저 → 서버 직접 호출로 바꾼다 | S23, S30 |
-| 프롬프트·출력(대화형) | DB `job_payloads` | 결과 전달 후 24시간. 검증 표본이면 판정까지 최대 48시간. `x-binjari-retention: none`이면 작업 종료까지(이 작업은 중복 실행 표본에서 빠진다, 노드는 모름) | AES-256-GCM, 키는 DB 밖(`DATA_ENCRYPTION_KEY`, 키 ID로 교체) | S12, S13 |
+| 프롬프트·출력(대화형) | DB `job_payloads` | 결과 전달 후 24시간. 검증 표본이면 판정까지 최대 48시간. `x-spareon-retention: none`이면 작업 종료까지(이 작업은 중복 실행 표본에서 빠진다, 노드는 모름) | AES-256-GCM, 키는 DB 밖(`DATA_ENCRYPTION_KEY`, 키 ID로 교체) | S12, S13 |
 | 프롬프트 | 서버 → 에이전트 | 전송 중. 256 KiB 초과분은 `inputRef`(단기 서명 토큰, 목표 5분) | TLS | S11, S12 |
 | 프롬프트·출력 | 에이전트 프로세스 메모리 | 시도 동안 | 디스크 쓰기 금지(정적 검사 + 통합 테스트) | S17, S22 |
 | 프롬프트·출력 | llama-server 메모리·VRAM | 시도 동안, 프로세스 종료로 해제 | 127.0.0.1 무작위 포트 + 무작위 키, 프롬프트 로그·캐시·슬롯 저장 끔 | S19 |
@@ -1006,7 +1006,7 @@ flowchart LR
 | M10 | 정산 기록에 연결된 수익은 모두 `matured`이고 한 번만 연결된다. `under_review`·`held`·TCR 수익은 연결되지 않는다 | 원장 + DB 제약 |
 | M11 | 원장의 준비금(KRW) = 테스트 충전 합 − 외부 지출 − 정산 지급. 은행 잔고와는 사람이 대조 | 대사 + 운영 런북 |
 
-DB가 강제하는 부분(트리거·제약·최소 권한 역할 `binjari_app`)과 각 불변식의 테스트 위치는 [DB.md](DB.md) 4절(ADR 0018).
+DB가 강제하는 부분(트리거·제약·최소 권한 역할 `spareon_app`)과 각 불변식의 테스트 위치는 [DB.md](DB.md) 4절(ADR 0018).
 
 ## 10. 안전 스위치와 기능 플래그
 | 스위치 | 기본값 | 켜면 | 위치 | 담당 |
@@ -1020,7 +1020,7 @@ DB가 강제하는 부분(트리거·제약·최소 권한 역할 `binjari_app`)
 | 킬스위치 | 꺼짐 | 범위 안 노드 즉시 멈춤·오퍼 금지 | DB(`kill_switches`) | S10, S11 |
 | `DEV_API_KEY`, `DEV_AGENT_SECRET`, `DEV_DASHBOARD` | 없음 | 운영(`NODE_ENV=production`, `NODE_ENV`가 없을 때 포함)에서 설정돼 있으면 시작 거부 | 환경변수 | S04, S05 |
 | `HOST` | `127.0.0.1` | `0.0.0.0`이면 LAN에 열림. 개발 서버(`pnpm dev:server`)는 `HOST`를 무시하고 `--lan` 플래그로만 연다 | 환경변수 | S04, S30 |
-| `DB_ROLE` | `binjari_app` | 다른 값이면 시작 거부. 연결 URL에 `options`가 있으면 역할 옵션이 덮어써지므로 거부하고, 개발 서버는 시작할 때 `current_user`가 `binjari_app`인지 확인한다 | 환경변수 | S03, S04 |
+| `DB_ROLE` | `spareon_app` | 다른 값이면 시작 거부. 연결 URL에 `options`가 있으면 역할 옵션이 덮어써지므로 거부하고, 개발 서버는 시작할 때 `current_user`가 `spareon_app`인지 확인한다 | 환경변수 | S03, S04 |
 | `--always-available` | 없음 | 개발 콘솔에서만, 서비스 모드에서는 거부 | 에이전트 플래그 | S18 |
 | 샌드박스 충전 한도 | 계정당 소액, 전체 일일 상한 | TCR 발행 남용 방지 | 설정 | S25 |
 

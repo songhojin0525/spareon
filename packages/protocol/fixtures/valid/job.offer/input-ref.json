@@ -19,7 +19,7 @@
       "greedy": false
     },
     "inputRef": {
-      "url": "https://api.binjari.example/v1/agent/inputs/01920000-0000-7000-8000-000000000042",
+      "url": "https://api.spareon.example/v1/agent/inputs/01920000-0000-7000-8000-000000000042",
       "token": "eyJhbGciOiJFZERTQSJ9.eyJhIjoxfQ.c2ln",
       "sha256": "d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4",
       "bytes": 300000

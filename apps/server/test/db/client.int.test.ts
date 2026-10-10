@@ -157,7 +157,7 @@ describe('withTransaction (real Postgres)', () => {
   });
 });
 
-describe('createDb role option (the server always runs as binjari_app)', () => {
+describe('createDb role option (the server always runs as spareon_app)', () => {
   let db: TestDb;
 
   beforeAll(async () => {
@@ -168,10 +168,10 @@ describe('createDb role option (the server always runs as binjari_app)', () => {
   });
 
   it('starts every pooled session as the given role, which cannot disable the ledger triggers', async () => {
-    const app = createDb({ url: db.url, role: 'binjari_app', maxConnections: 2 });
+    const app = createDb({ url: db.url, role: 'spareon_app', maxConnections: 2 });
     try {
       const who = await app.pool.query<{ u: string }>('SELECT current_user AS u');
-      expect(who.rows[0]?.u).toBe('binjari_app');
+      expect(who.rows[0]?.u).toBe('spareon_app');
       const err = await app.pool.query('ALTER TABLE ledger_postings DISABLE TRIGGER ALL').then(
         () => undefined,
         (e: unknown) => e,
@@ -188,15 +188,15 @@ describe('createDb role option (the server always runs as binjari_app)', () => {
 
   it('refuses a URL whose options would silently replace the role', () => {
     const url = `${db.url}${db.url.includes('?') ? '&' : '?'}options=-c%20search_path%3Dpublic`;
-    expect(() => createDb({ url, role: 'binjari_app' })).toThrow(/options/);
+    expect(() => createDb({ url, role: 'spareon_app' })).toThrow(/options/);
   });
 
-  it('assertSessionRole passes as binjari_app and fails for a session without the role', async () => {
-    const app = createDb({ url: db.url, role: 'binjari_app', maxConnections: 1 });
+  it('assertSessionRole passes as spareon_app and fails for a session without the role', async () => {
+    const app = createDb({ url: db.url, role: 'spareon_app', maxConnections: 1 });
     const owner = createDb({ url: db.url, maxConnections: 1 });
     try {
-      await expect(assertSessionRole(app, 'binjari_app')).resolves.toBeUndefined();
-      await expect(assertSessionRole(owner, 'binjari_app')).rejects.toThrow(/expected binjari_app/);
+      await expect(assertSessionRole(app, 'spareon_app')).resolves.toBeUndefined();
+      await expect(assertSessionRole(owner, 'spareon_app')).rejects.toThrow(/expected spareon_app/);
     } finally {
       await app.close();
       await owner.close();

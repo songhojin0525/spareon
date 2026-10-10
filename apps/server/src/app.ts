@@ -1,5 +1,5 @@
-import { LIMITS } from '@binjari/protocol';
 import websocket from '@fastify/websocket';
+import { LIMITS } from '@spareon/protocol';
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 
 import { registerChatCompletions } from './buyer-api/chat-completions.js';
@@ -41,7 +41,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
 
 export interface ServerDeps extends AppDeps {
   readonly env: ServerEnv;
-  /** Database handle running as binjari_app (createDb({ role })). */
+  /** Database handle running as spareon_app (createDb({ role })). */
   readonly db: Db;
   readonly world: SkeletonWorld;
   readonly cipher: PayloadCipher;

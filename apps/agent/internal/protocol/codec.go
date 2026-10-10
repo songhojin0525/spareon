@@ -36,7 +36,7 @@ const (
 )
 
 // SchemaBaseURI prefixes every schema $id; ".invalid" never resolves, and no loader is installed.
-const SchemaBaseURI = "https://schemas.binjari.invalid/protocol/"
+const SchemaBaseURI = "https://schemas.spareon.invalid/protocol/"
 
 // Side is a protocol endpoint.
 type Side string

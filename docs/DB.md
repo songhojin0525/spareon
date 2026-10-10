@@ -5,7 +5,7 @@
 ## 1. 원칙
 | 규칙 | 내용 | 확인하는 테스트 |
 |---|---|---|
-| 시간 | 모든 시각 열은 `timestamptz`(UTC). DB 기본값 `now()`를 두지 않는다 — 서버가 주입된 `Clock`으로 값을 넣는다(가상 시계 테스트). 예외는 `binjari_meta.migrations.applied_at` | `test/db/schema.int.test.ts` |
+| 시간 | 모든 시각 열은 `timestamptz`(UTC). DB 기본값 `now()`를 두지 않는다 — 서버가 주입된 `Clock`으로 값을 넣는다(가상 시계 테스트). 예외는 `spareon_meta.migrations.applied_at` | `test/db/schema.int.test.ts` |
 | 돈 | 금액·가격·잔액은 모두 `bigint` 최소 단위(µCR, µTCR, 원, µUSD). `numeric`·`real`·`double precision`·`money` 열은 0개. 비율도 정수(`*_ppm`, `*_bps`, `rate_micros`) | `schema.int.test.ts` |
 | ID | 앱이 만든 UUIDv7. 예외: `ledger_postings.id`, `outbox_events.id`는 `bigint identity`(순서가 의미 있고 밖으로 나가지 않음) | 팩토리 테스트 |
 | 열거형 | Postgres enum 대신 `text + CHECK`(값 추가·down이 쉬움). 값 목록은 TS 상수 하나에서 나온다 | 드리프트 검사 |
@@ -106,11 +106,11 @@ erDiagram
 | 운영 | `settings` | 설정·기능 플래그(`ledger_frozen` 등), 개발 시드 표시 `dev.seed` | — |
 | | `audit_log` | 민감 동작 감사 기록(추가 전용) | 영구 |
 | | `outbox_events` | 트랜잭션 아웃박스(ID·상태만) | 발행 후 정리 |
-| 메타 | `binjari_meta.migrations` | 적용한 마이그레이션 태그·체크섬 (`0000_schema` 표, `0001_invariants` 트리거, `0002_app_role` 역할, `0003_review_fixes` 검토 반영) | — |
+| 메타 | `spareon_meta.migrations` | 적용한 마이그레이션 태그·체크섬 (`0000_schema` 표, `0001_invariants` 트리거, `0002_app_role` 역할, `0003_review_fixes` 검토 반영) | — |
 
 ## 4. 불변식과 강제 위치
 
-'DB'는 앱이 실수하거나 버그가 있어도 DB가 거부한다는 뜻이다. 'DB 역할'은 서버 연결 역할(`binjari_app`)로는 우회할 수 없다는 뜻이다. 앱·대사 몫은 해당 차수가 테스트로 증명한다.
+'DB'는 앱이 실수하거나 버그가 있어도 DB가 거부한다는 뜻이다. 'DB 역할'은 서버 연결 역할(`spareon_app`)로는 우회할 수 없다는 뜻이다. 앱·대사 몫은 해당 차수가 테스트로 증명한다.
 
 | ID | 불변식 | 강제 위치 | 구현 | 테스트 |
 |---|---|---|---|---|
@@ -126,9 +126,9 @@ erDiagram
 | M9 | 크레딧이 무에서 생기는 거래는 `TEST_TOPUP`·`SANDBOX_TOPUP`뿐 | 앱(S06) + 감사 | 거래 종류 CHECK 목록. 어떤 종류가 어떤 계정을 움직이는지는 S06 | S06 |
 | M10 | 정산 기록에 연결된 수익은 `matured`에서 한 번만 연결, TCR 수익은 연결 불가, 같은 매장의 정산 기록에만 | DB | `earnings_payout_link_check`(CR만, 상태와 연결이 함께), 트리거 `earnings_insert_guard`(수익은 `pending`·`held`로, 정산 기록은 `recorded`로 시작)·`earnings_guard`(연결은 `matured`에서 한 번), 복합 FK `(payout_record_id, store_id)`·`(node_id, store_id)`·`(attempt_id, job_id, node_id)` | `factories.int.test.ts` |
 | M11 | 준비금 = 테스트 충전 − 외부 지출 − 정산 지급 | 대사(S06) + 런북 | — | S06 |
-| A1 | `ledger_accounts`·`ledger_transactions`·`ledger_postings`·`audit_log`·`price_versions`·`price_entries`·`fx_rates`는 추가만 | DB + DB 역할 | 행 트리거(UPDATE·DELETE)와 문장 트리거(TRUNCATE)로 거부(BJ002). `binjari_app`은 SELECT·INSERT 권한만 | `invariants`·`roles.int.test.ts` |
+| A1 | `ledger_accounts`·`ledger_transactions`·`ledger_postings`·`audit_log`·`price_versions`·`price_entries`·`fx_rates`는 추가만 | DB + DB 역할 | 행 트리거(UPDATE·DELETE)와 문장 트리거(TRUNCATE)로 거부(BJ002). `spareon_app`은 SELECT·INSERT 권한만 | `invariants`·`roles.int.test.ts` |
 | A2 | `holds`·`earnings`·`payout_records`는 지우지 않고, 금액·주체는 바뀌지 않으며 끝난 상태는 최종 | DB + DB 역할 | 트리거(BJ005), 앱 역할에 DELETE 권한 없음 | `invariants`·`factories`·`roles` |
-| A3 | 트리거를 끄는 경로가 없다 | DB 역할 | 모든 불변식 트리거 `ENABLE ALWAYS`(`session_replication_role = replica`에서도 동작). `binjari_app`은 테이블 소유자가 아니고 DDL·TRIGGER·TRUNCATE 권한이 없으며 슈퍼유저가 아니다 | `roles.int.test.ts` |
+| A3 | 트리거를 끄는 경로가 없다 | DB 역할 | 모든 불변식 트리거 `ENABLE ALWAYS`(`session_replication_role = replica`에서도 동작). `spareon_app`은 테이블 소유자가 아니고 DDL·TRIGGER·TRUNCATE 권한이 없으며 슈퍼유저가 아니다 | `roles.int.test.ts` |
 | A4 | 잔액 트리거를 임시 테이블로 속일 수 없다 | DB | `SECURITY DEFINER` 함수는 `search_path = pg_catalog, pg_temp` + 스키마를 붙인 이름 | `roles.int.test.ts` |
 | Q1 | 큐·스윕·대사 조회가 인덱스를 탄다 | DB | `jobs_queue_model_idx`(`model_id, priority DESC, created_at, id`, `status = 'queued'` 부분), `jobs_queue_idx`(모델 무관), `job_attempts_offered_sweep_idx`·`job_attempts_lease_idx`(만료 스윕), `holds_active_account_idx`(M4 대사), `ledger_postings_account_idx`(M2 대사) | `factories.int.test.ts`(통계가 있는 2만 행에서 실제 claim 쿼리의 EXPLAIN) |
 | C1 | 구매자 콘텐츠는 암호문으로만, 정해진 열에만 | DB 스키마 | `job_payloads.ciphertext`·`batch_files.ciphertext`(최소 28바이트), 콘텐츠 열 목록 고정 테스트 | `schema.int.test.ts` |
@@ -138,16 +138,16 @@ erDiagram
 **DB가 막지 못하는 것(의도)**:
 - 마이그레이션 소유자(DDL 권한) 연결은 트리거를 지우거나 끌 수 있다. 그래서 운영에서 서버는 소유자로 접속하지 않는다(5절).
 - 거래가 '맞는 종류의 계정'을 움직이는지(예: `JOB_CAPTURE`가 홀드에서 나가는지)는 비즈니스 규칙이라 S06 원장 서비스와 대사가 맡는다.
-- **앱 역할로도 크레딧을 만들 수 있다(M9는 DB가 막지 않는다).** `binjari_app`은 음수 허용 계정(예: `fx_conversion`)을 만들고, 그 계정에서 구매자 지갑으로 가는 합 0 거래를 쓸 수 있다. DB가 보장하는 것은 '합 0·음수 금지·기록 불변'까지이고, 누가 어떤 종류의 거래를 만들 수 있는지는 S06(거래 종류별 허용 계정)과 대사(M11: 준비금 대조, 발행 감사)가 막는다. 탈취된 앱 연결은 여전히 돈 사고다 — 다만 흔적(추가 전용 기록)은 지울 수 없다.
+- **앱 역할로도 크레딧을 만들 수 있다(M9는 DB가 막지 않는다).** `spareon_app`은 음수 허용 계정(예: `fx_conversion`)을 만들고, 그 계정에서 구매자 지갑으로 가는 합 0 거래를 쓸 수 있다. DB가 보장하는 것은 '합 0·음수 금지·기록 불변'까지이고, 누가 어떤 종류의 거래를 만들 수 있는지는 S06(거래 종류별 허용 계정)과 대사(M11: 준비금 대조, 발행 감사)가 막는다. 탈취된 앱 연결은 여전히 돈 사고다 — 다만 흔적(추가 전용 기록)은 지울 수 없다.
 
 ## 5. DB 역할
 | 역할 | 누가 | 권한 |
 |---|---|---|
 | 마이그레이션 소유자 | `pnpm db:migrate`를 돌리는 연결(관리형 DB의 관리 계정) | 테이블·함수 소유, DDL |
-| `binjari_app` (NOLOGIN 그룹) | 서버. 운영 로그인 역할을 이 역할의 멤버로 만든다(S30) | 추가 전용 표 7개: SELECT·INSERT / `account_balances`: SELECT / `holds`·`earnings`·`payout_records`: SELECT·INSERT·UPDATE / 나머지: SELECT·INSERT·UPDATE·DELETE / 시퀀스 USAGE·SELECT. TRUNCATE·TRIGGER·REFERENCES·DDL 없음 |
+| `spareon_app` (NOLOGIN 그룹) | 서버. 운영 로그인 역할을 이 역할의 멤버로 만든다(S30) | 추가 전용 표 7개: SELECT·INSERT / `account_balances`: SELECT / `holds`·`earnings`·`payout_records`: SELECT·INSERT·UPDATE / 나머지: SELECT·INSERT·UPDATE·DELETE / 시퀀스 USAGE·SELECT. TRUNCATE·TRIGGER·REFERENCES·DDL 없음 |
 
 - 새 테이블은 그 테이블을 만드는 마이그레이션에서 권한을 정해야 한다. 정하지 않으면 `roles.int.test.ts`가 실패한다.
-- 역할은 클러스터 전역이다. down 마이그레이션은 이 DB의 권한만 회수하고 역할은 지우지 않는다. 역할을 만들 권한(`CREATEROLE`)이 없는 DB에서는 마이그레이션이 실패한다(조용히 건너뛰면 서버가 소유자 권한으로 돌게 되므로). 그때는 관리자가 `CREATE ROLE binjari_app NOLOGIN`을 먼저 하면 된다.
+- 역할은 클러스터 전역이다. down 마이그레이션은 이 DB의 권한만 회수하고 역할은 지우지 않는다. 역할을 만들 권한(`CREATEROLE`)이 없는 DB에서는 마이그레이션이 실패한다(조용히 건너뛰면 서버가 소유자 권한으로 돌게 되므로). 그때는 관리자가 `CREATE ROLE spareon_app NOLOGIN`을 먼저 하면 된다.
 
 ## 6. 마이그레이션
 | 명령 (`apps/server`) | 내용 |
@@ -158,7 +158,7 @@ erDiagram
 | `pnpm db:rollback --yes [--steps N \| --all]` | down 파일로 되돌리기(데이터 손실, `--yes` 필수) |
 | `pnpm db:seed` | 개발용 시드(로컬 DB만, 두 번 실행해도 변화 없음) |
 
-- 실행기는 직접 만들었다(`src/db/migrate.ts`): 저널(`drizzle/meta/_journal.json`) 순서, 파일마다 한 트랜잭션, `binjari_meta.migrations`에 태그·SHA-256 체크섬 기록(줄 끝 CRLF·LF 무관), 적용 뒤 바뀐 파일·저널에 없는 적용 기록이 있으면 거부, advisory lock으로 동시 실행 직렬화, `lock_timeout` 10초.
+- 실행기는 직접 만들었다(`src/db/migrate.ts`): 저널(`drizzle/meta/_journal.json`) 순서, 파일마다 한 트랜잭션, `spareon_meta.migrations`에 태그·SHA-256 체크섬 기록(줄 끝 CRLF·LF 무관), 적용 뒤 바뀐 파일·저널에 없는 적용 기록이 있으면 거부, advisory lock으로 동시 실행 직렬화, `lock_timeout` 10초.
 - down은 `drizzle/down/<tag>.sql`. 되돌리기 전에 필요한 down 파일이 모두 있는지 먼저 확인한다.
 - 트리거·함수·권한은 `drizzle-kit generate --custom`으로 만든 빈 마이그레이션에 손으로 쓴다(0001, 0002).
 - 마이그레이션 파일 머리에 잠금 영향(`Locking:`)을 적는다. 실행기는 파일마다 트랜잭션으로 감싸므로 `CREATE INDEX CONCURRENTLY`는 마이그레이션 파일에 쓸 수 없다. 운영 중인 큰 테이블에 잠금이 긴 변경(열 타입 변경, 인덱스·제약 추가)이 필요해지면 ① 인덱스는 운영자가 `CONCURRENTLY`로 먼저 만들고 ② 마이그레이션은 `ADD CONSTRAINT ... USING INDEX` 또는 `NOT VALID` 뒤 `VALIDATE CONSTRAINT`로 짧게 잠그는 방식으로 나눈다(절차는 S30 런북). 파일럿 전에는 테이블이 비어 있어 해당 없음.

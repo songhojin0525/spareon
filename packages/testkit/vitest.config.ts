@@ -1,3 +1,3 @@
-import { defineBinjariVitestConfig } from './src/vitest-config.js';
+import { defineSpareonVitestConfig } from './src/vitest-config.js';
 
-export default defineBinjariVitestConfig({ useTestDatabase: true });
+export default defineSpareonVitestConfig({ useTestDatabase: true });

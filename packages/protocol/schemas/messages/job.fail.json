@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schemas.binjari.invalid/protocol/messages/job.fail.json",
+  "$id": "https://schemas.spareon.invalid/protocol/messages/job.fail.json",
   "$ref": "../envelope.json",
   "properties": {
     "type": {

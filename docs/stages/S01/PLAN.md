@@ -56,7 +56,7 @@ BUSINESS_CONTEXT 전체, CLAUDE.md, STAGES.md, S02~S32 문서의 목표·수용 
 ## 체크포인트
 | # | 내용 | 검증 |
 |---|---|---|
-| 1 | PLAN + check-docs 확장 + 단위 테스트 + mermaid 파서 테스트 | `pnpm --filter @binjari/repo-checks test`, `node scripts/check-docs.mjs`(필수 파일 없음으로 실패하는 것 확인) |
+| 1 | PLAN + check-docs 확장 + 단위 테스트 + mermaid 파서 테스트 | `pnpm --filter @spareon/repo-checks test`, `node scripts/check-docs.mjs`(필수 파일 없음으로 실패하는 것 확인) |
 | 2 | ARCHITECTURE 1부: 맥락도, 서버·에이전트 모듈, 돈의 흐름, 데이터 보존, 시간 예산, 규모 | check-docs, mermaid 테스트 |
 | 3 | ARCHITECTURE 2부: 시퀀스 10개, 상태 기계(노드·작업·시도·홀드·수익·릴리스 + 에이전트 로컬) | 같은 검증 + 전이 주체 검사 |
 | 4 | ARCHITECTURE 3부: 자기 반박, 이견, 차수 매핑 / ADR 0002~0016 | check-docs(ADR 형식·참조) |

@@ -5,7 +5,7 @@
   "ts": "2026-10-09T04:36:00.000Z",
   "payload": {
     "manifest": {
-      "manifest": "{\"files\":[{\"bytes\":12000000,\"path\":\"binjari-agent.exe\",\"sha256\":\"f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1\",\"url\":\"https://releases.example.com/0.2.0/binjari-agent.exe\"},{\"bytes\":4000000,\"path\":\"bin/binjari-helper.exe\",\"sha256\":\"f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2\",\"url\":\"https://releases.example.com/0.2.0/binjari-helper.exe\"}],\"issuedAt\":\"2026-10-09T04:36:00.000Z\",\"platform\":\"windows-amd64\",\"schema\":\"binjari.release-manifest/1\",\"version\":\"0.2.0\"}",
+      "manifest": "{\"files\":[{\"bytes\":12000000,\"path\":\"spareon-agent.exe\",\"sha256\":\"f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1\",\"url\":\"https://releases.example.com/0.2.0/spareon-agent.exe\"},{\"bytes\":4000000,\"path\":\"bin/spareon-helper.exe\",\"sha256\":\"f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2\",\"url\":\"https://releases.example.com/0.2.0/spareon-helper.exe\"}],\"issuedAt\":\"2026-10-09T04:36:00.000Z\",\"platform\":\"windows-amd64\",\"schema\":\"spareon.release-manifest/1\",\"version\":\"0.2.0\"}",
       "signature": "997cb5a9a6060a5a99ab065ad3c56c02c360c9bfe82e21a8b33316905f5c94c0af6c70a1c902e039cb76b98b19499e4e48b4cca989305c7ff0465da0cd3cbd02",
       "keyId": "release-2026a"
     }

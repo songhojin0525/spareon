@@ -10,7 +10,7 @@
  */
 import { createHmac } from 'node:crypto';
 
-import { uuidV7 } from '@binjari/shared';
+import { uuidV7 } from '@spareon/shared';
 
 import { sha256Hex } from './bundle.js';
 import { publicKeyFromSeed } from './sign.js';
@@ -21,11 +21,11 @@ export const DEV_NODE_NAME_RE = /^[A-Za-z0-9._-]{1,64}$/;
 export const DEV_NODE_ID_EPOCH_MS = 1_767_225_600_000;
 
 const DOMAIN = {
-  nodeId: 'binjari-dev-node-id-v1',
-  nodeKey: 'binjari-dev-node-key-v1',
-  fpStore: 'binjari-dev-fp-store-v1',
-  fpGlobal: 'binjari-dev-fp-global-v1',
-  model: 'binjari-dev-model-v1',
+  nodeId: 'spareon-dev-node-id-v1',
+  nodeKey: 'spareon-dev-node-key-v1',
+  fpStore: 'spareon-dev-fp-store-v1',
+  fpGlobal: 'spareon-dev-fp-global-v1',
+  model: 'spareon-dev-model-v1',
 } as const;
 
 export class DevIdentityError extends Error {}

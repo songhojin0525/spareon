@@ -18,7 +18,7 @@
 ## 산출물
 - 서버: 에이전트 릴리스 관리(초안 → 단계적 배포 % → 일시정지 → 완료 / 롤백), 매장 대상 지정, 버전 고정
 - 릴리스 서명 도구(CLI)
-- 에이전트: `internal/update/` + `cmd/binjari-updater/`
+- 에이전트: `internal/update/` + `cmd/spareon-updater/`
 - 설치 프로그램: WiX Toolset 기반 MSI(다른 도구가 더 낫다면 ADR로 근거) — `apps/agent/installer/`
 - CI: Windows 잡에서 빌드 → MSI 생성 → 설치·서비스 시작·중지·제거 연기 시험 → 산출물 업로드
 - `docs/UPDATES.md`, `docs/INSTALL.md`(설치 담당자용 한국어), `docs/manual-tests/S21.md`
@@ -41,7 +41,7 @@
 
 ### 3. 설치 프로그램 (MSI)
 - 속성: `ENROLL_CODE`, `SERVER_URL`, `PERSIST_DIR`, `IMAGE_MODE=1`(마스터 이미지용), `CACHE_MODE=server`, `REMOVE_DATA=1`(제거 시 캐시까지 삭제).
-- 무인 설치 예: `msiexec /i binjari-agent.msi ENROLL_CODE=ABCD2345 PERSIST_DIR=D:\Binjari /qn` — INSTALL.md에 매장 유형별 예시.
+- 무인 설치 예: `msiexec /i spareon-agent.msi ENROLL_CODE=ABCD2345 PERSIST_DIR=D:\Spareon /qn` — INSTALL.md에 매장 유형별 예시.
 - 설치 내용: 서비스 등록(자동 시작, 실패 시 재시작), 헬퍼 실행 구성(S18 방식), 캐시 모드일 때만 LAN 방화벽 규칙, 시작 메뉴 없이 조용히.
 - 제거: 서비스·규칙·예약 작업 제거, 기본은 영구 데이터 보존(`REMOVE_DATA=1`이면 삭제).
 - 코드 서명: CI 비밀값(인증서)이 있으면 서명, 없으면 서명 없이 빌드하고 경고. 인증서 준비는 HUMAN_TODO(백신 오탐·SmartScreen 경고 감소 이유 설명).

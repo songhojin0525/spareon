@@ -106,7 +106,7 @@ describe('auth.prove signing bytes (S02 acceptance 4)', () => {
     const bytes = authSigningBytes(nonce, nodeId, protocolHash);
     expect(hex(bytes)).toBe(vectors.auth.bytesHex);
     expect(new TextDecoder().decode(bytes)).toBe(
-      `binjari-auth-v1\n${nonce}\n${nodeId}\n${protocolHash}`,
+      `spareon-auth-v1\n${nonce}\n${nodeId}\n${protocolHash}`,
     );
   });
 

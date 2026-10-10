@@ -7,7 +7,7 @@ v0.1이 쓸 PostgreSQL 스키마를 Drizzle(TS)로 정의하고, drizzle-kit이 
 
 ### D-a. 마이그레이션 실행기는 직접 만든다 (drizzle-kit은 생성기로만)
 - drizzle-kit `generate`로 SQL과 스냅숏(`drizzle/meta`)을 만들고, 사람이 읽을 수 있게 다듬는다. 트리거·함수는 `drizzle-kit generate --custom`으로 만든 빈 마이그레이션에 손으로 쓴다(저널 순서 유지).
-- 적용은 `apps/server/src/db/migrate.ts`: 저널 순서대로, 파일마다 한 트랜잭션, `binjari_meta.migrations`에 태그·SHA-256 체크섬 기록, 적용된 파일이 바뀌면 거부, advisory lock으로 동시 실행 방지. down은 `drizzle/down/<tag>.sql`을 역순으로.
+- 적용은 `apps/server/src/db/migrate.ts`: 저널 순서대로, 파일마다 한 트랜잭션, `spareon_meta.migrations`에 태그·SHA-256 체크섬 기록, 적용된 파일이 바뀌면 거부, advisory lock으로 동시 실행 방지. down은 `drizzle/down/<tag>.sql`을 역순으로.
 - 대안: drizzle-orm 내장 migrator. 버림: down이 없고, 적용 기록이 해시만이라 어떤 파일인지 알기 어렵다. 반박: "직접 만든 실행기는 버그 위험" → 실행기 자체를 통합 테스트(체크섬 변조 거부, 부분 실패 롤백, 동시 실행, down 순서)로 덮는다.
 
 ### D-b. 스키마 일치 검사 두 겹
@@ -45,13 +45,13 @@ v0.1이 쓸 PostgreSQL 스키마를 Drizzle(TS)로 정의하고, drizzle-kit이 
 - ID는 앱이 만든 UUIDv7. 예외: `ledger_postings`·`outbox_events`는 `bigint identity`(순서가 의미 있고 외부에 노출되지 않음).
 
 ### D-h. 테스트 키트
-- `createTestDatabaseSetup({ prepareTemplate })`: 전역 설정이 템플릿 DB를 만들고 훅(서버는 마이그레이션 적용)을 한 번 실행. `defineBinjariVitestConfig({ useTestDatabase, globalSetup })`로 패키지가 자기 설정 파일을 지정.
+- `createTestDatabaseSetup({ prepareTemplate })`: 전역 설정이 템플릿 DB를 만들고 훅(서버는 마이그레이션 적용)을 한 번 실행. `defineSpareonVitestConfig({ useTestDatabase, globalSetup })`로 패키지가 자기 설정 파일을 지정.
 - `createIsolatedDatabase({ empty: true })`: 마이그레이션 테스트용 빈 DB.
 - `FakeClock`(set·advance, 구조적으로 서버 `Clock` 호환), `createSeededRandom(seed)`(sfc32, 결정적), `dumpSchema(client)`.
 - **팩토리는 서버(`apps/server/src/testing/`)에 둔다**(명세는 testkit). 이유: 팩토리는 Drizzle 테이블 타입을 써야 스키마가 바뀔 때 컴파일 오류로 드러난다. testkit이 서버를 import하면 순환 의존(server devDep → testkit → server)이 생긴다. testkit에는 스키마를 모르는 일반 도구만 둔다. (가정으로 기록)
 
 ### D-i. DB 역할 분리 (선택 확장을 본 작업에 포함 — 검토 포인트 '다른 연결 역할'의 답)
-- 마이그레이션이 `binjari_app` 역할(NOLOGIN 그룹 역할)을 만들고 권한을 준다: 원장 추가 전용 테이블은 SELECT·INSERT만, `account_balances`는 SELECT만, 그 밖은 SELECT·INSERT·UPDATE·DELETE. DDL·TRUNCATE·TRIGGER 권한 없음, 테이블 소유자 아님 → 트리거 비활성화 불가. 운영 로그인 역할은 `binjari_app`의 멤버로 만든다(S30, 런북).
+- 마이그레이션이 `spareon_app` 역할(NOLOGIN 그룹 역할)을 만들고 권한을 준다: 원장 추가 전용 테이블은 SELECT·INSERT만, `account_balances`는 SELECT만, 그 밖은 SELECT·INSERT·UPDATE·DELETE. DDL·TRUNCATE·TRIGGER 권한 없음, 테이블 소유자 아님 → 트리거 비활성화 불가. 운영 로그인 역할은 `spareon_app`의 멤버로 만든다(S30, 런북).
 - 역할은 클러스터 전역이라 동시 생성 경합(duplicate_object)을 잡는다. down은 이 DB의 권한만 회수하고 역할은 지우지 않는다(다른 DB가 쓸 수 있음).
 
 ## 새 의존성

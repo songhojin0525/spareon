@@ -125,15 +125,15 @@ importers:
 
   apps/server:
     dependencies:
-      '@binjari/protocol':
-        specifier: workspace:*
-        version: link:../../packages/protocol
-      '@binjari/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       '@fastify/websocket':
         specifier: 'catalog:'
         version: 11.3.1
+      '@spareon/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
+      '@spareon/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.3(@types/pg@8.23.1)(pg@8.23.1)
@@ -147,7 +147,7 @@ importers:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
-      '@binjari/testkit':
+      '@spareon/testkit':
         specifier: workspace:*
         version: link:../../packages/testkit
       '@types/node':
@@ -177,7 +177,7 @@ importers:
 
   apps/web:
     devDependencies:
-      '@binjari/testkit':
+      '@spareon/testkit':
         specifier: workspace:*
         version: link:../../packages/testkit
       '@types/node':
@@ -192,14 +192,14 @@ importers:
 
   packages/protocol:
     dependencies:
-      '@binjari/shared':
+      '@spareon/shared':
         specifier: workspace:*
         version: link:../shared
       ajv:
         specifier: 'catalog:'
         version: 8.20.0
     devDependencies:
-      '@binjari/testkit':
+      '@spareon/testkit':
         specifier: workspace:*
         version: link:../testkit
       '@types/node':
@@ -220,7 +220,7 @@ importers:
 
   packages/shared:
     devDependencies:
-      '@binjari/testkit':
+      '@spareon/testkit':
         specifier: workspace:*
         version: link:../testkit
       '@types/node':
@@ -260,16 +260,16 @@ importers:
 
   tools/repo-checks:
     devDependencies:
-      '@binjari/protocol':
+      '@spareon/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
-      '@binjari/shared':
+      '@spareon/shared':
         specifier: workspace:*
         version: link:../../packages/shared
-      '@binjari/testkit':
+      '@spareon/testkit':
         specifier: workspace:*
         version: link:../../packages/testkit
-      '@binjari/web':
+      '@spareon/web':
         specifier: workspace:*
         version: link:../../apps/web
       '@types/jsdom':

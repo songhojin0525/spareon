@@ -14,7 +14,7 @@
 ## 실행하는 법 (복사해서 바로 쓰는 명령)
 ```
 node scripts/check-docs.mjs
-pnpm --filter @binjari/repo-checks test
+pnpm --filter @spareon/repo-checks test
 pnpm verify
 ```
 
@@ -22,9 +22,9 @@ pnpm verify
 | # | 기준 | 실행한 명령 | 결과 |
 |---|---|---|---|
 | 1 | 산출물 전부 존재, check-docs 통과, pnpm verify 통과 | `node scripts/check-docs.mjs` / `pnpm verify` | `check-docs: OK`(필수 문서 REQUIRED_FILES 포함) / `RESULT: PASS (9 step(s) passed)` |
-| 2 | 시퀀스 10개·상태 기계 6개, 모든 전이에 트리거 주체 | `pnpm --filter @binjari/repo-checks test` (check-docs.test.ts의 개수 테스트 + check-docs 주체·사건 규칙) | ARCHITECTURE에 sequenceDiagram 10, stateDiagram 7(노드·작업·시도·홀드·수익·릴리스 + 에이전트 로컬). 모든 전이가 `: [주체] 사건` 형식이고, 주체는 STATE_ACTORS 어휘 안에 있음 |
+| 2 | 시퀀스 10개·상태 기계 6개, 모든 전이에 트리거 주체 | `pnpm --filter @spareon/repo-checks test` (check-docs.test.ts의 개수 테스트 + check-docs 주체·사건 규칙) | ARCHITECTURE에 sequenceDiagram 10, stateDiagram 7(노드·작업·시도·홀드·수익·릴리스 + 에이전트 로컬). 모든 전이가 `: [주체] 사건` 형식이고, 주체는 STATE_ACTORS 어휘 안에 있음 |
 | 3 | 위협 표의 모든 행에 완화(차수 ID) 또는 수용 사유 | `node scripts/check-docs.mjs` (isStageCell: 차수 ID 목록만 또는 `수용: <4자 이상 사유>`) | 99행 통과, 수용 8행, ID 중복 0 |
-| 4 | mermaid 문법 검증 | `pnpm --filter @binjari/repo-checks test` (mermaid-syntax.test.ts: mermaid 11.17.2 `parse()` + jsdom) | 저장소의 mermaid 블록 23개 모두 파싱 성공. 깨진 다이어그램을 거부하는지 확인하는 테스트도 통과 |
+| 4 | mermaid 문법 검증 | `pnpm --filter @spareon/repo-checks test` (mermaid-syntax.test.ts: mermaid 11.17.2 `parse()` + jsdom) | 저장소의 mermaid 블록 23개 모두 파싱 성공. 깨진 다이어그램을 거부하는지 확인하는 테스트도 통과 |
 | 5 | 적대적 검토가 돈이 새는 경로·손님 영향 경로를 찾고 문서에 반영 | adversarial-reviewer 서브에이전트 (검토 요청에 두 관점을 명시) | 높음 8, 중간 16, 낮음 6. 전부 고침(아래 표) |
 
 ## 적대적 검토 결과
@@ -58,7 +58,7 @@ pnpm verify
 | 낮음 | T10 근거 문구 불일치 | 고침: '1회 놓침 허용' |
 | 낮음 | ADR 0002 초당 완료 1,000 vs ARCHITECTURE 500 | 고침: 500으로 통일(실행 중 50% 가정 명시) |
 | 낮음 | GPU 간 일치율 실측을 S13으로 표기(S13은 실기 불가) | 고침: S19 실기로(ADR 0007, 11절) |
-| 낮음 | ADR 0010이 D10과 불일치, `x-binjari-trusted-only`의 담당 차수 없음 | 고침: D10 반영, 신뢰 노드 전용은 v0.1 비목표(MVP·ADR 0010) |
+| 낮음 | ADR 0010이 D10과 불일치, `x-spareon-trusted-only`의 담당 차수 없음 | 고침: D10 반영, 신뢰 노드 전용은 v0.1 비목표(MVP·ADR 0010) |
 | 낮음 | HUMAN_TODO의 `scripts\board-web.cmd`에 백스페이스 문자 | 고침 |
 
 ## 가정 (사람이 나중에 확인할 것)

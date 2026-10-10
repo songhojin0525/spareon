@@ -11,7 +11,7 @@ describe('parseEnv', () => {
       HOST: '127.0.0.1',
       PORT: 8080,
       NODE_ENV: 'production',
-      DB_ROLE: 'binjari_app',
+      DB_ROLE: 'spareon_app',
       DATA_ENCRYPTION_KEY_ID: 'k1',
     });
   });
@@ -24,7 +24,7 @@ describe('parseEnv', () => {
   });
 
   it('accepts only the least-privilege database role', () => {
-    expect(parseEnv({ DB_ROLE: 'binjari_app' }).DB_ROLE).toBe('binjari_app');
+    expect(parseEnv({ DB_ROLE: 'spareon_app' }).DB_ROLE).toBe('spareon_app');
     expect(() => parseEnv({ DB_ROLE: 'postgres' })).toThrow(ConfigError);
   });
 

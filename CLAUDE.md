@@ -1,6 +1,6 @@
-# binjari(빈자리) — Claude Code 작업 규칙
+# spareon — Claude Code 작업 규칙
 
-> `binjari`는 가칭 코드네임이다. 이 파일은 모든 세션이 자동으로 읽는다. 짧게 유지하고, 세부 내용은 링크된 문서를 필요한 만큼만 읽는다.
+> 프로젝트 이름은 `spareon`(한국어 문서·화면에서도 Spareon)이다. 옛 코드네임 `binjari`에서 2026-10-10에 바꿨다(ADR 0020). 이 파일은 모든 세션이 자동으로 읽는다. 짧게 유지하고, 세부 내용은 링크된 문서를 필요한 만큼만 읽는다.
 
 ## 무엇을 만드는가
 PC방에서 손님이 없는 PC의 GPU로 오픈소스 AI 모델 추론을 처리하고, 그 대가로 매장(PC방)에 **크레딧**을 적립해 주는 플랫폼이다. 구매자는 크레딧으로 오픈소스 모델과 외부 모델(Claude Opus·Sonnet·Haiku 등)을 쓴다. 장기 비전은 크레딧이 여러 AI 모델로 환전되는 "컴퓨팅 본위 화폐"가 되는 것이다.
@@ -44,7 +44,7 @@ PC방에서 손님이 없는 PC의 GPU로 오픈소스 AI 모델 추론을 처�
 ```
 apps/server       Fastify 서버
 apps/web          Next.js 웹 (사장님 /owner · 구매자 /app · 운영자 /ops)
-apps/agent        Go 에이전트 (cmd/binjari-agent, cmd/binjari-helper, cmd/binjari-updater, cmd/nodesim)
+apps/agent        Go 에이전트 (cmd/spareon-agent, cmd/spareon-helper, cmd/spareon-updater, cmd/nodesim)
 packages/protocol JSON Schema + TS 타입 + fixtures
 packages/shared   돈·ID·시간 유틸
 packages/testkit  테스트 DB, 가짜 에이전트, 가상 시계
@@ -52,7 +52,7 @@ tools/econ-sim    경제 시뮬레이터
 tools/loadgen     구매자 부하 생성기
 deploy/  docs/  prompts/  scripts/
 ```
-패키지 이름은 `@binjari/<폴더명>`. Go 모듈은 `binjari/agent`.
+패키지 이름은 `@spareon/<폴더명>`. Go 모듈은 `spareon/agent`.
 
 ## 명령
 - `pnpm verify` — 전체 게이트: 포맷 검사, 린트, 타입체크, TS 테스트, (Go가 있으면) `gofmt`·`go vet`·`go test`·Windows 교차 빌드. 모든 차수의 기본 수용 기준.

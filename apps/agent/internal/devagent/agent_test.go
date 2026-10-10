@@ -16,9 +16,9 @@ import (
 
 	"github.com/coder/websocket"
 
-	"binjari/agent/internal/devauth"
-	"binjari/agent/internal/protocol"
-	"binjari/agent/internal/runtime"
+	"spareon/agent/internal/devauth"
+	"spareon/agent/internal/protocol"
+	"spareon/agent/internal/runtime"
 )
 
 const secret = "test-agent-secret-0123456789abcdef"

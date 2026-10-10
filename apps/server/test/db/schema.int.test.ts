@@ -57,7 +57,7 @@ describe('migrated schema (template database)', () => {
   it('records the applied migrations', async () => {
     const rows = await db.withClient(
       async (c) =>
-        (await c.query<{ tag: string }>('SELECT tag FROM binjari_meta.migrations ORDER BY idx'))
+        (await c.query<{ tag: string }>('SELECT tag FROM spareon_meta.migrations ORDER BY idx'))
           .rows,
     );
     expect(rows.map((r) => r.tag)).toEqual([

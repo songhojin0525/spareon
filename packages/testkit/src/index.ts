@@ -37,9 +37,9 @@ export type { SeededRandom } from './random.js';
 export { createSeededRandom } from './random.js';
 export type { DumpSchemaOptions } from './schema-dump.js';
 export { dumpSchema } from './schema-dump.js';
-export type { BinjariVitestOptions } from './vitest-config.js';
+export type { SpareonVitestOptions } from './vitest-config.js';
 export {
-  defineBinjariVitestConfig,
+  defineSpareonVitestConfig,
   INTEGRATION_TEST_PATTERN,
   isQuickMode,
   QUICK_ENV,

@@ -9,7 +9,7 @@ import { z } from 'zod';
 /**
  * Migration runner (ADR 0018). drizzle-kit only generates SQL; this applies it.
  * - Order and tags come from drizzle/meta/_journal.json (what `drizzle-kit generate` maintains).
- * - Each migration runs in its own transaction and is recorded in binjari_meta.migrations with the
+ * - Each migration runs in its own transaction and is recorded in spareon_meta.migrations with the
  *   SHA-256 of its file. A recorded migration whose file changed is refused (no silent drift).
  * - Down files live in drizzle/down/<tag>.sql and are applied in reverse order by rollback().
  * - A session advisory lock serializes concurrent runners (two server instances starting at once).
@@ -150,22 +150,22 @@ async function withMigrationLock<T>(
   const migrations = await loadMigrations(options.dir);
   const client = new pg.Client({
     connectionString: options.url,
-    application_name: 'binjari-migrate',
+    application_name: 'spareon-migrate',
   });
   await client.connect();
   try {
     await acquireRunnerLock(client, runnerWaitMs);
     try {
       await client.query(`SET lock_timeout = ${String(lockTimeoutMs)}`);
-      await client.query('CREATE SCHEMA IF NOT EXISTS binjari_meta');
-      await client.query(`CREATE TABLE IF NOT EXISTS binjari_meta.migrations (
+      await client.query('CREATE SCHEMA IF NOT EXISTS spareon_meta');
+      await client.query(`CREATE TABLE IF NOT EXISTS spareon_meta.migrations (
         idx integer PRIMARY KEY,
         tag text NOT NULL UNIQUE,
         checksum text NOT NULL,
         applied_at timestamptz NOT NULL DEFAULT now()
       )`);
       const res = await client.query<AppliedRow>(
-        'SELECT idx, tag, checksum FROM binjari_meta.migrations ORDER BY idx',
+        'SELECT idx, tag, checksum FROM spareon_meta.migrations ORDER BY idx',
       );
       verifyApplied(res.rows, migrations);
       return await fn(client, res.rows, migrations);
@@ -231,7 +231,7 @@ export async function migrate(options: MigrationRunOptions): Promise<{ applied: 
       await inTransaction(client, m.tag, async () => {
         await client.query(m.up);
         await client.query(
-          'INSERT INTO binjari_meta.migrations (idx, tag, checksum) VALUES ($1, $2, $3)',
+          'INSERT INTO spareon_meta.migrations (idx, tag, checksum) VALUES ($1, $2, $3)',
           [m.idx, m.tag, m.checksum],
         );
       });
@@ -269,7 +269,7 @@ export async function rollback(options: RollbackOptions): Promise<{ rolledBack: 
       options.log?.(`rolling back ${m.tag}`);
       await inTransaction(client, m.tag, async () => {
         await client.query(m.down ?? '');
-        await client.query('DELETE FROM binjari_meta.migrations WHERE idx = $1', [m.idx]);
+        await client.query('DELETE FROM spareon_meta.migrations WHERE idx = $1', [m.idx]);
       });
       rolledBack.push(m.tag);
     }
@@ -289,19 +289,19 @@ export async function migrationStatus(
   const migrations = await loadMigrations(options.dir);
   const client = new pg.Client({
     connectionString: options.url,
-    application_name: 'binjari-migrate-status',
+    application_name: 'spareon-migrate-status',
   });
   await client.connect();
   try {
     const exists = await client.query<{ t: string | null }>(
-      "SELECT to_regclass('binjari_meta.migrations')::text AS t",
+      "SELECT to_regclass('spareon_meta.migrations')::text AS t",
     );
     const done =
       exists.rows[0]?.t == null
         ? []
         : (
             await client.query<AppliedRow>(
-              'SELECT idx, tag, checksum FROM binjari_meta.migrations ORDER BY idx',
+              'SELECT idx, tag, checksum FROM spareon_meta.migrations ORDER BY idx',
             )
           ).rows;
     verifyApplied(done, migrations);

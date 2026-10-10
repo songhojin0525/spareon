@@ -1,4 +1,4 @@
-module binjari/agent
+module spareon/agent
 
 go 1.27.0
 

@@ -6,7 +6,7 @@
 
 ## 한 일 (5줄 이내, 사람이 30초 안에 읽을 수 있게)
 - v0.1 전체 테이블 36개를 Drizzle 스키마와 검토한 SQL 마이그레이션 4개로 만들었다: 0000 테이블, 0001 불변식 트리거, 0002 앱 역할, 0003 검토 반영. 실수 열과 타임존 없는 시각 열은 없다. 구매자 콘텐츠는 암호문 열에만 둔다.
-- 돈·감사 불변식을 DB가 직접 강제한다: 통화별 합 0(커밋 시점), 잔액은 기입에서만 바뀜, 음수 금지, 원장·감사·가격·환율은 추가만 가능, 돈 기록(홀드·수익·정산 기록) 보호. 서버는 최소 권한 역할 `binjari_app`으로 접속하므로 트리거를 끌 수 없다.
+- 돈·감사 불변식을 DB가 직접 강제한다: 통화별 합 0(커밋 시점), 잔액은 기입에서만 바뀜, 음수 금지, 원장·감사·가격·환율은 추가만 가능, 돈 기록(홀드·수익·정산 기록) 보호. 서버는 최소 권한 역할 `spareon_app`으로 접속하므로 트리거를 끌 수 없다.
 - 실행기를 직접 만들었다(up/down, 체크섬, 잠금 대기 상한, 읽기 전용 status). up → down → up 스키마가 같고, TS 스키마와 어긋나지 않는지도 테스트한다.
 - 테스트 키트(템플릿 DB 복제·빈 DB·FakeClock·시드 난수), 팩토리, 로컬 전용 시드, 일시적 충돌을 재시도하는 DB 클라이언트(40001·40P01 실제 유도 테스트)를 만들었다.
 - 문서: `docs/DB.md`(ERD·불변식 → 강제 위치 표), ADR 0018. CI에 Postgres 16 서비스 잡(`DATABASE_URL` 경로)을 추가했다.
@@ -14,8 +14,8 @@
 ## 실행하는 법 (복사해서 바로 쓰는 명령)
 ```
 pnpm verify                                             # 전체 게이트
-pnpm --filter @binjari/server test                      # 서버 DB 테스트(embedded-postgres 자동)
-DATABASE_URL=postgres://user:pw@127.0.0.1:5432/postgres pnpm --filter @binjari/server test   # 실제 서버 경로
+pnpm --filter @spareon/server test                      # 서버 DB 테스트(embedded-postgres 자동)
+DATABASE_URL=postgres://user:pw@127.0.0.1:5432/postgres pnpm --filter @spareon/server test   # 실제 서버 경로
 cd apps/server
 DATABASE_URL=... pnpm db:migrate        # 적용
 DATABASE_URL=... pnpm db:status         # 적용/대기 목록(읽기 전용)
@@ -27,7 +27,7 @@ pnpm db:generate                        # TS 스키마 → 새 마이그레이�
 ## 수용 기준 결과
 | # | 기준 | 실행한 명령 | 결과 |
 |---|---|---|---|
-| 1 | `pnpm verify` 통과. embedded-postgres와 `DATABASE_URL` 양쪽에서 마이그레이션 적용 | `pnpm verify`. embedded-postgres를 별도 서버로 띄우고 `DATABASE_URL=<그 URL> pnpm --filter @binjari/server test`, 같은 URL로 `db:migrate`·`db:status`·`db:seed`(두 번)·`db:rollback --yes --all` 실행 | PASS(9단계, 지휘자가 마무리 전에 다시 실행해 확인). embedded 경로는 전역 설정 템플릿과 `migrate.int.test.ts`에서 확인. `DATABASE_URL` 경로는 그 시점 10개 파일 73개 테스트 통과(검토자가 0003 뒤 다시 돌려 79개 통과). CLI 모두 정상. CI `postgres` 잡(postgres:16 서비스)은 다음 push 때 확인 |
+| 1 | `pnpm verify` 통과. embedded-postgres와 `DATABASE_URL` 양쪽에서 마이그레이션 적용 | `pnpm verify`. embedded-postgres를 별도 서버로 띄우고 `DATABASE_URL=<그 URL> pnpm --filter @spareon/server test`, 같은 URL로 `db:migrate`·`db:status`·`db:seed`(두 번)·`db:rollback --yes --all` 실행 | PASS(9단계, 지휘자가 마무리 전에 다시 실행해 확인). embedded 경로는 전역 설정 템플릿과 `migrate.int.test.ts`에서 확인. `DATABASE_URL` 경로는 그 시점 10개 파일 73개 테스트 통과(검토자가 0003 뒤 다시 돌려 79개 통과). CLI 모두 정상. CI `postgres` 잡(postgres:16 서비스)은 다음 push 때 확인 |
 | 2 | 제약 테스트: 합 ≠ 0 커밋 실패, `audit_log` UPDATE 실패, 비허용 계정 음수 실패, 중복 멱등 키 실패 | `test/db/invariants.int.test.ts` | PASS. BJ001이 COMMIT에서 남, `audit_log` 등 7개 표의 UPDATE·DELETE·TRUNCATE가 BJ002(replica 모드에서도), 음수는 23514, 원장·HTTP 멱등 키 중복은 23505 |
 | 3 | up → down → up 뒤 스키마가 같다(덤프 비교) | `test/db/migrate.int.test.ts` | PASS. 카탈로그 덤프(표·열·제약·인덱스·트리거·함수·권한)가 문자 단위로 같다. 1~4단계 부분 down → up도 같다. down 뒤 public 객체 0개 |
 | 4 | `docs/DB.md`에 ERD와 불변식 표 | `node scripts/check-docs.mjs`, `tools/repo-checks` mermaid 구문 테스트 | PASS. erDiagram과 불변식 표(M1~M11, A1~A4, Q1, C1 → 강제 위치·구현·테스트) |
@@ -36,13 +36,13 @@ pnpm db:generate                        # TS 스키마 → 새 마이그레이�
 1차(높음 1, 중간 6, 낮음 7)와 2차(0003 검증, 중간 1).
 | 심각도 | 지적 | 조치(고침 / 안 고친 이유) |
 |---|---|---|
-| 높음 | 앱 역할이 M1을 깰 수 있음: 합 0 기입 → `SET CONSTRAINTS IMMEDIATE` → `OVERRIDING SYSTEM VALUE`로 id=-1인 +1,000,000 기입 → 커밋 성공. 거래별 합 검사가 최대 id 기입에서만 돌았기 때문 | 고침(0003). 기입은 그 거래 안에서 id가 커지는 순서로만 붙도록 BEFORE 트리거가 강제한다(BJ001). 슈퍼유저 재현과 `binjari_app` 재현 모두 회귀 테스트로 막힘 확인 |
+| 높음 | 앱 역할이 M1을 깰 수 있음: 합 0 기입 → `SET CONSTRAINTS IMMEDIATE` → `OVERRIDING SYSTEM VALUE`로 id=-1인 +1,000,000 기입 → 커밋 성공. 거래별 합 검사가 최대 id 기입에서만 돌았기 때문 | 고침(0003). 기입은 그 거래 안에서 id가 커지는 순서로만 붙도록 BEFORE 트리거가 강제한다(BJ001). 슈퍼유저 재현과 `spareon_app` 재현 모두 회귀 테스트로 막힘 확인 |
 | 중간 | M1-b 경합 우회: 아직 커밋 안 된 남의 거래에 기입을 넣으면 BEFORE 트리거가 거래 행을 못 찾아 통과 | 고침(0003). 거래 행이 보이지 않아도 BJ004로 거부. 두 연결로 회귀 테스트 |
 | 중간 | M10이 UPDATE 때만 검사됨. INSERT로 바로 정산 연결되거나 다른 매장 정산 기록에 연결 가능 | 고침(0003). 홀드·수익·정산 기록은 INSERT 때 초기 상태만 허용(BJ005). 복합 FK `(node_id, store_id)`, `(attempt_id, job_id, node_id)`, `(payout_record_id, store_id)` 추가. 회귀 테스트 |
 | 중간 | 문서가 실제보다 강하게 주장함(탈취된 앱 연결로 돈을 만들 수 없다는 취지). 음수 허용 계정에서 합 0 거래로 CR 발행이 가능 | 고침(문서). DB.md 4절과 ADR 0018에 "M9는 DB가 아니라 S06(거래 종류별 허용 계정)과 대사·감사가 막는다"를 명시. 우회 3건을 막은 사실도 기록 |
 | 중간 | DB.md는 `CONCURRENTLY`를 권하는데 실행기는 파일마다 트랜잭션이라 쓸 수 없음 | 문서를 고침. 실행기 제약을 적고, 큰 테이블 변경은 런북 절차(운영자가 CONCURRENTLY로 먼저 만들고 `USING INDEX`·`NOT VALID`+`VALIDATE`로 나눔, S30)로 안내. 파일럿 전에는 표가 비어 해당 없음 |
 | 중간 | 큐 인덱스에 `model_id`가 없고, EXPLAIN 테스트가 seqscan을 끈 채 다른 쿼리를 봄(동어반복) | 고침(0003). `jobs_queue_model_idx(model_id, priority DESC, created_at, id) WHERE status='queued'` 추가. 테스트는 통계를 갖춘 약 2만 3천 행에서 실제 claim 쿼리의 플랜이 이 인덱스를 고르는지 확인 |
-| 중간(2차) | 0003 첫 판의 열 단위 INSERT 권한 때문에 Drizzle 기입 INSERT(`"id" ... VALUES (default, ...)`)가 `binjari_app`에서 42501로 실패 | 고침. 표 단위 INSERT 권한으로 되돌림(id 순서 트리거만으로 M1 우회가 막힘). `binjari_app`으로 Drizzle 원장 기입이 성공하는 회귀 테스트와, 골라 넣은 id 공격이 BJ001로 막히는 테스트 추가 |
+| 중간(2차) | 0003 첫 판의 열 단위 INSERT 권한 때문에 Drizzle 기입 INSERT(`"id" ... VALUES (default, ...)`)가 `spareon_app`에서 42501로 실패 | 고침. 표 단위 INSERT 권한으로 되돌림(id 순서 트리거만으로 M1 우회가 막힘). `spareon_app`으로 Drizzle 원장 기입이 성공하는 회귀 테스트와, 골라 넣은 id 공격이 BJ001로 막히는 테스트 추가 |
 | 낮음 | 실행기 advisory lock 대기에 상한이 없음 | 고침. `pg_try_advisory_lock` 폴링, 상한 기본 120초. 테스트 |
 | 낮음 | unlock 실패가 원래 오류를 덮음 | 고침. unlock·연결 종료 오류는 무시 |
 | 낮음 | down 파일 체크섬 없음, `db:status`가 DDL 실행 | status는 고침(읽기 전용, 잠금 없음, 테스트). down 체크섬은 안 고침: down은 개발·사고 대응용이고 운영 되돌리기는 새 up으로 한다(DB.md 6절) |
@@ -76,8 +76,8 @@ pnpm db:generate                        # TS 스키마 → 새 마이그레이�
 ## 다음 차수에 미치는 영향
 - S06: 잔액은 기입 트리거가 갱신하므로 원장 서비스는 기입만 쓴다. 잠금 순서는 계정 ID 순 `FOR UPDATE`. 한 거래의 기입은 같은 DB 트랜잭션에서 id 순서대로 넣는다(Drizzle 기본 동작). M9(발행 경로)와 M4·M11 대사는 S06 몫. 거래 종류 CHECK 목록은 S06이 확정한다.
 - S05·S12·S13·S15·S16: 테이블과 상태 이름은 ARCHITECTURE 5절과 일치한다. 구매자 콘텐츠는 `job_payloads`·`batch_files` 암호문 열에만 둔다. 이름에 콘텐츠를 암시하는 열을 새로 만들면 `schema.int.test.ts`가 실패한다.
-- 새 테이블을 만드는 차수: 그 마이그레이션에서 `binjari_app` 권한을 정해야 한다(`roles.int.test.ts`가 강제). down 파일도 함께 쓴다.
-- S30: 서버는 `binjari_app` 멤버인 로그인 역할로 접속하고, 마이그레이션은 소유자 계정으로 돌린다(런북). 운영 DB의 `CREATEROLE`을 확인해야 한다.
+- 새 테이블을 만드는 차수: 그 마이그레이션에서 `spareon_app` 권한을 정해야 한다(`roles.int.test.ts`가 강제). down 파일도 함께 쓴다.
+- S30: 서버는 `spareon_app` 멤버인 로그인 역할로 접속하고, 마이그레이션은 소유자 계정으로 돌린다(런북). 운영 DB의 `CREATEROLE`을 확인해야 한다.
 - 테스트: 서버 통합 테스트는 `openTestDb()`(템플릿 복제), 마이그레이션 테스트는 `openTestDb({ empty: true })`, 데이터는 `createFactories({ db, clock: FakeClock, random: createSeededRandom })`로 만든다.
 - S04·S09·S10·S12·S13·S17~S22: S03 진행 중에 사람의 결정으로 ADR 0019(AMD GPU를 Vulkan 시험 노드로 지원)가 추가됐다. 차수 문서의 'NVIDIA 전용' 문구보다 ADR 0019가 우선한다. DB에는 아직 반영할 열이 없다(노드 GPU 요약은 `nodes.gpu_summary` jsonb). 백엔드별 배정·검증 조건은 S09·S12·S13이 정한다.
 

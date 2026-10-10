@@ -261,7 +261,7 @@ export async function runAll(opts, ctx) {
       ctx.pnpm !== undefined
         ? ctx.pnpm
         : resolvePnpm({ env: ctx.env, platform: process.platform, execPath: process.execPath });
-    const testEnv = opts.quick ? { BINJARI_TEST_QUICK: '1' } : { BINJARI_TEST_QUICK: '0' };
+    const testEnv = opts.quick ? { SPAREON_TEST_QUICK: '1' } : { SPAREON_TEST_QUICK: '0' };
     /** @type {Array<[string, CommandSpec[]]>} */
     const tsSteps = [
       [

@@ -22,7 +22,7 @@
     "timeLimitMs": 600000,
     "leaseTtlMs": 15000,
     "inputRef": {
-      "url": "http://api.binjari.example/v1/i/x",
+      "url": "http://api.spareon.example/v1/i/x",
       "token": "abcdefghijklmnop",
       "sha256": "d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4",
       "bytes": 1

@@ -13,7 +13,7 @@
 -- Append-only tables: ledger_accounts, ledger_transactions, ledger_postings, audit_log,
 -- price_versions, price_entries, fx_rates
 -- ===================================================================================
-CREATE FUNCTION binjari_reject_change() RETURNS trigger
+CREATE FUNCTION spareon_reject_change() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
   RAISE EXCEPTION '% is append-only: % is not allowed', TG_TABLE_NAME, TG_OP
@@ -22,33 +22,33 @@ END
 $$;
 --> statement-breakpoint
 CREATE TRIGGER ledger_accounts_append_only BEFORE UPDATE OR DELETE ON ledger_accounts
-  FOR EACH ROW EXECUTE FUNCTION binjari_reject_change();
+  FOR EACH ROW EXECUTE FUNCTION spareon_reject_change();
 CREATE TRIGGER ledger_accounts_no_truncate BEFORE TRUNCATE ON ledger_accounts
-  FOR EACH STATEMENT EXECUTE FUNCTION binjari_reject_change();
+  FOR EACH STATEMENT EXECUTE FUNCTION spareon_reject_change();
 CREATE TRIGGER ledger_transactions_append_only BEFORE UPDATE OR DELETE ON ledger_transactions
-  FOR EACH ROW EXECUTE FUNCTION binjari_reject_change();
+  FOR EACH ROW EXECUTE FUNCTION spareon_reject_change();
 CREATE TRIGGER ledger_transactions_no_truncate BEFORE TRUNCATE ON ledger_transactions
-  FOR EACH STATEMENT EXECUTE FUNCTION binjari_reject_change();
+  FOR EACH STATEMENT EXECUTE FUNCTION spareon_reject_change();
 CREATE TRIGGER ledger_postings_append_only BEFORE UPDATE OR DELETE ON ledger_postings
-  FOR EACH ROW EXECUTE FUNCTION binjari_reject_change();
+  FOR EACH ROW EXECUTE FUNCTION spareon_reject_change();
 CREATE TRIGGER ledger_postings_no_truncate BEFORE TRUNCATE ON ledger_postings
-  FOR EACH STATEMENT EXECUTE FUNCTION binjari_reject_change();
+  FOR EACH STATEMENT EXECUTE FUNCTION spareon_reject_change();
 CREATE TRIGGER audit_log_append_only BEFORE UPDATE OR DELETE ON audit_log
-  FOR EACH ROW EXECUTE FUNCTION binjari_reject_change();
+  FOR EACH ROW EXECUTE FUNCTION spareon_reject_change();
 CREATE TRIGGER audit_log_no_truncate BEFORE TRUNCATE ON audit_log
-  FOR EACH STATEMENT EXECUTE FUNCTION binjari_reject_change();
+  FOR EACH STATEMENT EXECUTE FUNCTION spareon_reject_change();
 CREATE TRIGGER price_versions_append_only BEFORE UPDATE OR DELETE ON price_versions
-  FOR EACH ROW EXECUTE FUNCTION binjari_reject_change();
+  FOR EACH ROW EXECUTE FUNCTION spareon_reject_change();
 CREATE TRIGGER price_versions_no_truncate BEFORE TRUNCATE ON price_versions
-  FOR EACH STATEMENT EXECUTE FUNCTION binjari_reject_change();
+  FOR EACH STATEMENT EXECUTE FUNCTION spareon_reject_change();
 CREATE TRIGGER price_entries_append_only BEFORE UPDATE OR DELETE ON price_entries
-  FOR EACH ROW EXECUTE FUNCTION binjari_reject_change();
+  FOR EACH ROW EXECUTE FUNCTION spareon_reject_change();
 CREATE TRIGGER price_entries_no_truncate BEFORE TRUNCATE ON price_entries
-  FOR EACH STATEMENT EXECUTE FUNCTION binjari_reject_change();
+  FOR EACH STATEMENT EXECUTE FUNCTION spareon_reject_change();
 CREATE TRIGGER fx_rates_append_only BEFORE UPDATE OR DELETE ON fx_rates
-  FOR EACH ROW EXECUTE FUNCTION binjari_reject_change();
+  FOR EACH ROW EXECUTE FUNCTION spareon_reject_change();
 CREATE TRIGGER fx_rates_no_truncate BEFORE TRUNCATE ON fx_rates
-  FOR EACH STATEMENT EXECUTE FUNCTION binjari_reject_change();
+  FOR EACH STATEMENT EXECUTE FUNCTION spareon_reject_change();
 --> statement-breakpoint
 
 -- ===================================================================================
@@ -56,7 +56,7 @@ CREATE TRIGGER fx_rates_no_truncate BEFORE TRUNCATE ON fx_rates
 -- only from that same DB transaction (no balanced pair slipped into an old, committed entry).
 -- pg_current_xact_id() is the top-level id, so savepoints (nested transactions) still match.
 -- ===================================================================================
-CREATE FUNCTION binjari_ledger_tx_stamp() RETURNS trigger
+CREATE FUNCTION spareon_ledger_tx_stamp() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
   NEW.created_xid := pg_current_xact_id();
@@ -65,9 +65,9 @@ END
 $$;
 --> statement-breakpoint
 CREATE TRIGGER ledger_transactions_stamp BEFORE INSERT ON ledger_transactions
-  FOR EACH ROW EXECUTE FUNCTION binjari_ledger_tx_stamp();
+  FOR EACH ROW EXECUTE FUNCTION spareon_ledger_tx_stamp();
 --> statement-breakpoint
-CREATE FUNCTION binjari_ledger_posting_same_xact() RETURNS trigger
+CREATE FUNCTION spareon_ledger_posting_same_xact() RETURNS trigger
 LANGUAGE plpgsql AS $$
 DECLARE
   tx_xid xid8;
@@ -83,7 +83,7 @@ END
 $$;
 --> statement-breakpoint
 CREATE TRIGGER ledger_postings_same_xact BEFORE INSERT ON ledger_postings
-  FOR EACH ROW EXECUTE FUNCTION binjari_ledger_posting_same_xact();
+  FOR EACH ROW EXECUTE FUNCTION spareon_ledger_posting_same_xact();
 --> statement-breakpoint
 
 -- ===================================================================================
@@ -92,7 +92,7 @@ CREATE TRIGGER ledger_postings_same_xact BEFORE INSERT ON ledger_postings
 -- posting (catches postings added after SET CONSTRAINTS ... IMMEDIATE already checked the sum).
 -- The per-posting check only runs on the transaction's last posting, so k postings cost O(k), not O(k^2).
 -- ===================================================================================
-CREATE FUNCTION binjari_assert_tx_balanced(p_tx uuid) RETURNS void
+CREATE FUNCTION spareon_assert_tx_balanced(p_tx uuid) RETURNS void
 LANGUAGE plpgsql AS $$
 DECLARE
   bad record;
@@ -115,25 +115,25 @@ BEGIN
 END
 $$;
 --> statement-breakpoint
-CREATE FUNCTION binjari_ledger_tx_balanced() RETURNS trigger
+CREATE FUNCTION spareon_ledger_tx_balanced() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
-  PERFORM binjari_assert_tx_balanced(NEW.id);
+  PERFORM spareon_assert_tx_balanced(NEW.id);
   RETURN NULL;
 END
 $$;
 --> statement-breakpoint
 CREATE CONSTRAINT TRIGGER ledger_tx_balanced AFTER INSERT ON ledger_transactions
   DEFERRABLE INITIALLY DEFERRED
-  FOR EACH ROW EXECUTE FUNCTION binjari_ledger_tx_balanced();
+  FOR EACH ROW EXECUTE FUNCTION spareon_ledger_tx_balanced();
 --> statement-breakpoint
-CREATE FUNCTION binjari_ledger_postings_balanced() RETURNS trigger
+CREATE FUNCTION spareon_ledger_postings_balanced() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
   -- Identity ids grow within a DB transaction, and postings only come from the creating transaction,
   -- so the max id is the last posting; all pending checks fire together, so one full sum suffices.
   IF NEW.id = (SELECT max(id) FROM public.ledger_postings WHERE tx_id = NEW.tx_id) THEN
-    PERFORM binjari_assert_tx_balanced(NEW.tx_id);
+    PERFORM spareon_assert_tx_balanced(NEW.tx_id);
   END IF;
   RETURN NULL;
 END
@@ -141,7 +141,7 @@ $$;
 --> statement-breakpoint
 CREATE CONSTRAINT TRIGGER ledger_postings_balanced AFTER INSERT ON ledger_postings
   DEFERRABLE INITIALLY DEFERRED
-  FOR EACH ROW EXECUTE FUNCTION binjari_ledger_postings_balanced();
+  FOR EACH ROW EXECUTE FUNCTION spareon_ledger_postings_balanced();
 --> statement-breakpoint
 
 -- ===================================================================================
@@ -149,7 +149,7 @@ CREATE CONSTRAINT TRIGGER ledger_postings_balanced AFTER INSERT ON ledger_postin
 -- SECURITY DEFINER: the app role has no write privilege on account_balances (0002), the trigger does.
 -- The sign rule is the CHECK account_balances_non_negative_check, evaluated on this UPDATE.
 -- ===================================================================================
-CREATE FUNCTION binjari_ledger_account_open() RETURNS trigger
+CREATE FUNCTION spareon_ledger_account_open() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $$
 BEGIN
   INSERT INTO public.account_balances (account_id, currency, allow_negative, balance, version)
@@ -159,9 +159,9 @@ END
 $$;
 --> statement-breakpoint
 CREATE TRIGGER ledger_accounts_open AFTER INSERT ON ledger_accounts
-  FOR EACH ROW EXECUTE FUNCTION binjari_ledger_account_open();
+  FOR EACH ROW EXECUTE FUNCTION spareon_ledger_account_open();
 --> statement-breakpoint
-CREATE FUNCTION binjari_ledger_apply_posting() RETURNS trigger
+CREATE FUNCTION spareon_ledger_apply_posting() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $$
 BEGIN
   UPDATE public.account_balances
@@ -177,9 +177,9 @@ END
 $$;
 --> statement-breakpoint
 CREATE TRIGGER ledger_postings_apply AFTER INSERT ON ledger_postings
-  FOR EACH ROW EXECUTE FUNCTION binjari_ledger_apply_posting();
+  FOR EACH ROW EXECUTE FUNCTION spareon_ledger_apply_posting();
 --> statement-breakpoint
-CREATE FUNCTION binjari_account_balances_guard() RETURNS trigger
+CREATE FUNCTION spareon_account_balances_guard() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
   -- Depth 1 = a statement run directly by a client; the ledger triggers above run at depth 2.
@@ -197,15 +197,15 @@ END
 $$;
 --> statement-breakpoint
 CREATE TRIGGER account_balances_guard BEFORE INSERT OR UPDATE OR DELETE ON account_balances
-  FOR EACH ROW EXECUTE FUNCTION binjari_account_balances_guard();
+  FOR EACH ROW EXECUTE FUNCTION spareon_account_balances_guard();
 CREATE TRIGGER account_balances_no_truncate BEFORE TRUNCATE ON account_balances
-  FOR EACH STATEMENT EXECUTE FUNCTION binjari_reject_change();
+  FOR EACH STATEMENT EXECUTE FUNCTION spareon_reject_change();
 --> statement-breakpoint
 
 -- ===================================================================================
 -- Money records that change state but must never lose history (M5, M6, M10).
 -- ===================================================================================
-CREATE FUNCTION binjari_holds_guard() RETURNS trigger
+CREATE FUNCTION spareon_holds_guard() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
   IF TG_OP = 'DELETE' THEN
@@ -227,11 +227,11 @@ END
 $$;
 --> statement-breakpoint
 CREATE TRIGGER holds_guard BEFORE UPDATE OR DELETE ON holds
-  FOR EACH ROW EXECUTE FUNCTION binjari_holds_guard();
+  FOR EACH ROW EXECUTE FUNCTION spareon_holds_guard();
 CREATE TRIGGER holds_no_truncate BEFORE TRUNCATE ON holds
-  FOR EACH STATEMENT EXECUTE FUNCTION binjari_reject_change();
+  FOR EACH STATEMENT EXECUTE FUNCTION spareon_reject_change();
 --> statement-breakpoint
-CREATE FUNCTION binjari_earnings_guard() RETURNS trigger
+CREATE FUNCTION spareon_earnings_guard() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
   IF TG_OP = 'DELETE' THEN
@@ -260,11 +260,11 @@ END
 $$;
 --> statement-breakpoint
 CREATE TRIGGER earnings_guard BEFORE UPDATE OR DELETE ON earnings
-  FOR EACH ROW EXECUTE FUNCTION binjari_earnings_guard();
+  FOR EACH ROW EXECUTE FUNCTION spareon_earnings_guard();
 CREATE TRIGGER earnings_no_truncate BEFORE TRUNCATE ON earnings
-  FOR EACH STATEMENT EXECUTE FUNCTION binjari_reject_change();
+  FOR EACH STATEMENT EXECUTE FUNCTION spareon_reject_change();
 --> statement-breakpoint
-CREATE FUNCTION binjari_payout_records_guard() RETURNS trigger
+CREATE FUNCTION spareon_payout_records_guard() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
   IF TG_OP = 'DELETE' THEN
@@ -283,9 +283,9 @@ END
 $$;
 --> statement-breakpoint
 CREATE TRIGGER payout_records_guard BEFORE UPDATE OR DELETE ON payout_records
-  FOR EACH ROW EXECUTE FUNCTION binjari_payout_records_guard();
+  FOR EACH ROW EXECUTE FUNCTION spareon_payout_records_guard();
 CREATE TRIGGER payout_records_no_truncate BEFORE TRUNCATE ON payout_records
-  FOR EACH STATEMENT EXECUTE FUNCTION binjari_reject_change();
+  FOR EACH STATEMENT EXECUTE FUNCTION spareon_reject_change();
 --> statement-breakpoint
 
 -- ===================================================================================

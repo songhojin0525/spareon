@@ -15,7 +15,7 @@
 1. **잔액은 DB가 유도한다.** `ledger_postings` INSERT 트리거가 같은 트랜잭션에서 `account_balances`를 갱신하고, 그 밖의 쓰기는 거부한다. 음수 금지는 `allow_negative`를 복합 FK로 복사한 CHECK다.
 2. **통화별 합 0은 지연 제약 트리거 두 개**(거래마다·기입마다)로 커밋 시점에 검사하고, 기입은 거래를 만든 DB 트랜잭션 안에서만 붙일 수 있다(`created_xid`).
 3. **추가 전용·불변 테이블**(원장 3종, `audit_log`, 가격표 2종, 환율)은 UPDATE·DELETE·TRUNCATE를 트리거로 거부한다. `holds`·`earnings`·`payout_records`는 상태만 바뀌고 금액·주체는 고정, 삭제 금지, 끝난 상태는 최종(트리거). 모든 불변식 트리거는 `ENABLE ALWAYS`.
-4. **최소 권한 역할 `binjari_app`**: 서버는 테이블 소유자가 아닌 이 역할의 멤버로 접속한다. 추가 전용 테이블은 SELECT·INSERT, 잔액은 SELECT, 돈 기록은 DELETE 없음, DDL·TRUNCATE·TRIGGER 없음 → 트리거를 끄거나 지울 수 없다.
+4. **최소 권한 역할 `spareon_app`**: 서버는 테이블 소유자가 아닌 이 역할의 멤버로 접속한다. 추가 전용 테이블은 SELECT·INSERT, 잔액은 SELECT, 돈 기록은 DELETE 없음, DDL·TRUNCATE·TRIGGER 없음 → 트리거를 끄거나 지울 수 없다.
 5. **트리거는 불변식에만.** 어떤 거래를 만들지(종류별 계정 이동, 잠금 순서, 멱등 재실행)는 S06 원장 서비스가 정한다.
 6. **마이그레이션**: drizzle-kit `generate`로 SQL·스냅숏을 만들고 사람이 다듬는다. 트리거·권한은 `--custom` 빈 마이그레이션에 손으로 쓴다. 적용은 자체 실행기(`src/db/migrate.ts`): 저널 순서, 파일당 트랜잭션, 체크섬 기록·변조 거부, advisory lock, `drizzle/down/<tag>.sql`로 down. up → down → up 덤프 비교와 TS 스키마 드리프트 검사를 테스트로 둔다.
 7. **명세와 다르게 한 것**: 상태 이름은 ARCHITECTURE 5절을 따른다(노드 `pending`·`excluded`, 수익 `held`·`under_review`·`payout_recorded`·`settled` 등). 통화에 `TCR`(D2). 구매자 콘텐츠는 `jobs`가 아니라 `job_payloads`(암호문·보존 기한·행 삭제로 파기, ADR 0010). 지문은 `fp_store`·`fp_global`(D3)과 `UNIQUE(store_id, fp_store)`. `params_b`·`score`·`reputation` 실수 대신 `params_millions`·`score_ppm`·`reputation_ppm` 정수(부동소수점 열 0개). 홀드는 도메인 테이블을 FK로 참조하지 않는다(`purpose`, `reference_id`). 시각 열에 DB `now()` 기본값 없음(주입된 Clock). 열거형은 `text + CHECK`. 팩토리는 testkit이 아니라 서버(`src/testing/`)에 둔다(Drizzle 타입을 써야 하고, testkit → server는 순환).

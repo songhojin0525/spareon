@@ -18,11 +18,11 @@ import type { ManifestKind, ManifestMap, SignedManifest } from './generated/prot
 import { canonicalJson } from './wire/canonical-json.js';
 import { parseStrictJson } from './wire/strict-json.js';
 
-export const AUTH_DOMAIN = 'binjari-auth-v1';
-export const ENROLL_DOMAIN = 'binjari-enroll-v1';
+export const AUTH_DOMAIN = 'spareon-auth-v1';
+export const ENROLL_DOMAIN = 'spareon-enroll-v1';
 export const MANIFEST_DOMAINS: Readonly<Record<ManifestKind, string>> = {
-  model: 'binjari-model-manifest-v1',
-  release: 'binjari-release-manifest-v1',
+  model: 'spareon-model-manifest-v1',
+  release: 'spareon-release-manifest-v1',
 };
 
 const HEX32 = /^[0-9a-f]{64}$/;
@@ -38,7 +38,7 @@ function need(re: RegExp, value: string, what: string): string {
 
 const utf8 = (s: string): Uint8Array => new TextEncoder().encode(s);
 
-/** "binjari-auth-v1\n" + nonce + "\n" + nodeId + "\n" + protocolHash (ADR 0008). */
+/** "spareon-auth-v1\n" + nonce + "\n" + nodeId + "\n" + protocolHash (ADR 0008). */
 export function authSigningBytes(nonce: string, nodeId: string, protocolHash: string): Uint8Array {
   return utf8(
     [
@@ -58,7 +58,7 @@ export interface EnrollSigningInput {
   readonly fpGlobal: string;
 }
 
-/** "binjari-enroll-v1\n" + nonce + "\n" + enrollId + "\n" + publicKey + "\n" + fpStore + "\n" + fpGlobal. */
+/** "spareon-enroll-v1\n" + nonce + "\n" + enrollId + "\n" + publicKey + "\n" + fpStore + "\n" + fpGlobal. */
 export function enrollSigningBytes(i: EnrollSigningInput): Uint8Array {
   return utf8(
     [
@@ -72,7 +72,7 @@ export function enrollSigningBytes(i: EnrollSigningInput): Uint8Array {
   );
 }
 
-/** "binjari-<kind>-manifest-v1\n" + the manifest's canonical JSON text, exactly as transmitted. */
+/** "spareon-<kind>-manifest-v1\n" + the manifest's canonical JSON text, exactly as transmitted. */
 export function manifestSigningBytes(kind: ManifestKind, manifestJson: string): Uint8Array {
   return utf8(`${MANIFEST_DOMAINS[kind]}\n${manifestJson}`);
 }

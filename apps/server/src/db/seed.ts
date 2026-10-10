@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 
-import { MICRO_CR_PER_CR } from '@binjari/shared';
+import { MICRO_CR_PER_CR } from '@spareon/shared';
 import { z } from 'zod';
 
 import type { Clock } from '../lib/clock.js';
@@ -10,12 +10,12 @@ import { migrationStatus } from './migrate.js';
 import { fxRates, settings } from './schema/index.js';
 
 /**
- * Development seed (`pnpm --filter @binjari/server db:seed`): a small, believable data set for local
+ * Development seed (`pnpm --filter @spareon/server db:seed`): a small, believable data set for local
  * work — one operator, owner and buyer, one verified PC-bang with three nodes, two models, a price list,
  * the platform ledger accounts and an operator TEST_TOPUP for the buyer.
  *
  * - Idempotent: the `dev.seed` setting marks a seeded database; a second run changes nothing.
- * - Local only: refuses a non-local DATABASE_URL unless BINJARI_ALLOW_REMOTE_SEED=1 (never seed production).
+ * - Local only: refuses a non-local DATABASE_URL unless SPAREON_ALLOW_REMOTE_SEED=1 (never seed production).
  * - Users get an unusable password hash: nobody can log in until S05 provides real accounts.
  * - No real money: TEST_TOPUP is a recorded test top-up (ARCHITECTURE 9.2), not a payment.
  */
@@ -32,7 +32,7 @@ const envSchema = z.object({
   DATABASE_URL: z
     .string({ error: 'DATABASE_URL is required' })
     .regex(/^postgres(ql)?:\/\//, 'DATABASE_URL must be a postgres:// URL'),
-  BINJARI_ALLOW_REMOTE_SEED: z.enum(['0', '1']).optional(),
+  SPAREON_ALLOW_REMOTE_SEED: z.enum(['0', '1']).optional(),
 });
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
@@ -76,7 +76,7 @@ export async function seedDatabase(options: {
       `database has pending migrations (${status.pending.join(', ')}): run db:migrate first`,
     );
   }
-  const handle = createDb({ url: options.url, maxConnections: 1, applicationName: 'binjari-seed' });
+  const handle = createDb({ url: options.url, maxConnections: 1, applicationName: 'spareon-seed' });
   try {
     return await withTransaction(handle.db, async (tx) => {
       const now = options.clock.now();
@@ -94,15 +94,15 @@ export async function seedDatabase(options: {
         random: options.random ?? cryptoRandom,
       });
       const operator = await f.operator({
-        email: 'operator@binjari.test',
+        email: 'operator@spareon.test',
         displayName: '운영자',
       });
-      const owner = await f.owner({ email: 'owner@binjari.test', displayName: '사장님' });
-      const buyer = await f.buyer({ email: 'buyer@binjari.test', displayName: '구매자' });
+      const owner = await f.owner({ email: 'owner@spareon.test', displayName: '사장님' });
+      const buyer = await f.buyer({ email: 'buyer@spareon.test', displayName: '구매자' });
 
       const store = await f.store({
         ownerId: owner.id,
-        name: '빈자리 PC방 (개발용)',
+        name: 'Spareon PC방 (개발용)',
         electricityWonPerKwh: 150n,
         verifiedAt: now,
         verifiedBy: operator.id,
@@ -201,10 +201,10 @@ export async function runSeedCli(
     io.err(parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; '));
     return 2;
   }
-  const { DATABASE_URL: url, BINJARI_ALLOW_REMOTE_SEED: allowRemote } = parsed.data;
+  const { DATABASE_URL: url, SPAREON_ALLOW_REMOTE_SEED: allowRemote } = parsed.data;
   if (!isLocalDatabaseUrl(url) && allowRemote !== '1') {
     io.err(
-      'refusing to seed a non-local database (set BINJARI_ALLOW_REMOTE_SEED=1 if this really is a dev database)',
+      'refusing to seed a non-local database (set SPAREON_ALLOW_REMOTE_SEED=1 if this really is a dev database)',
     );
     return 2;
   }

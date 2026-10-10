@@ -2,9 +2,9 @@
 DROP TRIGGER payout_records_insert_guard ON payout_records;
 DROP TRIGGER earnings_insert_guard ON earnings;
 DROP TRIGGER holds_insert_guard ON holds;
-DROP FUNCTION binjari_money_record_insert_guard();
+DROP FUNCTION spareon_money_record_insert_guard();
 
-CREATE OR REPLACE FUNCTION binjari_ledger_posting_same_xact() RETURNS trigger
+CREATE OR REPLACE FUNCTION spareon_ledger_posting_same_xact() RETURNS trigger
 LANGUAGE plpgsql AS $$
 DECLARE
   tx_xid xid8;

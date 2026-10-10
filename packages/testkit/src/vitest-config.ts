@@ -6,7 +6,7 @@ import { defineConfig, type ViteUserConfig } from 'vitest/config';
 export const INTEGRATION_TEST_PATTERN = '**/*.int.test.ts';
 
 /** Environment variable set by scripts/verify.mjs for `--quick`. */
-export const QUICK_ENV = 'BINJARI_TEST_QUICK';
+export const QUICK_ENV = 'SPAREON_TEST_QUICK';
 
 export function isQuickMode(
   env: Readonly<Record<string, string | undefined>> = process.env,
@@ -14,7 +14,7 @@ export function isQuickMode(
   return env[QUICK_ENV] === '1';
 }
 
-export interface BinjariVitestOptions {
+export interface SpareonVitestOptions {
   /** Start the shared test PostgreSQL once per run (packages/testkit/src/global-setup.ts). */
   readonly useTestDatabase?: boolean;
   /**
@@ -28,7 +28,7 @@ export interface BinjariVitestOptions {
 export const GLOBAL_SETUP_PATH = fileURLToPath(new URL('./global-setup.ts', import.meta.url));
 
 /** Shared Vitest config for every package, so `--quick` and DB setup behave the same everywhere. */
-export function defineBinjariVitestConfig(options: BinjariVitestOptions = {}): ViteUserConfig {
+export function defineSpareonVitestConfig(options: SpareonVitestOptions = {}): ViteUserConfig {
   const quick = isQuickMode(options.env);
   return defineConfig({
     test: {

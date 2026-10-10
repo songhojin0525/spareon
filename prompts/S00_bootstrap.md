@@ -22,7 +22,7 @@
 - `scripts/check-docs.mjs` — 문서 검사 초기 버전(이후 차수가 확장)
 - `apps/server` — Fastify 최소 앱(`GET /healthz`) + 테스트 1개
 - `apps/web` — 자리표시 패키지(테스트 1개). Next.js는 S23에서 만든다.
-- `apps/agent` — Go 모듈 `binjari/agent`, `cmd/binjari-agent/main.go`(`version` 출력) + 테스트 1개
+- `apps/agent` — Go 모듈 `spareon/agent`, `cmd/spareon-agent/main.go`(`version` 출력) + 테스트 1개
 - `packages/shared`, `packages/protocol`(자리표시), `packages/testkit`(테스트 DB 헬퍼, 아래 4절)
 - `.github/workflows/ci.yml`
 - `README.md`(프로젝트 소개 짧게 + START_HERE 링크), `docs/adr/0000-template.md`, `docs/adr/0001-record-decisions.md`

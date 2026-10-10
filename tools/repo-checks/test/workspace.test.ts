@@ -2,10 +2,10 @@ import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { JSON_SCHEMA_DIALECT } from '@binjari/protocol';
-import { MICRO_CR_PER_CR } from '@binjari/shared';
-import { defineBinjariVitestConfig } from '@binjari/testkit/vitest-config';
-import { resolveLocale } from '@binjari/web';
+import { JSON_SCHEMA_DIALECT } from '@spareon/protocol';
+import { MICRO_CR_PER_CR } from '@spareon/shared';
+import { defineSpareonVitestConfig } from '@spareon/testkit/vitest-config';
+import { resolveLocale } from '@spareon/web';
 import { describe, expect, it } from 'vitest';
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
@@ -40,14 +40,14 @@ describe('workspace wiring', () => {
     expect(JSON_SCHEMA_DIALECT).toBe('https://json-schema.org/draft/2020-12/schema');
     expect(MICRO_CR_PER_CR).toBe(10n ** 6n);
     expect(resolveLocale('xx')).toBe('ko');
-    expect(typeof defineBinjariVitestConfig).toBe('function');
+    expect(typeof defineSpareonVitestConfig).toBe('function');
   });
 
   it('every package follows the naming and module conventions', () => {
     const pkgs = workspacePackages();
     expect(pkgs.length).toBeGreaterThanOrEqual(6);
     for (const { dir, pkg } of pkgs) {
-      expect(pkg.name, dir).toBe(`@binjari/${path.basename(dir)}`);
+      expect(pkg.name, dir).toBe(`@spareon/${path.basename(dir)}`);
       expect(pkg.private, dir).toBe(true);
       expect(pkg.type, dir).toBe('module');
       expect(pkg.scripts?.['typecheck'], dir).toBeDefined();
@@ -72,7 +72,7 @@ describe('workspace wiring', () => {
     for (const { dir, pkg } of workspacePackages()) {
       if (pkg.scripts?.['test'] === undefined) continue;
       const config = readFileSync(path.join(repoRoot, dir, 'vitest.config.ts'), 'utf8');
-      expect(config, dir).toMatch(/defineBinjariVitestConfig\(/);
+      expect(config, dir).toMatch(/defineSpareonVitestConfig\(/);
     }
   });
 });

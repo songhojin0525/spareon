@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 
-import { isUuidV7, uuidV7TimeMs } from '@binjari/shared';
+import { isUuidV7, uuidV7TimeMs } from '@spareon/shared';
 import { describe, expect, it } from 'vitest';
 
 import {

@@ -2,7 +2,7 @@
 //
 // Release builds set these with:
 //
-//	go build -ldflags "-X binjari/agent/internal/version.Version=1.2.3 -X binjari/agent/internal/version.Commit=abc123" ./cmd/binjari-agent
+//	go build -ldflags "-X spareon/agent/internal/version.Version=1.2.3 -X spareon/agent/internal/version.Commit=abc123" ./cmd/spareon-agent
 package version
 
 import (

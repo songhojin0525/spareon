@@ -1,7 +1,7 @@
 # S04 계획 — 걷는 뼈대 = 0단계 장난감
 
 ## 목표 요약
-구매자 요청 → 서버 → 에이전트(PC) → 응답 → 크레딧 이동을 처음부터 끝까지 가늘게 잇는다. S02 프로토콜(코덱·서명)과 S03 스키마(원장 트리거·`binjari_app` 역할)를 그대로 쓰고, 단순화한 곳은 모두 `SKELETON(SNN)`으로 표시한다. 원장 불변식(통화별 합 0)과 손님 우선(불확실하면 멈춤)은 뼈대에서도 지킨다.
+구매자 요청 → 서버 → 에이전트(PC) → 응답 → 크레딧 이동을 처음부터 끝까지 가늘게 잇는다. S02 프로토콜(코덱·서명)과 S03 스키마(원장 트리거·`spareon_app` 역할)를 그대로 쓰고, 단순화한 곳은 모두 `SKELETON(SNN)`으로 표시한다. 원장 불변식(통화별 합 0)과 손님 우선(불확실하면 멈춤)은 뼈대에서도 지킨다.
 
 ## 핵심 설계 결정 (대안 → 선택 → 스스로 반박)
 
@@ -14,7 +14,7 @@
 - `holds.buyer_account_id`는 구매자 **홀드 계정**을 가리킨다(M4 대사 = 홀드 계정 잔액 = 그 계정의 활성 홀드 합). 가정으로 기록.
 
 ### D-b. 개발용 노드 인증: 공유 비밀에서 ed25519 키를 유도한다 (프로토콜 그대로)
-- `hello → auth.challenge → auth.prove → auth.ok`를 S02 그대로 쓴다. 에이전트와 서버가 `DEV_AGENT_SECRET`과 `nodeId`에서 같은 ed25519 시드 `HMAC-SHA256(secret, "binjari-dev-node-key-v1\n" + nodeId)`를 유도한다. 서버는 그 공개키로 서명을 검증한다(`verifyEd25519`, nonce 5초 일회용).
+- `hello → auth.challenge → auth.prove → auth.ok`를 S02 그대로 쓴다. 에이전트와 서버가 `DEV_AGENT_SECRET`과 `nodeId`에서 같은 ed25519 시드 `HMAC-SHA256(secret, "spareon-dev-node-key-v1\n" + nodeId)`를 유도한다. 서버는 그 공개키로 서명을 검증한다(`verifyEd25519`, nonce 5초 일회용).
 - `nodeId`·`fpStore`·`fpGlobal`도 에이전트 이름에서 결정적으로 유도한다(재시작해도 같은 노드 행). 처음 보는 nodeId는 개발용 매장에 자동 등록한다 — `SKELETON(S10, S11)`.
 - 대안: 비밀을 메시지에 그대로 실어 보내기(임시 형식). 버림: 차수 원칙 "버릴 임시 형식을 만들지 않는다"와 어긋나고, 비밀이 평문으로 매번 오간다. TS·Go 유도 결과는 공유 벡터 파일로 고정한다.
 - 반박: "비밀을 아는 사람은 누구든 노드가 된다" → 개발용이 맞다. 운영(`NODE_ENV=production`)에서는 개발용 비밀·키가 설정돼 있으면 서버가 시작을 거부한다(D-f).
@@ -38,10 +38,10 @@
 - 바인딩 기본 `127.0.0.1`. LAN은 `HOST=0.0.0.0`(개발 서버 `--lan` 플래그)로만.
 - `DEV_API_KEY`·`DEV_AGENT_SECRET`에는 기본값이 없다(24자 이상 필수). `NODE_ENV=production`에서 둘 중 하나라도 설정되면 설정 오류로 시작 거부. 개발용 인증이 꺼져 있으면 해당 엔드포인트는 401/`auth.fail`.
 - `/dev` 대시보드는 `NODE_ENV=development` 또는 `DEV_DASHBOARD=1`일 때만 라우트가 등록된다(아니면 404). 운영에서 `DEV_DASHBOARD=1`이면 시작 거부.
-- 서버 DB 연결은 언제나 `role=binjari_app`으로 시작한다(`-c role=binjari_app`). 연결 URL이 소유자 계정이어도 트리거를 끌 수 없는 권한으로 돈다(S03 영향). 관리형 풀러가 시작 옵션을 지원하는지는 S30.
+- 서버 DB 연결은 언제나 `role=spareon_app`으로 시작한다(`-c role=spareon_app`). 연결 URL이 소유자 계정이어도 트리거를 끌 수 없는 권한으로 돈다(S03 영향). 관리형 풀러가 시작 옵션을 지원하는지는 S30.
 
-### D-g. 에이전트(Go) `binjari-agent run`
-- `--server`, `--secret`(또는 `BINJARI_DEV_AGENT_SECRET`), `--name`, `--runtime fake|ollama`, `--ollama-url`, `--model <id>=<ollama 이름>`(반복), `--always-available`.
+### D-g. 에이전트(Go) `spareon-agent run`
+- `--server`, `--secret`(또는 `SPAREON_DEV_AGENT_SECRET`), `--name`, `--runtime fake|ollama`, `--ollama-url`, `--model <id>=<ollama 이름>`(반복), `--always-available`.
 - `--always-available`이 없으면 `eligible=false`(사유 `helper_missing`)로 보고하고 작업을 받지 않는다 — 손님 감지가 없으면 '불확실 = 멈춤'(절대 규칙 1). 손님 감지는 `SKELETON(S18)`.
 - 런타임 인터페이스 + `fake`(결정적 출력) + `ollama`(`POST /api/chat`, `stream:false`). Ollama 모델 이름(`qwen2.5:0.5b`)은 프로토콜 모델 ID 규칙(`:` 금지)에 맞지 않아 `--model`로 대응시킨다.
 - Ctrl+C: 진행 중 작업 취소 → `job.preempted(reason=shutdown)` 전송(최대 1초) → 연결 종료. 서버 지시(`job.cancel`·`control.pause`·`control.kill`)와 잘못된 멈춤 명령(`DecodeError.Pause`)에도 즉시 멈춘다.
@@ -49,7 +49,7 @@
 
 ### D-h. TS 가짜 에이전트 `FakeAgent`(testkit)
 - 같은 프로토콜(코덱·서명·개발용 신원)을 쓰는 TS 구현. Node 22 내장 `WebSocket`을 써서 의존성을 늘리지 않는다. 테스트용 행동 옵션: 수락 안 함, 수락 뒤 침묵, 완료 두 번 보내기, 재시도 가능 실패, 지연.
-- testkit이 `@binjari/protocol`을 import하면 순환이 생긴다(protocol이 vitest 설정 때문에 testkit을 devDependency로 씀). 확인해 보니 pnpm이 `pnpm -r run typecheck`를 `ERR_PNPM_TASK_CYCLE`로 거부한다. 그래서 FakeAgent는 프로토콜 함수(코덱·서명·개발용 신원)를 **주입받는다**(`new FakeAgent({ protocol })`, 호출하는 쪽이 `import * as protocol from '@binjari/protocol'`을 넘김). testkit은 프로토콜을 모르는 채로 남고 패키지 그래프에 순환이 없다. 메시지 모양은 encode 때 스키마가 검사한다.
+- testkit이 `@spareon/protocol`을 import하면 순환이 생긴다(protocol이 vitest 설정 때문에 testkit을 devDependency로 씀). 확인해 보니 pnpm이 `pnpm -r run typecheck`를 `ERR_PNPM_TASK_CYCLE`로 거부한다. 그래서 FakeAgent는 프로토콜 함수(코덱·서명·개발용 신원)를 **주입받는다**(`new FakeAgent({ protocol })`, 호출하는 쪽이 `import * as protocol from '@spareon/protocol'`을 넘김). testkit은 프로토콜을 모르는 채로 남고 패키지 그래프에 순환이 없다. 메시지 모양은 encode 때 스키마가 검사한다.
 
 ### D-i. 서버 모듈 배치 (ARCHITECTURE 2.1 이름)
 `lib`(config·ids·crypto), `ledger/skeleton.ts`(돈 — 린트의 money 규칙 적용), `gateway/`(WS 세션·개발용 인증), `scheduler/`(배정·수명·청소), `buyerApi/`(chat completions), `fleet/`(노드 상태), `skeleton/bootstrap.ts`(개발용 매장·구매자·충전), `dev/dashboard.ts`. 각 단순화 지점에 `SKELETON(SNN)`.
@@ -71,13 +71,13 @@
 ## 새 의존성
 - `@fastify/websocket` 11.3.1(MIT, 2026-09-18, 스택 결정) — 서버 WS. 내부적으로 `ws`.
 - `github.com/coder/websocket` v1.8.15(ISC, 2026-06-15, 스택 결정) — 에이전트 WS 클라이언트.
-- testkit → `@binjari/protocol`(워크스페이스).
+- testkit → `@spareon/protocol`(워크스페이스).
 
 ## 체크포인트
 | # | 내용 | 검증 |
 |---|---|---|
-| 1 | 설정(개발용 키·운영 거부·LAN), DB `binjari_app` 연결 옵션, 개발용 신원 유도(TS·Go 공유 벡터), 의존성 추가 | config 테스트, devauth 벡터 테스트(TS·Go) |
-| 2 | 원장 뼈대(홀드·캡처·해제), payload 암호화, 개발용 준비(bootstrap) | 통합 테스트: 합 0, 멱등, 잔액 부족 402, binjari_app 권한으로 동작 |
+| 1 | 설정(개발용 키·운영 거부·LAN), DB `spareon_app` 연결 옵션, 개발용 신원 유도(TS·Go 공유 벡터), 의존성 추가 | config 테스트, devauth 벡터 테스트(TS·Go) |
+| 2 | 원장 뼈대(홀드·캡처·해제), payload 암호화, 개발용 준비(bootstrap) | 통합 테스트: 합 0, 멱등, 잔액 부족 402, spareon_app 권한으로 동작 |
 | 3 | 게이트웨이·스케줄러·구매자 API·FakeAgent | 통합 테스트: 정상 완료, 오퍼 무응답 → 다음 노드, 리스 만료 → 재시도, 재시도 상한 → 해제, 완료 2회 → 캡처 1회 |
 | 4 | E2E(노드 2, 요청 20, 도중 끊김) | 이중 과금 0, 원장 합 0, 실패 요청 과금 0, 남은 활성 상태 0 |
 | 5 | `/dev` 대시보드 + `dev:server` | 라우트 테스트(꺼짐 404, 이스케이프, 콘텐츠 없음) |

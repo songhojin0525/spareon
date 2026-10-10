@@ -4,8 +4,8 @@ import { randomBytes } from 'node:crypto';
 const IDENT_RE = /^[a-z][a-z0-9_]{0,62}$/;
 const RUN_ID_RE = /^[a-z0-9]{1,20}$/;
 
-export const TEMPLATE_PREFIX = 'binjari_tpl_';
-export const ISOLATED_PREFIX = 'binjari_t_';
+export const TEMPLATE_PREFIX = 'spareon_tpl_';
+export const ISOLATED_PREFIX = 'spareon_t_';
 
 export function assertSafeIdentifier(name: string): string {
   if (!IDENT_RE.test(name)) {

@@ -10,7 +10,7 @@ import {
   templateName,
   withDatabase,
 } from '../src/naming.js';
-import { defineBinjariVitestConfig, isQuickMode } from '../src/vitest-config.js';
+import { defineSpareonVitestConfig, isQuickMode } from '../src/vitest-config.js';
 
 describe('resolveDatabaseSource', () => {
   it('prefers TEST_DATABASE_URL over DATABASE_URL', () => {
@@ -43,7 +43,7 @@ describe('resolveDatabaseSource', () => {
     expect(() => resolveDatabaseSource({ DATABASE_URL: remote })).toThrow(/remote host/);
     expect(() => resolveDatabaseSource({ DATABASE_URL: remote })).not.toThrow(/secret/);
     expect(
-      resolveDatabaseSource({ DATABASE_URL: remote, BINJARI_ALLOW_REMOTE_TEST_DB: '1' }),
+      resolveDatabaseSource({ DATABASE_URL: remote, SPAREON_ALLOW_REMOTE_TEST_DB: '1' }),
     ).toMatchObject({ kind: 'external' });
     // Host overrides that pg honours, and an empty host (PGHOST decides), count as possibly remote.
     expect(() =>
@@ -68,9 +68,9 @@ describe('resolveDatabaseSource', () => {
 
 describe('database naming', () => {
   it('builds run-scoped names that are safe identifiers', () => {
-    expect(templateName('abc123')).toBe('binjari_tpl_abc123');
-    expect(isolatedName('abc123', 'ff00')).toBe('binjari_t_abc123_ff00');
-    expect(isolatedName('abc123')).toMatch(/^binjari_t_abc123_[0-9a-f]{12}$/);
+    expect(templateName('abc123')).toBe('spareon_tpl_abc123');
+    expect(isolatedName('abc123', 'ff00')).toBe('spareon_t_abc123_ff00');
+    expect(isolatedName('abc123')).toMatch(/^spareon_t_abc123_[0-9a-f]{12}$/);
   });
 
   it('rejects identifiers that could break out of quoting', () => {
@@ -82,7 +82,7 @@ describe('database naming', () => {
   });
 
   it('LIKE pattern escapes underscores (behaviour is checked against Postgres in db.int.test.ts)', () => {
-    expect(runDatabasesLikePattern('r1')).toBe(String.raw`binjari\_t\_r1\_%`);
+    expect(runDatabasesLikePattern('r1')).toBe(String.raw`spareon\_t\_r1\_%`);
   });
 
   it('withDatabase swaps only the database and keeps credentials and params', () => {
@@ -98,17 +98,17 @@ describe('database naming', () => {
   });
 });
 
-describe('defineBinjariVitestConfig', () => {
+describe('defineSpareonVitestConfig', () => {
   it('excludes integration tests and DB setup only in quick mode', () => {
-    const full = defineBinjariVitestConfig({ useTestDatabase: true, env: {} });
-    const quick = defineBinjariVitestConfig({
+    const full = defineSpareonVitestConfig({ useTestDatabase: true, env: {} });
+    const quick = defineSpareonVitestConfig({
       useTestDatabase: true,
-      env: { BINJARI_TEST_QUICK: '1' },
+      env: { SPAREON_TEST_QUICK: '1' },
     });
     expect(full.test?.exclude).not.toContain('**/*.int.test.ts');
     expect(full.test?.globalSetup).toHaveLength(1);
     expect(quick.test?.exclude).toContain('**/*.int.test.ts');
     expect(quick.test?.globalSetup).toEqual([]);
-    expect(isQuickMode({ BINJARI_TEST_QUICK: 'true' })).toBe(false);
+    expect(isQuickMode({ SPAREON_TEST_QUICK: 'true' })).toBe(false);
   });
 });

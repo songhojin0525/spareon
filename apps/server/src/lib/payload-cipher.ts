@@ -25,7 +25,7 @@ export class PayloadCipherError extends Error {
 }
 
 export function payloadAad(jobId: string, kind: string): string {
-  return `binjari-payload-v1\n${jobId}\n${kind}`;
+  return `spareon-payload-v1\n${jobId}\n${kind}`;
 }
 
 export function createPayloadCipher(keyHex: string, keyId: string): PayloadCipher {

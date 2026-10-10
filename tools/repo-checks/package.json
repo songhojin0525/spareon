@@ -1,5 +1,5 @@
 {
-  "name": "@binjari/repo-checks",
+  "name": "@spareon/repo-checks",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -9,10 +9,10 @@
     "test": "vitest run"
   },
   "devDependencies": {
-    "@binjari/protocol": "workspace:*",
-    "@binjari/shared": "workspace:*",
-    "@binjari/testkit": "workspace:*",
-    "@binjari/web": "workspace:*",
+    "@spareon/protocol": "workspace:*",
+    "@spareon/shared": "workspace:*",
+    "@spareon/testkit": "workspace:*",
+    "@spareon/web": "workspace:*",
     "@types/jsdom": "catalog:",
     "@types/node": "catalog:",
     "eslint": "catalog:",

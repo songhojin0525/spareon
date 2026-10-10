@@ -4,6 +4,6 @@
   "id": "01920000-0000-7000-8000-000000000158",
   "ts": "2026-10-09T04:36:00.000Z",
   "payload": {
-    "manifest": "{\"artifact\":{\"bytes\":4683073536,\"sha256\":\"e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1\",\"url\":\"https://models.example.com/qwen2.5-7b/q4_k_m.gguf\"},\"contextLength\":32768,\"format\":\"gguf\",\"license\":\"Apache-2.0\",\"modelId\":\"qwen2.5-7b-instruct-q4_k_m\",\"revision\":1,\"runtime\":{\"minVersion\":\"b4567\",\"name\":\"llamacpp\"},\"schema\":\"binjari.model-manifest/1\"}"
+    "manifest": "{\"artifact\":{\"bytes\":4683073536,\"sha256\":\"e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1\",\"url\":\"https://models.example.com/qwen2.5-7b/q4_k_m.gguf\"},\"contextLength\":32768,\"format\":\"gguf\",\"license\":\"Apache-2.0\",\"modelId\":\"qwen2.5-7b-instruct-q4_k_m\",\"revision\":1,\"runtime\":{\"minVersion\":\"b4567\",\"name\":\"llamacpp\"},\"schema\":\"spareon.model-manifest/1\"}"
   }
 }

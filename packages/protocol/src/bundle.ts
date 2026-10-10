@@ -3,8 +3,8 @@ import { createHash } from 'node:crypto';
 import { canonicalJson } from './wire/canonical-json.js';
 
 /** Base URI of every schema `$id`. `.invalid` can never resolve, so no validator fetches anything. */
-export const SCHEMA_BASE_URI = 'https://schemas.binjari.invalid/protocol/';
-export const BUNDLE_FORMAT = 'binjari-protocol-bundle/1';
+export const SCHEMA_BASE_URI = 'https://schemas.spareon.invalid/protocol/';
+export const BUNDLE_FORMAT = 'spareon-protocol-bundle/1';
 
 /**
  * The protocol bundle: every file under packages/protocol/schemas, keyed by its path relative to that

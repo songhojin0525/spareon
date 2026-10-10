@@ -1,5 +1,5 @@
 {
-  "name": "@binjari/server",
+  "name": "@spareon/server",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -17,8 +17,8 @@
     "demo": "tsx src/bin/demo.ts"
   },
   "dependencies": {
-    "@binjari/protocol": "workspace:*",
-    "@binjari/shared": "workspace:*",
+    "@spareon/protocol": "workspace:*",
+    "@spareon/shared": "workspace:*",
     "@fastify/websocket": "catalog:",
     "drizzle-orm": "catalog:",
     "fastify": "catalog:",
@@ -26,7 +26,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@binjari/testkit": "workspace:*",
+    "@spareon/testkit": "workspace:*",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
     "@types/ws": "catalog:",

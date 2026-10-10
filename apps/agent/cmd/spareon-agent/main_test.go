@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"binjari/agent/internal/version"
+	"spareon/agent/internal/version"
 )
 
 func TestRunVersion(t *testing.T) {

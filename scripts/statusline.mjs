@@ -12,7 +12,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(ROOT, '.runner', 'usage.json');
 const color = !process.env.NO_COLOR;
 const c = (code) => (s) => (color ? `\x1b[${code}m${s}\x1b[0m` : String(s));
-const orange = (s) => (color ? `\x1b[38;2;217;119;87m${s}\x1b[0m` : String(s));
+const wordmark = () =>
+  color ? '\x1b[1;97mspare\x1b[0m\x1b[1;38;2;45;212;191mon\x1b[0m' : 'spareon'; // 'spare' white, 'on' teal
 const gray = c('90');
 const green = c('32');
 const yellow = c('33');
@@ -119,7 +120,7 @@ async function main() {
       /* the status line still prints */
     }
   }
-  const parts = [orange('✻ binjari')];
+  const parts = [wordmark()];
   const st = currentStage();
   if (st) parts.push(st);
   if (five) parts.push(meter('5시간', five));
@@ -129,4 +130,4 @@ async function main() {
   process.stdout.write(parts.join(gray(' · ')) + '\n');
 }
 
-main().catch(() => process.stdout.write('binjari\n'));
+main().catch(() => process.stdout.write('spareon\n'));

@@ -27,10 +27,10 @@
 - 크기 제한: 입력 바이트 상한, 모델 컨텍스트 초과 시 400(서버 토크나이저로 미리 계산).
 - 인증: `Authorization: Bearer <API 키>`, 스코프 확인, 키별 분당 요청·동시 요청 한도(429 + `retry-after`).
 - 멱등성: `Idempotency-Key` 지원(같은 키 재요청 시 이전 결과 또는 진행 중 상태).
-- 확장(선택): `x-binjari-trusted-only: true`(신뢰 노드만 — 가격 할증 정책은 설정값), `x-binjari-retention: none`(결과 서버 보관 0 — 스트리밍·즉시 응답에서만).
+- 확장(선택): `x-spareon-trusted-only: true`(신뢰 노드만 — 가격 할증 정책은 설정값), `x-spareon-retention: none`(결과 서버 보관 0 — 스트리밍·즉시 응답에서만).
 
 ### 2. 응답
-- 비스트리밍: OpenAI chat.completion 형식, `usage`(prompt_tokens, completion_tokens, total_tokens — **서버 토크나이저 기준**), 확장 필드로 `x_binjari.cost_ucr`, `x_binjari.credits_remaining`.
+- 비스트리밍: OpenAI chat.completion 형식, `usage`(prompt_tokens, completion_tokens, total_tokens — **서버 토크나이저 기준**), 확장 필드로 `x_spareon.cost_ucr`, `x_spareon.credits_remaining`.
 - 스트리밍(SSE): `chat.completion.chunk` 형식, 마지막에 usage 청크(요청 옵션이 있으면), `data: [DONE]`. 이어쓰기(S12)로 노드가 바뀌어도 구매자에게는 하나의 끊기지 않은 스트림.
 - 하트비트: 생성 대기 중에도 연결이 끊기지 않도록 주석 줄(`: keep-alive`) 주기 전송.
 

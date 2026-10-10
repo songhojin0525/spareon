@@ -22,7 +22,7 @@
 ## 상세 요구사항
 
 ### 1. 최소 권한
-- 서비스 실행 계정 결정(ADR): LocalSystem vs 가상 서비스 계정(`NT SERVICE\BinjariAgent`) vs LocalService. 필요한 권한(헬퍼 실행용 `WTSQueryUserToken`, Job Object, GPU 접근, 영구 폴더 쓰기)을 표로 정리하고, 권한이 큰 작업만 분리할 수 있는지 검토. **세션 0에서 CUDA가 동작하는지**는 KNOWN_UNKNOWNS 항목이므로 실기 체크리스트에 포함하고, 안 될 때의 대안(사용자 세션에서 제한된 런타임 실행 등)을 ADR에 둔다.
+- 서비스 실행 계정 결정(ADR): LocalSystem vs 가상 서비스 계정(`NT SERVICE\SpareonAgent`) vs LocalService. 필요한 권한(헬퍼 실행용 `WTSQueryUserToken`, Job Object, GPU 접근, 영구 폴더 쓰기)을 표로 정리하고, 권한이 큰 작업만 분리할 수 있는지 검토. **세션 0에서 CUDA가 동작하는지**는 KNOWN_UNKNOWNS 항목이므로 실기 체크리스트에 포함하고, 안 될 때의 대안(사용자 세션에서 제한된 런타임 실행 등)을 ADR에 둔다.
 - 헬퍼는 사용자 권한, 관리자 요구 없음.
 
 ### 2. 파일·IPC 보호
@@ -68,4 +68,4 @@
 
 ## 선택 확장
 - 서버 인증서 고정(백업 핀 포함, 기본 꺼짐)
-- 에이전트 자가 진단 명령(`binjari-agent doctor`): 권한·ACL·네트워크·GPU·영구성 점검 결과 표
+- 에이전트 자가 진단 명령(`spareon-agent doctor`): 권한·ACL·네트워크·GPU·영구성 점검 결과 표

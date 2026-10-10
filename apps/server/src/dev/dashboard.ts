@@ -215,7 +215,7 @@ export function renderDashboard(s: Snapshot, sessions: SessionRegistry, now: Dat
     .join('');
   return `<!doctype html>
 <html lang="ko"><head><meta charset="utf-8"><meta http-equiv="refresh" content="2">
-<meta name="viewport" content="width=device-width, initial-scale=1"><title>빈자리 개발용 대시보드</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>Spareon 개발용 대시보드</title>
 <style>
 body{font-family:system-ui,sans-serif;margin:16px;background:#fafaf7;color:#1f1f1c}
 h1{font-size:20px}h2{font-size:16px;margin-top:24px}
@@ -224,7 +224,7 @@ th,td{border-bottom:1px solid #ddd;padding:4px 8px;text-align:left}td.num{text-a
 .st-idle,.st-completed{color:#1a7f37}.st-running,.st-offered{color:#0b5cad}.st-failed,.st-expired,.st-offline{color:#b42318}
 .ok{color:#1a7f37;font-weight:bold}.bad{color:#b42318;font-weight:bold}.note{color:#666;font-size:13px}
 </style></head><body>
-<h1>빈자리 개발용 대시보드 (S04 걷는 뼈대)</h1>
+<h1>Spareon 개발용 대시보드 (S04 걷는 뼈대)</h1>
 <p class="note">${e(fmtTime(now))} (서울) · 2초마다 새로 고침 · 개발용입니다. 프롬프트와 출력은 표시하지 않습니다.</p>
 <h2>노드</h2>
 <table><tr><th>이름</th><th>연결</th><th>상태</th><th>작업 가능</th><th>모델</th><th>런타임</th><th>마지막 수신</th></tr>${nodeRows || '<tr><td colspan="7">아직 연결된 PC가 없습니다.</td></tr>'}</table>

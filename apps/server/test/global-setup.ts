@@ -1,4 +1,4 @@
-import { createTestDatabaseSetup } from '@binjari/testkit/global-setup';
+import { createTestDatabaseSetup } from '@spareon/testkit/global-setup';
 
 import { migrate } from '../src/db/migrate.js';
 

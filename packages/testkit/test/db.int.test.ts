@@ -73,11 +73,11 @@ describe('test database (integration)', () => {
   });
 
   it('run cleanup drops only that run’s databases (underscores are escaped in LIKE)', async () => {
-    const { adminUrl } = inject('binjariTestDb');
+    const { adminUrl } = inject('spareonTestDb');
     const fakeRun = `zz${newRunId()}`;
     const target = isolatedName(fakeRun);
     // Decoys: would match if '_' were an unescaped LIKE wildcard, or if the prefix were not delimited.
-    const decoys = [`binjarixtx${fakeRun}xabc`, isolatedName(`${fakeRun}0`)];
+    const decoys = [`spareonxtx${fakeRun}xabc`, isolatedName(`${fakeRun}0`)];
     for (const name of [target, ...decoys]) await createDatabase(adminUrl, name);
     try {
       const dropped = await dropRunDatabases(adminUrl, fakeRun);
@@ -99,7 +99,7 @@ describe('test database (integration)', () => {
     const c = await createIsolatedDatabase();
     await c.drop();
     await c.drop();
-    const { adminUrl } = inject('binjariTestDb');
+    const { adminUrl } = inject('spareonTestDb');
     const exists = await withClient(adminUrl, async (cl) => {
       const res = await cl.query('SELECT 1 FROM pg_database WHERE datname = $1', [c.name]);
       return res.rowCount;

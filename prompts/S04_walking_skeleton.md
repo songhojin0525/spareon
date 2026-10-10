@@ -27,7 +27,7 @@
   - 단순 배정: 해당 모델을 가진 첫 번째 대기 노드 — `SKELETON(S12)`
   - 고정 단가 과금: 구매자 → 매장(70%) + 플랫폼(30%) 이동을 원장 테이블에 합 0 거래로 기록 — `SKELETON(S06, S08)`
   - `GET /dev` 개발용 대시보드(서버 렌더링 HTML, 2초 자동 새로고침): 노드 목록·상태, 최근 작업, 계정 잔액. `NODE_ENV=development` 또는 `DEV_DASHBOARD=1`일 때만 열린다.
-- 에이전트(Go): `binjari-agent run` 콘솔 모드(Windows·macOS·Linux)
+- 에이전트(Go): `spareon-agent run` 콘솔 모드(Windows·macOS·Linux)
   - 서버 연결 → 인증 → capabilities 보고 → 작업 수락 → 런타임 실행 → 완료 보고
   - 런타임 어댑터: `fake`(결정적 출력, 토큰 수 보고) · `ollama`(로컬 `http://127.0.0.1:11434`의 채팅 API 호출, 비스트리밍)
   - 손님 감지: 이 차수에서는 `--always-available`만 지원 — `SKELETON(S18)`. Ctrl+C 시 진행 중 작업을 `job.preempted`로 보고하고 종료.

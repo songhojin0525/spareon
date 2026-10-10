@@ -154,7 +154,7 @@ export const jobs = pgTable(
     stream: boolean('stream').notNull().default(false),
     /** Sampling parameters and the server-chosen seed (ADR 0007). Never prompt text. */
     params: jsonb('params').notNull(),
-    /** `none` = do not keep the result after delivery (x-binjari-retention, ADR 0010). */
+    /** `none` = do not keep the result after delivery (x-spareon-retention, ADR 0010). */
     retention: text('retention', { enum: JOB_RETENTIONS }).notNull().default('default'),
     inputBytes: integer('input_bytes').notNull(),
     maxTokens: integer('max_tokens').notNull(),

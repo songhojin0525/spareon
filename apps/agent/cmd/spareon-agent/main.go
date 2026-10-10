@@ -1,4 +1,4 @@
-// Command binjari-agent runs on PC-bang PCs and executes inference only while no customer is present.
+// Command spareon-agent runs on PC-bang PCs and executes inference only while no customer is present.
 //
 // SKELETON(S17): `run` is the S04 walking-skeleton console mode (internal/devagent); the agent core,
 // Windows service and session helper arrive in S17-S18.
@@ -16,16 +16,16 @@ import (
 	"syscall"
 	"time"
 
-	"binjari/agent/internal/devagent"
-	"binjari/agent/internal/devauth"
-	"binjari/agent/internal/runtime"
-	"binjari/agent/internal/version"
+	"spareon/agent/internal/devagent"
+	"spareon/agent/internal/devauth"
+	"spareon/agent/internal/runtime"
+	"spareon/agent/internal/version"
 )
 
-const programName = "binjari-agent"
+const programName = "spareon-agent"
 
 // secretEnv lets the secret stay out of the process list and shell history.
-const secretEnv = "BINJARI_DEV_AGENT_SECRET"
+const secretEnv = "SPAREON_DEV_AGENT_SECRET"
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

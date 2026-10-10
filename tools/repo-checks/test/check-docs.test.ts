@@ -39,7 +39,7 @@ const GOOD_ADR = [
 ].join('\n');
 
 beforeEach(() => {
-  root = mkdtempSync(path.join(tmpdir(), 'binjari-docs-'));
+  root = mkdtempSync(path.join(tmpdir(), 'spareon-docs-'));
 });
 afterEach(() => {
   rmSync(root, { recursive: true, force: true });

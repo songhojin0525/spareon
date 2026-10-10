@@ -1,5 +1,5 @@
 {
-  "name": "@binjari/protocol",
+  "name": "@spareon/protocol",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -12,7 +12,7 @@
     "test": "vitest run"
   },
   "devDependencies": {
-    "@binjari/testkit": "workspace:*",
+    "@spareon/testkit": "workspace:*",
     "@types/node": "catalog:",
     "fast-check": "catalog:",
     "tsx": "catalog:",
@@ -20,7 +20,7 @@
     "vitest": "catalog:"
   },
   "dependencies": {
-    "@binjari/shared": "workspace:*",
+    "@spareon/shared": "workspace:*",
     "ajv": "catalog:"
   }
 }

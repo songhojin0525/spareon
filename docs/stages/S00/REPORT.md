@@ -20,8 +20,8 @@ pnpm install
 pnpm verify              # 전체 게이트
 pnpm verify --quick      # *.int.test.ts 제외
 pnpm verify --only=go    # Go 단계만 (--only=ts)
-pnpm --filter @binjari/server dev     # http://127.0.0.1:8080/healthz
-cd apps/agent && go run ./cmd/binjari-agent version
+pnpm --filter @spareon/server dev     # http://127.0.0.1:8080/healthz
+cd apps/agent && go run ./cmd/spareon-agent version
 pnpm lint:ci             # actionlint (Go 필요)
 ```
 
@@ -30,8 +30,8 @@ pnpm lint:ci             # actionlint (Go 필요)
 |---|---|---|---|
 | 1 | 깨끗한 클론에서 install+verify | 스크래치 폴더 `git clone` → `pnpm install --frozen-lockfile` → `pnpm verify` | PASS(9단계, 리뷰 반영 전 코드). 리뷰 반영 후 작업 트리에서 재실행 PASS (9 step(s) passed), 지휘자 재확인 PASS |
 | 2 | Windows 교차 빌드 | `pnpm verify`의 `go:build-windows`(GOOS=windows GOARCH=amd64 go build ./...) | PASS |
-| 3 | DATABASE_URL 없이 DB 테스트 | `pnpm --filter @binjari/testkit test` (URL 미설정) | PASS (17 tests, embedded-postgres 16.14, Windows) |
-| 4 | 린트 규칙 증명 | `pnpm --filter @binjari/repo-checks test` (lint-rules.test.ts) | PASS. 규칙을 약화한 변이 실험 3회 모두 테스트 실패로 잡힘 |
+| 3 | DATABASE_URL 없이 DB 테스트 | `pnpm --filter @spareon/testkit test` (URL 미설정) | PASS (17 tests, embedded-postgres 16.14, Windows) |
+| 4 | 린트 규칙 증명 | `pnpm --filter @spareon/repo-checks test` (lint-rules.test.ts) | PASS. 규칙을 약화한 변이 실험 3회 모두 테스트 실패로 잡힘 |
 | 5 | ENVIRONMENT.md에 버전·네트워크 | 파일 확인 | PASS |
 | 6 | CI YAML 검증 | `pnpm lint:ci`(actionlint v1.7.12) + ci-config.test.ts | PASS (지적 0건) |
 
@@ -55,7 +55,7 @@ pnpm lint:ci             # actionlint (Go 필요)
 | 테스트 Postgres 16.x | 운영 하한 16에 맞춤 | catalog embedded-postgres |
 | 내부 패키지가 TS 소스를 export | 빌드 순서 부담 회피. 번들은 S30에서 | 각 package.json exports |
 | Markdown은 Prettier 제외 | 보드가 PROGRESS 표를 파싱. 문서는 check-docs가 검사 | .prettierignore |
-| 원격 DATABASE_URL 거부(`BINJARI_ALLOW_REMOTE_TEST_DB=1`로 허용) | 테스트가 DB를 만들고 지움. 운영 DB 보호 | packages/testkit/src/db.ts |
+| 원격 DATABASE_URL 거부(`SPAREON_ALLOW_REMOTE_TEST_DB=1`로 허용) | 테스트가 DB를 만들고 지움. 운영 DB 보호 | packages/testkit/src/db.ts |
 
 ## 사람이 확인할 것 (HUMAN_TODO에 추가함)
 - GitHub 원격 연결 후 push해서 CI 첫 실행 확인(Linux·Windows 러너).
@@ -66,10 +66,10 @@ pnpm lint:ci             # actionlint (Go 필요)
 없음. (보고서 파일 쓰기가 서브에이전트에서 막힌 것은 지휘자가 대신 작성해 해결했다.)
 
 ## 다음 차수에 미치는 영향
-- 모든 패키지는 `defineBinjariVitestConfig()`를 쓴다. DB가 필요하면 `{ useTestDatabase: true }` + `*.int.test.ts` + `createIsolatedDatabase()`.
+- 모든 패키지는 `defineSpareonVitestConfig()`를 쓴다. DB가 필요하면 `{ useTestDatabase: true }` + `*.int.test.ts` + `createIsolatedDatabase()`.
 - S03: `packages/testkit/src/global-setup.ts`의 SKELETON(S03) 자리에서 템플릿 DB에 마이그레이션을 적용한다.
 - 서버 시간은 `apps/server/src/lib/clock.ts`의 Clock만 쓴다. money/ledger/pricing 폴더에서는 Number·Math·부동소수점 금지이고 인라인 ESLint 주석이 무시된다.
-- 새 패키지 규칙: `@binjari/<폴더>`, private, type module, typecheck 스크립트, 테스트가 있으면 `test: vitest run`(repo-checks가 검사). 설치 스크립트가 필요한 의존성은 pnpm-workspace.yaml `allowBuilds`에 이유와 함께 추가한다.
+- 새 패키지 규칙: `@spareon/<폴더>`, private, type module, typecheck 스크립트, 테스트가 있으면 `test: vitest run`(repo-checks가 검사). 설치 스크립트가 필요한 의존성은 pnpm-workspace.yaml `allowBuilds`에 이유와 함께 추가한다.
 
 ## 수치
 - TS 테스트: server 8, web 2, testkit 17(통합 8), repo-checks 약 140. Go 테스트 함수 6. 모두 통과.

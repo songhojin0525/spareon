@@ -1,5 +1,5 @@
-import { newUuidV7 } from '@binjari/shared';
-import { FakeClock } from '@binjari/testkit';
+import { newUuidV7 } from '@spareon/shared';
+import { FakeClock } from '@spareon/testkit';
 import fc from 'fast-check';
 import type pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';

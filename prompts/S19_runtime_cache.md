@@ -19,7 +19,7 @@ PC에서 실제 추론을 돌린다: 서명된 llama.cpp 런타임과 모델을 
 - `apps/agent/internal/runtime/llamacpp/` — 설치·실행·감시·추론·종료
 - `apps/agent/internal/gpu/nvidia/` — nvidia-smi 기반 GPU 정보·사용량·온도·전력·프로세스별 메모리
 - `apps/agent/internal/cache/` — 모델·런타임 캐시, 내려받기 관리자
-- `apps/agent/cmd/binjari-agent bench` 하위 명령 — 실측 도구
+- `apps/agent/cmd/spareon-agent bench` 하위 명령 — 실측 도구
 - 가짜 llama-server(`internal/runtime/llamacpp/fakeserver`) — CI용
 - `docs/RUNTIME.md`, `docs/manual-tests/S19.md`
 
@@ -47,7 +47,7 @@ PC에서 실제 추론을 돌린다: 서명된 llama.cpp 런타임과 모델을 
 - nvidia-smi가 없거나 실패하면 'GPU 정보 없음' → 작업 불가(fail-safe).
 
 ### 5. 캐시와 내려받기
-- 캐시 폴더(설정, 기본 `%ProgramData%\Binjari\cache` — S20에서 영구 드라이브로 바꿀 수 있게), 모델별 하위 폴더, 원자적 저장(.part → 검증 → 이름 바꾸기).
+- 캐시 폴더(설정, 기본 `%ProgramData%\Spareon\cache` — S20에서 영구 드라이브로 바꿀 수 있게), 모델별 하위 폴더, 원자적 저장(.part → 검증 → 이름 바꾸기).
 - 이어받기(HTTP Range), SHA-256 검증, 실패 시 지수 백오프.
 - 대역폭 상한(토큰 버킷), **다운로드 허용 시간대 + 손님 없음일 때만**(S18 신호로 즉시 일시정지).
 - 디스크 보호: 여유 공간이 설정값(기본 20GB 또는 15%) 밑이면 받지 않고, LRU로 오래 안 쓴 모델부터 지움(매장 기본 모델은 고정).
@@ -57,7 +57,7 @@ PC에서 실제 추론을 돌린다: 서명된 llama.cpp 런타임과 모델을 
 ### 6. 개발용 Ollama 어댑터
 - S04 어댑터를 같은 `Runtime` 인터페이스에 맞게 정리(개발·친구 PC 데모용). 운영 매장에서는 llama.cpp만.
 
-### 7. 실측 도구 (`binjari-agent bench`)
+### 7. 실측 도구 (`spareon-agent bench`)
 - 지정 모델로 고정 프롬프트 세트를 돌려: 로딩 시간, 프롬프트 처리 속도, 생성 tokens/s, 최대 VRAM, 평균·최대 전력(nvidia-smi 샘플링), GPU 온도 추이를 측정해 JSON + 사람이 읽는 표로 출력.
 - 결과 JSON 형식은 `tools/econ-sim/params/assumptions.json`의 처리량·전력 항목을 갱신할 수 있게 맞춘다(갱신 스크립트 포함).
 

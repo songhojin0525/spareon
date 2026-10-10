@@ -1,8 +1,8 @@
 {
-  "name": "binjari",
+  "name": "spareon",
   "version": "0.0.0",
   "private": true,
-  "description": "binjari monorepo: idle PC-bang GPUs serve open-source model inference for credits.",
+  "description": "spareon monorepo: idle PC-bang GPUs serve open-source model inference for credits.",
   "type": "module",
   "packageManager": "pnpm@11.28.2",
   "engines": {
@@ -20,8 +20,8 @@
     "board": "node scripts/board.mjs",
     "board:web": "node scripts/board.mjs --web --open",
     "lint:ci": "go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -no-color",
-    "dev:server": "pnpm --filter @binjari/server dev:server",
-    "demo": "pnpm --filter @binjari/server demo"
+    "dev:server": "pnpm --filter @spareon/server dev:server",
+    "demo": "pnpm --filter @spareon/server demo"
   },
   "devDependencies": {
     "@eslint-community/eslint-plugin-eslint-comments": "catalog:",

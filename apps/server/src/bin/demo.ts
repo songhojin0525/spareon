@@ -9,8 +9,8 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
-import * as protocol from '@binjari/protocol';
-import { FakeAgent } from '@binjari/testkit';
+import * as protocol from '@spareon/protocol';
+import { FakeAgent } from '@spareon/testkit';
 
 import { formatMicro } from '../dev/dashboard.js';
 import { devNodeLabel } from '../fleet/nodes.js';
@@ -38,9 +38,9 @@ interface Agents {
 }
 
 function startGoAgents(stack: DevStack, dir: string): Agents {
-  const exe = join(dir, process.platform === 'win32' ? 'binjari-agent.exe' : 'binjari-agent');
+  const exe = join(dir, process.platform === 'win32' ? 'spareon-agent.exe' : 'spareon-agent');
   out('Go 에이전트를 빌드합니다...');
-  const build = spawnSync('go', ['build', '-o', exe, './cmd/binjari-agent'], {
+  const build = spawnSync('go', ['build', '-o', exe, './cmd/spareon-agent'], {
     cwd: AGENT_DIR,
     shell: false,
     encoding: 'utf8',
@@ -64,7 +64,7 @@ function startGoAgents(stack: DevStack, dir: string): Agents {
       {
         shell: false,
         // The secret goes through the environment, not the command line.
-        env: { ...process.env, BINJARI_DEV_AGENT_SECRET: stack.agentSecret },
+        env: { ...process.env, SPAREON_DEV_AGENT_SECRET: stack.agentSecret },
         stdio: ['ignore', 'pipe', 'pipe'],
       },
     );
@@ -131,9 +131,9 @@ async function waitForNodes(stack: DevStack, count: number, timeoutMs: number): 
 
 async function main(): Promise<number> {
   const { values } = parseArgs({ options: { ts: { type: 'boolean', default: false } } });
-  const forcedTs = values.ts || process.env['BINJARI_DEMO_AGENT'] === 'ts';
+  const forcedTs = values.ts || process.env['SPAREON_DEMO_AGENT'] === 'ts';
   const useGo = !forcedTs && goAvailable();
-  const dir = await mkdtemp(join(tmpdir(), 'binjari-demo-'));
+  const dir = await mkdtemp(join(tmpdir(), 'spareon-demo-'));
   // A temporary database always: the demo never touches a configured DATABASE_URL.
   const stack = await startDevStack({
     env: {},

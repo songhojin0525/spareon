@@ -32,17 +32,17 @@ Windows 11 / Node 22.18.0 / corepack 0.33.0 / pnpm 11.28.2(전역) / Go 1.27.0 /
      못 찾으면 FAIL.
    - Go 단계: `go version`이 ENOENT면 SKIPPED를 크게 표시한다. `REQUIRE_GO=1`이면 FAIL이다. `gofmt -l` 출력이 비어 있지 않으면 FAIL이다.
    - 실패 판정: 종료 코드 ≠ 0, 시그널 종료, spawn 오류는 모두 FAIL이다. 반박: "에러만 출력하고 성공 처리"하는 경로를 막으려고 판정 함수를 분리해 단위 테스트한다.
-   - `--quick`은 환경변수 `BINJARI_TEST_QUICK=1`로 전달한다. 공용 Vitest 설정(`packages/testkit/src/vitest-config.ts`의 `defineBinjariVitestConfig`)이 이 값을 보고 `*.int.test.ts`와 DB globalSetup을 뺀다. CLI 글롭 인자를 pnpm 경유로 넘기면 셸마다 글롭 해석이 달라서 이 방식을 쓴다.
+   - `--quick`은 환경변수 `SPAREON_TEST_QUICK=1`로 전달한다. 공용 Vitest 설정(`packages/testkit/src/vitest-config.ts`의 `defineSpareonVitestConfig`)이 이 값을 보고 `*.int.test.ts`와 DB globalSetup을 뺀다. CLI 글롭 인자를 pnpm 경유로 넘기면 셸마다 글롭 해석이 달라서 이 방식을 쓴다.
    - `docs` 단계(`scripts/check-docs.mjs`)를 format 다음에 둔다. 게이트 4번 요구사항이다.
 7. **테스트 DB (`packages/testkit`)**
    - `TEST_DATABASE_URL` → `DATABASE_URL` → embedded-postgres 순서로 고른다. embedded-postgres는 **16.x**(`16.14.0-beta.17`)로 고정한다. 운영 하한이 16이므로 하한 버전에서 테스트해야 17+ 전용 기능을 실수로 쓰지 않는다.
-   - globalSetup이 한 번 띄우고 실행마다 고유한 `runId`로 템플릿 DB `binjari_tpl_<runId>`를 만든다. `createIsolatedDatabase()`는 `CREATE DATABASE binjari_t_<runId>_<rand> TEMPLATE …`로 테스트 파일마다 새 DB를 준다.
+   - globalSetup이 한 번 띄우고 실행마다 고유한 `runId`로 템플릿 DB `spareon_tpl_<runId>`를 만든다. `createIsolatedDatabase()`는 `CREATE DATABASE spareon_t_<runId>_<rand> TEMPLATE …`로 테스트 파일마다 새 DB를 준다.
    - 안전: 외부 DB(`DATABASE_URL`)를 쓸 때도 **이번 실행이 만든 접두사 DB만** 만들고 지운다. 다른 DB는 건드리지 않는다. 식별자는 정규식으로 검증한다.
    - root로 실행되는 리눅스(클라우드)에서는 initdb가 거부하므로 `createPostgresUser`를 켠다.
    - 포트는 OS가 준 빈 포트를 쓰고, 시작 실패 시 최대 3회 다른 포트로 재시도한다.
 8. **내부 패키지는 소스(`src/index.ts`)를 직접 export한다(JIT 패키지)**
    - 대안: 각 패키지를 빌드해 `dist`를 export. S00 단계에서는 빌드 순서 관리가 짐만 된다. 운영 번들링은 S30에서 결정한다(가정으로 기록).
-9. **테스트 러너 위치**: 린트 규칙 증명, verify 판정, check-docs, CI YAML 구조 테스트는 `tools/repo-checks`(`@binjari/repo-checks`) 패키지에 둔다. `pnpm -r`은 루트를 포함하지 않으므로 루트 테스트를 따로 두면 빠질 위험이 있다.
+9. **테스트 러너 위치**: 린트 규칙 증명, verify 판정, check-docs, CI YAML 구조 테스트는 `tools/repo-checks`(`@spareon/repo-checks`) 패키지에 둔다. `pnpm -r`은 루트를 포함하지 않으므로 루트 테스트를 따로 두면 빠질 위험이 있다.
 10. **CI**: `linux` 잡은 `REQUIRE_GO=1 pnpm verify`, `windows` 잡은 `apps/agent`에서 `go test ./...`. `concurrency`와 `permissions: contents: read`를 둔다. YAML은 `actionlint`(`go run`, 1회 시도)와 repo-checks의 구조 테스트로 검증한다.
 
 ## 새 의존성과 이유 (모두 MIT/Apache-2.0/ISC)
@@ -53,7 +53,7 @@ Windows 11 / Node 22.18.0 / corepack 0.33.0 / pnpm 11.28.2(전역) / Go 1.27.0 /
 | prettier | 포맷 |
 | vitest | 테스트 (스택 결정) |
 | fastify, zod | 서버 최소 앱과 환경변수 검증 (스택 결정) |
-| tsx | 서버 개발 실행 (`pnpm --filter @binjari/server dev`) |
+| tsx | 서버 개발 실행 (`pnpm --filter @spareon/server dev`) |
 | embedded-postgres, pg, @types/pg | 테스트 DB (스택 결정) |
 | yaml | CI YAML 구조 테스트 |
 | @types/node | Node 타입 |
@@ -70,7 +70,7 @@ Windows 11 / Node 22.18.0 / corepack 0.33.0 / pnpm 11.28.2(전역) / Go 1.27.0 /
 | 1 | PLAN.md, ENVIRONMENT.md, `.gitignore`·`.gitattributes`·`.editorconfig`·`.node-version` | 파일 존재, `git check-attr` |
 | 2 | 루트 워크스페이스 설정(package.json, pnpm-workspace, tsconfig, prettier, eslint) + 패키지 골격(server healthz, web, shared, protocol) + 각 테스트 | `pnpm install`, `pnpm -r typecheck`, `pnpm -r test`, `pnpm lint`, `pnpm format:check` |
 | 3 | 커스텀 금지 규칙 + 증명 테스트(`tools/repo-checks`) | 위반 샘플이 에러, 예외 파일·정상 코드는 통과 |
-| 4 | testkit: `startTestDatabase`, globalSetup, `createIsolatedDatabase` + int 테스트 | `DATABASE_URL` 없이 `pnpm --filter @binjari/testkit test` |
+| 4 | testkit: `startTestDatabase`, globalSetup, `createIsolatedDatabase` + int 테스트 | `DATABASE_URL` 없이 `pnpm --filter @spareon/testkit test` |
 | 5 | Go 에이전트 모듈 + 테스트 | `gofmt -l`, `go vet`, `go test`, `GOOS=windows go build` |
 | 6 | `scripts/verify.mjs`, `scripts/check-docs.mjs` + 판정 단위 테스트 | `pnpm verify`, `pnpm verify --quick`, `--only=go` |
 | 7 | CI 워크플로, README, ADR 0000/0001 | actionlint 또는 YAML 구조 테스트, check-docs |

@@ -3,9 +3,9 @@
  * walking skeleton runs where Go is not installed, and tests can script node behaviour (never accept,
  * go silent, fail, complete twice ...).
  *
- * testkit must not depend on @binjari/protocol (protocol already uses testkit for its Vitest config, and
+ * testkit must not depend on @spareon/protocol (protocol already uses testkit for its Vitest config, and
  * pnpm refuses the cycle), so the caller passes the protocol functions in:
- *   `new FakeAgent({ protocol: await import('@binjari/protocol'), ... })`
+ *   `new FakeAgent({ protocol: await import('@spareon/protocol'), ... })`
  * Messages are encoded with the real codec, so a malformed message fails here, not on the server.
  */
 import { createHash, randomBytes } from 'node:crypto';
@@ -24,7 +24,7 @@ export type FakeDecoded =
   | { readonly ok: true; readonly value: FakeEnvelope }
   | { readonly ok: false; readonly code: string; readonly pause: boolean };
 
-/** The subset of @binjari/protocol the fake agent needs (pass the module itself). */
+/** The subset of @spareon/protocol the fake agent needs (pass the module itself). */
 export interface FakeAgentProtocol {
   readonly PROTOCOL_HASH: string;
   defaultCodec(): {

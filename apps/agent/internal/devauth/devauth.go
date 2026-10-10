@@ -18,18 +18,18 @@ import (
 	"regexp"
 	"time"
 
-	"binjari/agent/internal/protocol"
+	"spareon/agent/internal/protocol"
 )
 
 // NodeIDEpochMs is the timestamp embedded in derived node ids (2026-01-01T00:00:00Z).
 const NodeIDEpochMs = 1_767_225_600_000
 
 const (
-	domainNodeID   = "binjari-dev-node-id-v1"
-	domainNodeKey  = "binjari-dev-node-key-v1"
-	domainFpStore  = "binjari-dev-fp-store-v1"
-	domainFpGlobal = "binjari-dev-fp-global-v1"
-	domainModel    = "binjari-dev-model-v1"
+	domainNodeID   = "spareon-dev-node-id-v1"
+	domainNodeKey  = "spareon-dev-node-key-v1"
+	domainFpStore  = "spareon-dev-fp-store-v1"
+	domainFpGlobal = "spareon-dev-fp-global-v1"
+	domainModel    = "spareon-dev-model-v1"
 )
 
 var reName = regexp.MustCompile(`^[A-Za-z0-9._-]{1,64}$`)

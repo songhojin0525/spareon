@@ -26,7 +26,7 @@
 
 ### 1. 서버 연동
 - `next.config`의 rewrite로 `/api/*` → `SERVER_URL`(환경변수). 브라우저 입장에서 같은 출처라 세션 쿠키·CSRF가 단순해진다.
-- 서버 OpenAPI에서 타입이 있는 클라이언트 생성(`openapi-typescript` + `openapi-fetch`), `pnpm --filter @binjari/web gen:api`. 생성물이 최신인지 검사.
+- 서버 OpenAPI에서 타입이 있는 클라이언트 생성(`openapi-typescript` + `openapi-fetch`), `pnpm --filter @spareon/web gen:api`. 생성물이 최신인지 검사.
 - 서버 컴포넌트에서 세션 확인 → 역할에 맞지 않는 영역 접근 시 리디렉트. **권한의 진실은 서버**에 있고 웹은 숨기기만 한다(서버가 403이면 그대로 처리).
 - CSRF 토큰은 서버(S05) 방식에 맞춰 상태 변경 요청에 자동 첨부.
 
@@ -52,7 +52,7 @@
 - 서버를 거치지 않는 인증, 브라우저 저장소에 토큰 보관
 
 ## 수용 기준
-1. `pnpm verify` 통과, `pnpm --filter @binjari/web build` 성공
+1. `pnpm verify` 통과, `pnpm --filter @spareon/web build` 성공
 2. 인증·역할 E2E 전부 통과
 3. axe 심각 위반 0
 4. 하드코딩 문자열 검사 통과

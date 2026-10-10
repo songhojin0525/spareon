@@ -12,7 +12,7 @@ export interface TestDatabaseInfo {
 
 declare module 'vitest' {
   export interface ProvidedContext {
-    binjariTestDb: TestDatabaseInfo;
+    spareonTestDb: TestDatabaseInfo;
   }
 }
 
@@ -33,16 +33,16 @@ export interface IsolatedDatabaseOptions {
 
 /**
  * Create a fresh database for one test file by cloning this run's template database.
- * Requires `defineBinjariVitestConfig({ useTestDatabase: true })` in the package's vitest config
+ * Requires `defineSpareonVitestConfig({ useTestDatabase: true })` in the package's vitest config
  * and a `*.int.test.ts` file name.
  */
 export async function createIsolatedDatabase(
   options: IsolatedDatabaseOptions = {},
 ): Promise<IsolatedDatabase> {
-  const info = inject('binjariTestDb') as TestDatabaseInfo | undefined;
+  const info = inject('spareonTestDb') as TestDatabaseInfo | undefined;
   if (info === undefined) {
     throw new Error(
-      'Test database is not available. Use defineBinjariVitestConfig({ useTestDatabase: true }) and name the test *.int.test.ts.',
+      'Test database is not available. Use defineSpareonVitestConfig({ useTestDatabase: true }) and name the test *.int.test.ts.',
     );
   }
   const name = isolatedName(info.runId);

@@ -13,7 +13,7 @@
 | 무엇 | 어디에 | 비고 |
 |---|---|---|
 | 이 저장소, Node.js 22 이상, pnpm(`corepack enable`) | 내 PC(서버) | `pnpm install`을 한 번 해 둔다 |
-| Go(최신 안정 버전) | 내 PC | 친구 PC용 `binjari-agent.exe`를 만드는 데만 쓴다 |
+| Go(최신 안정 버전) | 내 PC | 친구 PC용 `spareon-agent.exe`를 만드는 데만 쓴다 |
 | Ollama | 친구 PC마다 | <https://ollama.com> 에서 설치 |
 | 가벼운 채팅 모델 아무거나 하나 | 친구 PC마다 | 예: `qwen2.5:0.5b`. 이름은 예시일 뿐이다. 모든 PC가 같은 모델을 받으면 비교하기 쉽다 |
 
@@ -67,10 +67,10 @@ cloudflared tunnel --url http://localhost:8080
 ```powershell
 cd apps/agent
 $env:GOOS = "windows"; $env:GOARCH = "amd64"
-go build -o binjari-agent.exe ./cmd/binjari-agent
+go build -o spareon-agent.exe ./cmd/spareon-agent
 ```
-macOS·Linux 셸이면 `GOOS=windows GOARCH=amd64 go build -o binjari-agent.exe ./cmd/binjari-agent`.
-만든 `binjari-agent.exe`를 USB·메신저로 친구 PC에 옮긴다. 서명하지 않은 파일이라 Windows SmartScreen이 경고할 수 있다(코드 서명은 S21). "추가 정보 → 실행"으로 실행한다.
+macOS·Linux 셸이면 `GOOS=windows GOARCH=amd64 go build -o spareon-agent.exe ./cmd/spareon-agent`.
+만든 `spareon-agent.exe`를 USB·메신저로 친구 PC에 옮긴다. 서명하지 않은 파일이라 Windows SmartScreen이 경고할 수 있다(코드 서명은 S21). "추가 정보 → 실행"으로 실행한다.
 
 ### 5.2 Ollama와 모델
 친구 PC의 PowerShell에서:
@@ -91,8 +91,8 @@ ollama ps
 
 ### 5.4 에이전트 켜기
 ```powershell
-$env:BINJARI_DEV_AGENT_SECRET = "서버 화면에 나온 에이전트 비밀값"
-.\binjari-agent.exe run --server ws://192.168.0.10:8080/agent/v1/ws --name friend-1 --runtime ollama --model qwen2.5:0.5b --always-available
+$env:SPAREON_DEV_AGENT_SECRET = "서버 화면에 나온 에이전트 비밀값"
+.\spareon-agent.exe run --server ws://192.168.0.10:8080/agent/v1/ws --name friend-1 --runtime ollama --model qwen2.5:0.5b --always-available
 ```
 - `--server`: 4.2절에서 받은 주소(터널이면 `wss://...`).
 - `--name`: PC마다 다른 이름(영문·숫자·`.`·`_`·`-`, 64자 이하).
@@ -125,7 +125,7 @@ $env:BINJARI_DEV_AGENT_SECRET = "서버 화면에 나온 에이전트 비밀값"
 |---|---|
 | 에이전트가 "서버 연결 끊김: connect ... " 를 반복 | ① 서버를 `--lan` 없이 켰다 → `pnpm dev:server --lan` ② 방화벽이 8080 포트를 막는다 → 서버 PC의 Windows Defender 방화벽에서 Node.js의 '개인 네트워크' 허용, 또는 인바운드 규칙으로 TCP 8080 허용 ③ 주소 오타(`ws://IP:8080/agent/v1/ws`), 두 PC가 다른 네트워크(게스트 와이파이 등) ④ 터널이면 `wss://`인지 |
 | 서버가 `EADDRINUSE`(포트 사용 중)로 안 켜짐 | 8080을 다른 프로그램이 쓰는 중 → `pnpm dev:server --lan --port 8081`, 에이전트 주소도 8081로 |
-| 에이전트가 "인증 실패: 에이전트 비밀값이 서버와 다릅니다" | `BINJARI_DEV_AGENT_SECRET`이 서버 화면의 값과 다르다. 서버를 다시 켜면(키를 고정하지 않았으면) 값이 바뀐다 → 4.1절처럼 고정 |
+| 에이전트가 "인증 실패: 에이전트 비밀값이 서버와 다릅니다" | `SPAREON_DEV_AGENT_SECRET`이 서버 화면의 값과 다르다. 서버를 다시 켜면(키를 고정하지 않았으면) 값이 바뀐다 → 4.1절처럼 고정 |
 | 대시보드에서 작업 가능 '아니오' | 에이전트를 `--always-available` 없이 켰다 |
 | 질문이 `503 no_capacity` | 30초 안에 그 모델을 가진 대기 PC가 없었다 → 모델 ID(`qwen2.5-0.5b`)가 에이전트 화면의 ID와 같은지, PC가 '대기'인지 확인 |
 | 질문이 `404 model_not_found` | 아직 어떤 에이전트도 그 모델을 알리지 않았다 → 모델 이름 불일치(`:` 대신 `-`) |

@@ -15,10 +15,10 @@ import (
 // signature for one purpose never verifies for another; every component is format-checked (no "\n"
 // possible) before the bytes are built.
 const (
-	AuthDomain            = "binjari-auth-v1"
-	EnrollDomain          = "binjari-enroll-v1"
-	ModelManifestDomain   = "binjari-model-manifest-v1"
-	ReleaseManifestDomain = "binjari-release-manifest-v1"
+	AuthDomain            = "spareon-auth-v1"
+	EnrollDomain          = "spareon-enroll-v1"
+	ModelManifestDomain   = "spareon-model-manifest-v1"
+	ReleaseManifestDomain = "spareon-release-manifest-v1"
 )
 
 // ErrSigningInput is returned when a signing-bytes component has the wrong format.
@@ -37,7 +37,7 @@ func need(re *regexp.Regexp, v, what string) error {
 	return nil
 }
 
-// AuthSigningBytes is "binjari-auth-v1\n" + nonce + "\n" + nodeId + "\n" + protocolHash (ADR 0008).
+// AuthSigningBytes is "spareon-auth-v1\n" + nonce + "\n" + nodeId + "\n" + protocolHash (ADR 0008).
 func AuthSigningBytes(nonce, nodeID, protocolHash string) ([]byte, error) {
 	if err := errors.Join(
 		need(reHex32, nonce, "nonce"),
@@ -58,7 +58,7 @@ type EnrollSigningInput struct {
 	FpGlobal  string
 }
 
-// EnrollSigningBytes is "binjari-enroll-v1\n" + nonce + "\n" + enrollId + "\n" + publicKey + "\n" +
+// EnrollSigningBytes is "spareon-enroll-v1\n" + nonce + "\n" + enrollId + "\n" + publicKey + "\n" +
 // fpStore + "\n" + fpGlobal.
 func EnrollSigningBytes(in EnrollSigningInput) ([]byte, error) {
 	if err := errors.Join(
@@ -83,7 +83,7 @@ func manifestDomain(kind string) (string, bool) {
 	return "", false
 }
 
-// ManifestSigningBytes is "binjari-<kind>-manifest-v1\n" + the manifest text exactly as transmitted.
+// ManifestSigningBytes is "spareon-<kind>-manifest-v1\n" + the manifest text exactly as transmitted.
 func ManifestSigningBytes(kind, manifestJSON string) ([]byte, error) {
 	d, ok := manifestDomain(kind)
 	if !ok {

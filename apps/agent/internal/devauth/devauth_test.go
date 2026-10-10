@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"binjari/agent/internal/protocol"
+	"spareon/agent/internal/protocol"
 )
 
 type vectors struct {

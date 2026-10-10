@@ -21,7 +21,7 @@ import type {
   JobFailPayload,
   JobPreemptedPayload,
   JobRejectPayload,
-} from '@binjari/protocol';
+} from '@spareon/protocol';
 import { and, asc, desc, eq, inArray, lte, sql } from 'drizzle-orm';
 import type { FastifyBaseLogger } from 'fastify';
 

@@ -14,9 +14,9 @@
 | 스키마(원천) | `packages/protocol/schemas/` — `envelope.json`, `messages/<type>.json`, `http/<name>.json`, `manifests/{model,release}.json`, `defs/{common,policy,job-input}.json` |
 | 데이터(해시에 포함) | `registry.json`(타입·방향·기대 응답·시간 제한·잘못됐을 때 에이전트 멈춤 여부 `onInvalid`), `limits.json`(한도), `defs/error-codes.json`(오류 코드 레지스트리) |
 | 생성물 | `packages/protocol/src/generated/{protocol,bundle}.ts`, `apps/agent/internal/protocol/{zz_generated.go,bundle.json}` |
-| 생성 명령 | `pnpm --filter @binjari/protocol gen` (낡으면 `test/generated.test.ts` 실패) |
-| TS API | `@binjari/protocol`: `defaultCodec()`, `createCodec(bundle)`, `makeMessage`, `authSigningBytes`, `verifySignedManifest`, … |
-| Go API | `binjari/agent/internal/protocol`: `NewCodec()`, `DecodeMessage`, `EncodeMessage`, `AuthSigningBytes`, `VerifySignedManifest`, … |
+| 생성 명령 | `pnpm --filter @spareon/protocol gen` (낡으면 `test/generated.test.ts` 실패) |
+| TS API | `@spareon/protocol`: `defaultCodec()`, `createCodec(bundle)`, `makeMessage`, `authSigningBytes`, `verifySignedManifest`, … |
+| Go API | `spareon/agent/internal/protocol`: `NewCodec()`, `DecodeMessage`, `EncodeMessage`, `AuthSigningBytes`, `VerifySignedManifest`, … |
 | fixture·벡터 | `packages/protocol/fixtures/{valid,invalid,vectors}/` — TS와 Go 테스트가 같은 파일을 읽는다 |
 
 ## 2. 봉투
@@ -271,19 +271,19 @@ sequenceDiagram
 
 ### 9.1 `auth.prove`
 ```
-"binjari-auth-v1\n" + nonce + "\n" + nodeId + "\n" + protocolHash        (UTF-8)
+"spareon-auth-v1\n" + nonce + "\n" + nodeId + "\n" + protocolHash        (UTF-8)
 ```
 `nonce`는 `auth.challenge`의 64자 hex, `nodeId`는 `hello`의 UUIDv7, `protocolHash`는 `hello`의 64자 hex. 서버는 이 세션에서 실제로 보낸 nonce와 받은 hello 값으로 바이트를 만들어 검증한다. nonce는 한 번만 쓰고 5초 뒤 만료된다(S11).
 
 ### 9.2 `enroll.complete`
 ```
-"binjari-enroll-v1\n" + nonce + "\n" + enrollId + "\n" + publicKey + "\n" + fpStore + "\n" + fpGlobal
+"spareon-enroll-v1\n" + nonce + "\n" + enrollId + "\n" + publicKey + "\n" + fpStore + "\n" + fpGlobal
 ```
 `nonce`·`enrollId`는 `enroll.start.response`의 값. 서명 키는 등록하려는 새 공개키(키 소유 증명). 서버(S10)는 서명을 확인하기 전에 `isAcceptablePublicKey`로 키를 거부할 수 있고, 저장하는 공개키 문자열은 정규 인코딩 하나뿐이므로 문자열 비교로 같은 키를 찾는다.
 
 ### 9.3 매니페스트(모델·릴리스)
 ```
-"binjari-model-manifest-v1\n" + manifest        또는        "binjari-release-manifest-v1\n" + manifest
+"spareon-model-manifest-v1\n" + manifest        또는        "spareon-release-manifest-v1\n" + manifest
 ```
 `manifest`는 매니페스트 객체의 **정규화 JSON 문자열**이고 메시지에 그 문자열 그대로 실린다. 받는 쪽 순서(검증 후 파싱):
 1. `keyId`가 신뢰 키 목록에 있다(에이전트 내장: 현재 키 + 다음 키, ADR 0015) → 아니면 `manifest_signature_invalid`
@@ -299,7 +299,7 @@ sequenceDiagram
 - 쓰는 곳: `protocolHash`(스키마 번들), 매니페스트 서명, `capabilitiesDigest`
 
 ## 11. 버전 정책
-- `protocolHash` = SHA-256(정규화 JSON(`{"format":"binjari-protocol-bundle/1","files":{<schemas/ 아래 상대 경로>: <파싱한 JSON>}}`)). 서식·키 순서·줄바꿈은 해시를 바꾸지 않고, 내용 변경은 무엇이든 바꾼다. TS와 Go가 같은 값을 각자 계산하는 테스트가 있다(Go는 원천 스키마 파일을 직접 읽어 계산).
+- `protocolHash` = SHA-256(정규화 JSON(`{"format":"spareon-protocol-bundle/1","files":{<schemas/ 아래 상대 경로>: <파싱한 JSON>}}`)). 서식·키 순서·줄바꿈은 해시를 바꾸지 않고, 내용 변경은 무엇이든 바꾼다. TS와 Go가 같은 값을 각자 계산하는 테스트가 있다(Go는 원천 스키마 파일을 직접 읽어 계산).
 - 서버는 지원 해시 집합(`SUPPORTED_PROTOCOL_HASHES`, 현재 해시가 맨 앞)을 갖고, 모르는 해시는 `auth.fail(protocol_unsupported)`. 에이전트는 이 코드를 받으면 `Updating`으로 가서 업데이트를 기다린다.
 - **호환되는 변경**(필드 추가는 선택 필드로만, 열거값 추가, 한도 완화)도 해시를 바꾼다. 그래서:
   1. 바꾸기 전 번들(`src/generated/bundle.ts`의 내용)을 `packages/protocol/history/<옛 해시>.json`으로 보관하고 그 해시를 지원 집합에 남긴다.
@@ -311,12 +311,12 @@ sequenceDiagram
 ## 12. 보안 고려
 - **재전송**: `auth.prove`는 일회용 nonce에 묶인다. 메시지 `id`는 중복 감지용이며, 돈·상태에 영향을 주는 처리(`job.complete` 첫 유효 완료, 캡처)는 서버 쪽 조건부 갱신·멱등 키로 막는다(AGT-08, S11·S12). 시도 메시지는 세션의 노드가 그 시도의 노드인지 서버가 확인한다(AGT-09).
 - **크기**: 메시지 1 MiB, HTTPS 본문 64 KiB, 인라인 텍스트 256 KiB, `inputRef` 본문 16 MiB, 모든 문자열 `maxLength`, 모든 배열 `maxItems`, 모든 정수 범위, 중첩 32단계. 생성기가 규칙을 강제하므로 '제한 없는 필드'는 만들 수 없다(13절).
-- **중계(가정)**: `auth.prove` 서명 대상에는 서버 식별자(audience)가 없다. 같은 `protocolHash`를 쓰는 다른 서버(스테이징·악성)가 운영 서버의 challenge를 노드에 중계하면 그 노드로 가장할 수 있으나, 노드는 TLS로 운영 서버 인증서를 확인하고 접속 주소는 설치 때 고정되므로 막힌다고 가정한다. 이 가정이 깨지면(예: 노드가 여러 서버에 접속) 도메인 문자열을 `binjari-auth-v2`로 올리고 서버 origin을 구성요소로 넣는다.
+- **중계(가정)**: `auth.prove` 서명 대상에는 서버 식별자(audience)가 없다. 같은 `protocolHash`를 쓰는 다른 서버(스테이징·악성)가 운영 서버의 challenge를 노드에 중계하면 그 노드로 가장할 수 있으나, 노드는 TLS로 운영 서버 인증서를 확인하고 접속 주소는 설치 때 고정되므로 막힌다고 가정한다. 이 가정이 깨지면(예: 노드가 여러 서버에 접속) 도메인 문자열을 `spareon-auth-v2`로 올리고 서버 origin을 구성요소로 넣는다.
 - **서명 대상**: 9절. 도메인 분리, 형식 검사로 경계 고정, 비정규 스칼라 거부, 매니페스트는 검증 후 파싱.
 - **신뢰 경계**: 노드가 보낸 문자열(이름·버전·오류 메시지)은 좁은 문자 집합·길이 상한(WEB-03). 표시할 때도 웹은 이스케이프한다(S23).
 - **구별 불가능성**: `job.offer`에는 검증 표시가 없고 시드는 항상 있다(D4). 검증 작업의 크기·지연 분포 비교는 S13.
 - **내용 비노출**: 거부 사유(`detail`)·오류 메시지에 프롬프트·출력을 넣지 않는다(테스트로 확인).
-- **원격 로딩 없음**: 스키마 `$id`는 `https://schemas.binjari.invalid/…`(절대 해석되지 않는 주소)이고, 두 검증기 모두 외부 로더를 쓰지 않는다.
+- **원격 로딩 없음**: 스키마 `$id`는 `https://schemas.spareon.invalid/…`(절대 해석되지 않는 주소)이고, 두 검증기 모두 외부 로더를 쓰지 않는다.
 
 ## 13. 스키마 작성 규칙 (생성기가 강제)
 1. 허용 키워드만. `format`, `title`·`description`·`examples`·`default`(사람이 읽는 문구) 금지

@@ -8,7 +8,7 @@
  */
 import { randomBytes } from 'node:crypto';
 
-import { MICRO_CR_PER_CR } from '@binjari/shared';
+import { MICRO_CR_PER_CR } from '@spareon/shared';
 import { eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 
@@ -58,7 +58,7 @@ export async function ensureSkeletonWorld(
       const userId = id();
       await tx.insert(users).values({
         id: userId,
-        email: `skeleton-${role}-${userId.slice(-12)}@binjari.test`,
+        email: `skeleton-${role}-${userId.slice(-12)}@spareon.test`,
         passwordHash: UNUSABLE_PASSWORD_HASH,
         role,
         displayName: name,

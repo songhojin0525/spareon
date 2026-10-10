@@ -1,5 +1,5 @@
-import { isUuidV7, MICRO_CR_PER_CR, uuidV7TimeMs } from '@binjari/shared';
-import { createSeededRandom, FakeClock } from '@binjari/testkit';
+import { isUuidV7, MICRO_CR_PER_CR, uuidV7TimeMs } from '@spareon/shared';
+import { createSeededRandom, FakeClock } from '@spareon/testkit';
 import { eq, type SQL, sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
@@ -350,7 +350,7 @@ describe('dev seed', () => {
       sql`SELECT b.balance::text AS balance FROM account_balances b
             JOIN ledger_accounts a ON a.id = b.account_id
             JOIN users u ON u.id = a.owner_id
-           WHERE u.email = 'buyer@binjari.test' AND a.currency = 'CR'`,
+           WHERE u.email = 'buyer@spareon.test' AND a.currency = 'CR'`,
     );
     expect(wallet.rows[0]?.balance).toBe((10n * MICRO_CR_PER_CR).toString());
   });

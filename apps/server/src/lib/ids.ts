@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 
-import { uuidV7 } from '@binjari/shared';
+import { uuidV7 } from '@spareon/shared';
 
 import type { Clock } from './clock.js';
 

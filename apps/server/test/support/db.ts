@@ -1,4 +1,4 @@
-import { createIsolatedDatabase, type IsolatedDatabaseOptions, withClient } from '@binjari/testkit';
+import { createIsolatedDatabase, type IsolatedDatabaseOptions, withClient } from '@spareon/testkit';
 import type pg from 'pg';
 
 import { createDb, type DbHandle } from '../../src/db/client.js';

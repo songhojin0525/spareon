@@ -4,60 +4,60 @@
     {
       "secret": "dev-agent-secret-0123456789abcdef",
       "name": "friend-pc-1",
-      "nodeId": "019b76da-a800-75fd-927b-f75287937db3",
-      "seedHex": "d3e9711d3e54bf56a2ff7d956f7062cd998537ee47d8056105f43ad5be1a8bb4",
-      "publicKey": "a392c8d616840dfb8dc3752c6c8542bf52288875f3d3a47ffc1c866000f3a201",
-      "fpStore": "f801d9319d6d1714f3d848a3448588fd069da5dabf42bdd7809941567010fda6",
-      "fpGlobal": "68a4beaf28945bf4f207dfe1ad77ddec22fd3d3162aa869793cb01d83fc8118d",
+      "nodeId": "019b76da-a800-764c-82c6-d5c77af17bb4",
+      "seedHex": "9d409e944832a35a366f97664b7d669f98747a89c789d13823bc24af63108eb8",
+      "publicKey": "331f9a39888109271473bfeab3300652312c3a667296cd6f27aa6a2ff88deb75",
+      "fpStore": "d3ecdae91a2f0693d5fb52bd42b5bbadf0fe3b386c1de720d997d145e9e10e88",
+      "fpGlobal": "b393e1aca725e7e9aa67ab2e883525116a874da89c398dc13370e75847bb7cfa",
       "authNonce": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
-      "authProtocolHash": "c67e072c232742c69718f4e49fa18fdc44f2fc65f61a165e6277af3173e5c6ff",
-      "authSignature": "3ef92e72a91a16ed8bb481c8e0b05b5003eeff6fab0013cb4dc2d1fcb8507ad069113ea8ddc2123782f0f980290943b762627ab793f153fa0e4dda704567950b"
+      "authProtocolHash": "2028a45f0dfe3c6552fd7eecc6abe56391d4d2a753f37121852030463a06dda9",
+      "authSignature": "aea5172911a1b0305e515598bf9a800df0be3806be6b2a335b35da9e19770b9a137b6871f4ba4f40a793c0cc32164fafe6cd0e28641467a3f7531beead8a280c"
     },
     {
       "secret": "dev-agent-secret-0123456789abcdef",
       "name": "friend-pc-2",
-      "nodeId": "019b76da-a800-7994-ad71-492c0555c5be",
-      "seedHex": "aaa9020f162a819ea1e04fc12e0e507991ea8cfe66ccc33ba57a39f5814ca384",
-      "publicKey": "f4b4d0414e3693dfa819f69ed17fe40fc81e6e8426deb51c730505fc18eb4cde",
-      "fpStore": "3633c4cb29bcf7f43508a608949365b317cf49bfc9efb664d79cc521e1140e1f",
-      "fpGlobal": "d37de64ad331432c9046267f827388609943cbe34c0bd14aead114b1cfe13fcd",
+      "nodeId": "019b76da-a800-77c7-9958-37b4c5d00fad",
+      "seedHex": "d659d96cdd2e2ba09e4d149ca6aab83e7f67fb80ce54d137b504e2bc4ac721b4",
+      "publicKey": "064dae1cc9b2476a03e35d8ed4b14c66994b07b884c09e53544c1d51677f4467",
+      "fpStore": "57c88b3f6e044ae203927a4b5620611e52cf4c57e8f56112815e1620400bb788",
+      "fpGlobal": "56c8cb1a9c75dc9370831387c9da3d896759ab696b444d94331a7869db795b95",
       "authNonce": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
-      "authProtocolHash": "c67e072c232742c69718f4e49fa18fdc44f2fc65f61a165e6277af3173e5c6ff",
-      "authSignature": "9682fe6bac26a914e41bfbd23b0251970f6b7906fd48c7a7f99242fad40bb87bce04b78013d268e29878e3be4bf605c9f3c5ba6ec37b3446ab562fc34f82da0a"
+      "authProtocolHash": "2028a45f0dfe3c6552fd7eecc6abe56391d4d2a753f37121852030463a06dda9",
+      "authSignature": "5dbe904377756683882fcbb1b406254a6fe44f6f8fc2c838ade2aa81c1881b657a234e924d35eb1e3bd305f20ba790db858ef2b8ac43446fbe28a67f81e2c600"
     },
     {
       "secret": "한글 비밀값도 UTF-8 바이트로 쓴다 0123456789",
       "name": "A.b_c-9",
-      "nodeId": "019b76da-a800-7914-a872-6dc06a1e32ae",
-      "seedHex": "527c6afa1861cb52151b28d835e2e6f845462b4a9be27591ee84d8ea0995af69",
-      "publicKey": "daa525573c3e1aeff13ed5354ff42734ea0300ceae5cae28d0aa2ff340bb69ab",
-      "fpStore": "75cb7dd781876a63a2fb284e97fe185dc85d95a8b978165b2902d4593c953e14",
-      "fpGlobal": "b14bd9e9b3ff30d3626d28263d0cbf8c424dcb8e7a5dff8f74c931bffb38159f",
+      "nodeId": "019b76da-a800-7c84-b300-a7369f0cde34",
+      "seedHex": "5b7118a9a272dc17bcbaf371421eab7772a4813fef1d1117480fa978b39e755e",
+      "publicKey": "f1aa16fee160452f830577729bb09aef058346dcace986b1877fed5b6bd9a340",
+      "fpStore": "90105704ea9b34992b066d8b83e577410b0dd51170471299bc6311dc87250d8b",
+      "fpGlobal": "a0cd6e7bb10cf7c0394c8b2012e560d13ee2c57cdadb71f43bb938c0b57cce05",
       "authNonce": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
-      "authProtocolHash": "c67e072c232742c69718f4e49fa18fdc44f2fc65f61a165e6277af3173e5c6ff",
-      "authSignature": "f5d8b734678d9d202344043d2d89e35d6bd54cda3430560d2f663a82552661ab33e1d9894333acff6501f033fcbafa5ec78143b05e3da343996463c169a46e0c"
+      "authProtocolHash": "2028a45f0dfe3c6552fd7eecc6abe56391d4d2a753f37121852030463a06dda9",
+      "authSignature": "2dfb8eb917213b2ec79ee1ff691f663dcbf4dd67ba01ae6e7a0eb05ac27db19c0901616a8c383cf16df80e76792f1188eae12d4031a5312418e615117c7d5208"
     },
     {
       "secret": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
       "name": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",
-      "nodeId": "019b76da-a800-7e62-85b1-954061f54a0e",
-      "seedHex": "1b49df93a8a6edfa52bf2941fe1c2becdda6c41962bdf8374d387236cbbaec87",
-      "publicKey": "97e1412144b843cf13f1fa74387e10816ea291ee10e7ddac9a9db5ef77612e6c",
-      "fpStore": "3775addfc7765b2242027133a4fcaab0ce03eaa799c6d94424ddeece175e0d0e",
-      "fpGlobal": "fe72369ddd5a4b45a08bdcf946efd61dd94f39c7c54ded403ae2eb757755a00d",
+      "nodeId": "019b76da-a800-78af-8e72-93b767245e8e",
+      "seedHex": "e012fd09ac82a37ac251617aa55cb10208a1a044c0b9e4b4917cd15827921d5e",
+      "publicKey": "b515cac95a109a9045f950b6c03abd1d8c688d738c5de9dcd8fb51bab7bc75ca",
+      "fpStore": "b6a890a38838f6f1c82076526cf4dd39dfc67821d87c7ef2aa9f7b9971603912",
+      "fpGlobal": "de094260b64e423e29b8574bfcd8ceee5679b9efb4de474070ae3474b818e569",
       "authNonce": "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
-      "authProtocolHash": "c67e072c232742c69718f4e49fa18fdc44f2fc65f61a165e6277af3173e5c6ff",
-      "authSignature": "eabb4cd3f913e11316c9a6f8edd9cf391910a079c6600128a5565ce875466b7dcbb04813aa9ac34118b63098a4ebff1fa9666a094a83729d1c50c6ecac31c609"
+      "authProtocolHash": "2028a45f0dfe3c6552fd7eecc6abe56391d4d2a753f37121852030463a06dda9",
+      "authSignature": "fcf7d0e8ff714ff564f21801382b3c4427a574ff452c7c02b79b7ea545f5bfe054318cbea922317c65fd799f680a02db7e137fb3f105d16dee45f7453d9dda00"
     }
   ],
   "models": [
     {
       "id": "fake-echo",
-      "sha256": "a47abb9f8a791dd9784163dbb3e41667220bc9707d27d8a81210fd9f40d5d1dd"
+      "sha256": "a4b64b9cfe5d20a5b0100ca81ef2ae15cfdd92a698bbc488e198f907f0e0c4ab"
     },
     {
       "id": "qwen2.5-0.5b",
-      "sha256": "9c7b6c432054a677d392e3708f4fbaee52bf24a3c51958705627eef75dff20e8"
+      "sha256": "596e183ae9d46484755986743f4b7d57b37e3ec3e99d8fee29ca5a3cd412aebb"
     }
   ],
   "invalidNames": [

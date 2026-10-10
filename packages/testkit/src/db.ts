@@ -30,12 +30,12 @@ export function resolveDatabaseSource(
       if (
         envVar === 'DATABASE_URL' &&
         !isLocalHost(value) &&
-        env['BINJARI_ALLOW_REMOTE_TEST_DB'] !== '1'
+        env['SPAREON_ALLOW_REMOTE_TEST_DB'] !== '1'
       ) {
         throw new Error(
           `DATABASE_URL points at a remote host (${redactUrl(value)}); tests would create/drop databases there. ` +
             'Set TEST_DATABASE_URL for a dedicated test server, unset DATABASE_URL to use embedded Postgres, ' +
-            'or set BINJARI_ALLOW_REMOTE_TEST_DB=1.',
+            'or set SPAREON_ALLOW_REMOTE_TEST_DB=1.',
         );
       }
       return { kind: 'external', url: value, envVar };
@@ -100,7 +100,7 @@ export async function startTestDatabase(
 }
 
 async function startEmbedded(onLog?: (line: string) => void): Promise<TestDatabase> {
-  const root = await mkdtemp(join(tmpdir(), 'binjari-pg-'));
+  const root = await mkdtemp(join(tmpdir(), 'spareon-pg-'));
   const port = await getFreePort();
   const password = randomBytes(16).toString('hex');
   const logTail: string[] = [];

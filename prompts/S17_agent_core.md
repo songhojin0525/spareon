@@ -18,7 +18,7 @@ PC방 PC에서 몇 달 동안 꺼지지 않고 돌아갈 에이전트의 뼈대�
 ## 산출물
 ```
 apps/agent/
-  cmd/binjari-agent/   서비스·콘솔 겸용 실행 파일
+  cmd/spareon-agent/   서비스·콘솔 겸용 실행 파일
   cmd/nodesim/         가상 노드 N개 실행기
   internal/
     config/ logging/ state/ identity/ enroll/ conn/ protocol/
@@ -61,7 +61,7 @@ apps/agent/
 - 지표: 상태별 체류 시간, 작업 수, 실패 사유, 재연결 수, 선점 지연(손님 입력 → 프로세스 종료 → VRAM 해제 — 측정 지점 정의는 여기서, 실제 측정은 S18). `status` 메시지로 서버에 보고.
 
 ### 7. 명령
-- `binjari-agent run`(콘솔), `enroll --code`, `status`(로컬 상태 요약), `version`, `service install|uninstall|start|stop`(Windows가 아니면 '지원 안 함' 메시지 — 실제 구현 S21).
+- `spareon-agent run`(콘솔), `enroll --code`, `status`(로컬 상태 요약), `version`, `service install|uninstall|start|stop`(Windows가 아니면 '지원 안 함' 메시지 — 실제 구현 S21).
 
 ### 8. 노드 시뮬레이터 (`cmd/nodesim`)
 - 한 프로세스에서 가상 노드 N개(목표 500개 이상)를 실제 에이전트 코드 경로로 실행(가짜 런타임·가짜 손님 감지).

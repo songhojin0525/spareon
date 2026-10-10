@@ -6,7 +6,7 @@ import type {
   MessageType,
   PayloadOf,
   ServerMessageType,
-} from '@binjari/protocol';
+} from '@spareon/protocol';
 
 export type SendResult = 'sent' | 'closed' | 'invalid';
 

@@ -39,9 +39,9 @@
 
 ## 테스트 DB 선택 규칙 (`packages/testkit`)
 1. `TEST_DATABASE_URL`이 있으면 그 서버를 쓴다(전용 테스트 서버로 간주).
-2. 없고 `DATABASE_URL`이 있으면, 호스트가 `localhost`·`127.0.0.1`·`[::1]`일 때만 쓴다. 원격 호스트면 테스트가 실패한다. 테스트가 그 서버에 DB를 만들고 지우기 때문이다. 정말 원격을 쓰려면 `BINJARI_ALLOW_REMOTE_TEST_DB=1`을 설정한다.
+2. 없고 `DATABASE_URL`이 있으면, 호스트가 `localhost`·`127.0.0.1`·`[::1]`일 때만 쓴다. 원격 호스트면 테스트가 실패한다. 테스트가 그 서버에 DB를 만들고 지우기 때문이다. 정말 원격을 쓰려면 `SPAREON_ALLOW_REMOTE_TEST_DB=1`을 설정한다.
 3. 둘 다 없으면 embedded-postgres 16을 임시 디렉터리와 빈 포트로 띄우고, 끝나면 지운다.
-어느 경우든 이번 실행이 만든 `binjari_tpl_<runId>`, `binjari_t_<runId>_*` DB만 만들고 지운다.
+어느 경우든 이번 실행이 만든 `spareon_tpl_<runId>`, `spareon_t_<runId>_*` DB만 만들고 지운다.
 
 ## 다른 환경에서 확인할 것
 - **Claude Code 클라우드(리눅스, 네트워크 제한)**: npm 레지스트리 접근이 막히면 `pnpm install` 자체가 불가능하다. 그 경우 `HUMAN_TODO.md`에 적고 끝낸다. root로 실행되면 testkit이 embedded-postgres에 `createPostgresUser`를 켠다(initdb는 root 실행을 거부).

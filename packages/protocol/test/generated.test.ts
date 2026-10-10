@@ -17,11 +17,11 @@ const onDisk = (rel: string): string =>
 
 const source = readSchemaSources();
 
-describe('generated files are up to date (run `pnpm --filter @binjari/protocol gen`)', () => {
+describe('generated files are up to date (run `pnpm --filter @spareon/protocol gen`)', () => {
   const fresh = generateAll(source);
 
   it.each([...fresh.keys()])('%s', (rel) => {
-    expect(onDisk(rel), `${rel} is stale: run pnpm --filter @binjari/protocol gen`).toBe(
+    expect(onDisk(rel), `${rel} is stale: run pnpm --filter @spareon/protocol gen`).toBe(
       fresh.get(rel),
     );
   });

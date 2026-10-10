@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schemas.binjari.invalid/protocol/http/enroll.start.request.json",
+  "$id": "https://schemas.spareon.invalid/protocol/http/enroll.start.request.json",
   "type": "object",
   "additionalProperties": false,
   "required": ["code", "agentVersion", "protocolHash"],

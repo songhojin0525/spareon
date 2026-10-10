@@ -1,3 +1,3 @@
-import { defineBinjariVitestConfig } from '@binjari/testkit/vitest-config';
+import { defineSpareonVitestConfig } from '@spareon/testkit/vitest-config';
 
-export default defineBinjariVitestConfig();
+export default defineSpareonVitestConfig();

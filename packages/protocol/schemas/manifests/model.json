@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schemas.binjari.invalid/protocol/manifests/model.json",
+  "$id": "https://schemas.spareon.invalid/protocol/manifests/model.json",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -16,7 +16,7 @@
   "properties": {
     "schema": {
       "type": "string",
-      "const": "binjari.model-manifest/1"
+      "const": "spareon.model-manifest/1"
     },
     "modelId": {
       "$ref": "../defs/common.json#/$defs/modelId"

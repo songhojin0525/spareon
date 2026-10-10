@@ -1,4 +1,4 @@
-import { uuidV7 } from '@binjari/shared';
+import { uuidV7 } from '@spareon/shared';
 
 import type { Db, Tx } from '../db/client.js';
 import {
@@ -35,7 +35,7 @@ import type { Clock } from '../lib/clock.js';
  * through the ledger service (S06), which adds locking order, idempotent replays and audit records.
  */
 
-/** Source of random bytes; @binjari/testkit's createSeededRandom satisfies it (deterministic ids). */
+/** Source of random bytes; @spareon/testkit's createSeededRandom satisfies it (deterministic ids). */
 export interface RandomBytes {
   bytes(length: number): Uint8Array;
 }

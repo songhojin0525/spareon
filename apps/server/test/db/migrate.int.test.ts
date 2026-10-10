@@ -2,7 +2,7 @@ import { cp, mkdtemp, readFile, rm, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
-import { dumpSchema } from '@binjari/testkit';
+import { dumpSchema } from '@spareon/testkit';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import { runDbCli } from '../../src/db/cli.js';
@@ -21,7 +21,7 @@ import { migrationBetween, type SchemaSnapshot, snapshotOf } from '../support/dr
 
 const TAGS = ['0000_schema', '0001_invariants', '0002_app_role', '0003_review_fixes'];
 
-/** Schema dump of the app's objects; binjari_meta (migration bookkeeping) is compared separately. */
+/** Schema dump of the app's objects; spareon_meta (migration bookkeeping) is compared separately. */
 async function dump(db: TestDb): Promise<string> {
   return db.withClient((c) => dumpSchema(c, { schemas: ['public'] }));
 }
@@ -46,7 +46,7 @@ describe('migration runner', () => {
   };
   /** A writable copy of the real migrations directory. */
   const copyMigrations = async (): Promise<string> => {
-    const dir = await mkdtemp(path.join(tmpdir(), 'binjari-migrations-'));
+    const dir = await mkdtemp(path.join(tmpdir(), 'spareon-migrations-'));
     dirs.push(dir);
     await cp(DEFAULT_MIGRATIONS_DIR, dir, { recursive: true });
     return dir;
@@ -147,7 +147,7 @@ describe('migration runner', () => {
     expect((err as MigrationError).tag).toBe('0001_invariants');
     expect((err as MigrationError).message).toContain('no_such_table');
     const state = await db.withClient(async (c) => ({
-      tags: (await c.query<{ tag: string }>('SELECT tag FROM binjari_meta.migrations')).rows.map(
+      tags: (await c.query<{ tag: string }>('SELECT tag FROM spareon_meta.migrations')).rows.map(
         (r) => r.tag,
       ),
       halfDone: (await c.query<{ t: string | null }>("SELECT to_regclass('public.half_done') AS t"))
@@ -198,7 +198,7 @@ describe('migration runner', () => {
       async (c) =>
         (
           await c.query<{ n: number }>(
-            "SELECT count(*)::int AS n FROM pg_namespace WHERE nspname = 'binjari_meta'",
+            "SELECT count(*)::int AS n FROM pg_namespace WHERE nspname = 'spareon_meta'",
           )
         ).rows[0]?.n,
     );
@@ -304,7 +304,7 @@ describe('db CLI', () => {
     expect((await run(['rollback', '--yes', '--steps', '0'])).code).toBe(2);
     expect((await run([])).code).toBe(2);
     const bad = await run(['status'], {
-      DATABASE_URL: 'postgres://binjari:hunter2-secret@127.0.0.1:1/nope',
+      DATABASE_URL: 'postgres://spareon:hunter2-secret@127.0.0.1:1/nope',
     });
     expect(bad.code).toBe(1);
     expect(bad.err.join('\n')).not.toContain('hunter2-secret');

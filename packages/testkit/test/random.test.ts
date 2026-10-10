@@ -4,6 +4,8 @@ import { createSeededRandom } from '../src/random.js';
 
 describe('createSeededRandom', () => {
   it('is deterministic for a seed and pinned across platforms', () => {
+    // The seed is only test input: the golden values below were computed for 'binjari' (the project's old
+    // codename) and must stay pinned to it so a real algorithm change still shows up here.
     const a = createSeededRandom('binjari');
     const b = createSeededRandom('binjari');
     const seqA = Array.from({ length: 5 }, () => a.uint32());

@@ -41,7 +41,7 @@ func sourceBundleHash(t *testing.T) (string, []byte) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	canonical, err := CanonicalJSON(map[string]any{"format": "binjari-protocol-bundle/1", "files": files})
+	canonical, err := CanonicalJSON(map[string]any{"format": "spareon-protocol-bundle/1", "files": files})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +54,7 @@ func sourceBundleHash(t *testing.T) (string, []byte) {
 func TestProtocolHashMatchesTS(t *testing.T) {
 	got, canonical := sourceBundleHash(t)
 	if got != ProtocolHash {
-		t.Fatalf("hash from source schemas %s != generated ProtocolHash %s (run pnpm --filter @binjari/protocol gen)", got, ProtocolHash)
+		t.Fatalf("hash from source schemas %s != generated ProtocolHash %s (run pnpm --filter @spareon/protocol gen)", got, ProtocolHash)
 	}
 	if !bytes.Equal(canonical, bytes.TrimSuffix(bundleJSON, []byte("\n"))) {
 		t.Fatal("embedded bundle.json differs from the canonical source bundle (run gen)")

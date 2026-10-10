@@ -21,9 +21,9 @@ import (
 
 	"github.com/coder/websocket"
 
-	"binjari/agent/internal/devauth"
-	"binjari/agent/internal/protocol"
-	"binjari/agent/internal/runtime"
+	"spareon/agent/internal/devauth"
+	"spareon/agent/internal/protocol"
+	"spareon/agent/internal/runtime"
 )
 
 // Config configures an agent. Zero durations take the protocol defaults.

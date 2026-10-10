@@ -23,7 +23,7 @@ export interface DbConfig {
   readonly connectionTimeoutMs?: number;
   /**
    * Run every session as this role (`-c role=<role>` at connection start). The server passes
-   * `binjari_app` so it keeps least privilege even when the URL names a more powerful login (S03).
+   * `spareon_app` so it keeps least privilege even when the URL names a more powerful login (S03).
    * Must be a plain lowercase identifier.
    */
   readonly role?: string;
@@ -64,7 +64,7 @@ export function createDb(config: DbConfig): DbHandle {
     ...(config.role === undefined ? {} : { options: `-c role=${config.role}` }),
     connectionString: config.url,
     max: config.maxConnections ?? 10,
-    application_name: config.applicationName ?? 'binjari-server',
+    application_name: config.applicationName ?? 'spareon-server',
     statement_timeout: config.statementTimeoutMs ?? 30_000,
     idle_in_transaction_session_timeout: config.idleInTransactionTimeoutMs ?? 60_000,
     connectionTimeoutMillis: config.connectionTimeoutMs ?? 10_000,

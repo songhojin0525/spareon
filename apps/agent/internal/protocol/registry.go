@@ -1,4 +1,4 @@
-// Package protocol is the agent side of the binjari agent<->server protocol contract (S02).
+// Package protocol is the agent side of the spareon agent<->server protocol contract (S02).
 //
 // The JSON Schemas in packages/protocol/schemas are the single source of truth. The TS generator
 // (packages/protocol/scripts/gen.ts) writes zz_generated.go and bundle.json here; both are checked for

@@ -1,4 +1,4 @@
-import { createSeededRandom, FakeClock } from '@binjari/testkit';
+import { createSeededRandom, FakeClock } from '@spareon/testkit';
 import { eq } from 'drizzle-orm';
 import fc from 'fast-check';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -21,7 +21,7 @@ import { balanceOf, ledgerBalanced } from '../support/ledger.js';
 
 const CR = 1_000_000n;
 
-describe('skeleton ledger (runs as binjari_app)', () => {
+describe('skeleton ledger (runs as spareon_app)', () => {
   let testDb: TestDb;
   let app: DbHandle;
   const clock = new FakeClock();
@@ -32,7 +32,7 @@ describe('skeleton ledger (runs as binjari_app)', () => {
 
   beforeAll(async () => {
     testDb = await openTestDb();
-    app = createDb({ url: testDb.url, role: 'binjari_app', maxConnections: 4 });
+    app = createDb({ url: testDb.url, role: 'spareon_app', maxConnections: 4 });
     world = await ensureSkeletonWorld(app.db, deps, { topupCr: 1n });
     f = createFactories({ db: app.db, clock, random });
   });

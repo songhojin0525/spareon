@@ -20,8 +20,8 @@ import {
   type ProtocolMessage,
   type ServerMessageType,
   verifyEd25519,
-} from '@binjari/protocol';
-import { formatTimestamp } from '@binjari/shared';
+} from '@spareon/protocol';
+import { formatTimestamp } from '@spareon/shared';
 import type { FastifyBaseLogger, FastifyInstance } from 'fastify';
 import type { WebSocket } from 'ws';
 

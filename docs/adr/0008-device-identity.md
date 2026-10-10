@@ -14,7 +14,7 @@
 
 ## 결정
 - **키**: 노드마다 에이전트가 ed25519 키쌍을 만든다. 개인키는 영구 폴더에(Windows는 DPAPI 머신 범위 + 추가 엔트로피, S22), 서버에는 공개키만.
-- **인증**: `hello` → `auth.challenge`(일회용 nonce, 5초 만료) → `auth.prove`. 서명 대상 바이트는 정확히 `"binjari-auth-v1\n" + nonce + "\n" + nodeId + "\n" + protocolHash`(UTF-8). 앞의 도메인 문자열이 매니페스트 서명 등 다른 용도와 섞이지 않게 한다. nonce 재사용·만료·잘못된 서명은 `auth.fail` 후 종료(S11).
+- **인증**: `hello` → `auth.challenge`(일회용 nonce, 5초 만료) → `auth.prove`. 서명 대상 바이트는 정확히 `"spareon-auth-v1\n" + nonce + "\n" + nodeId + "\n" + protocolHash`(UTF-8). 앞의 도메인 문자열이 매니페스트 서명 등 다른 용도와 섞이지 않게 한다. nonce 재사용·만료·잘못된 서명은 `auth.fail` 후 종료(S11).
 - **지문 두 개**(S10 명세 보완):
   - `fpStore = HMAC-SHA256(storeSalt, 원본)` — 같은 매장 안 재부착 판단용. `storeSalt`는 `enroll.start` 응답으로 받는다.
   - `fpGlobal = HMAC-SHA256(globalSalt, 원본)` — 매장 간 같은 하드웨어 탐지용. `globalSalt`는 서버 전체에 하나. GPU UUID는 128비트 난수라 솔트가 알려져도 원본을 역산할 수 없다(목적은 DB 유출 시 원본 노출 방지).

@@ -56,7 +56,7 @@ describe('ci.yml', () => {
     const job = wf.jobs['postgres'];
     expect(job?.['runs-on']).toBe('ubuntu-latest');
     expect(job?.services?.['postgres']?.image).toMatch(/^postgres:16(\.|$)/);
-    const step = job?.steps.find((s) => s.run === 'pnpm --filter @binjari/server test');
+    const step = job?.steps.find((s) => s.run === 'pnpm --filter @spareon/server test');
     expect(step?.env?.['DATABASE_URL']).toMatch(/^postgres:\/\/[^@]+@127\.0\.0\.1:5432\//);
   });
 

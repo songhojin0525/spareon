@@ -9,14 +9,14 @@
     "publicKey": "3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c"
   },
   "auth": {
-    "domain": "binjari-auth-v1",
+    "domain": "spareon-auth-v1",
     "input": {
       "nonce": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
       "nodeId": "01920000-0000-7000-8000-000000000010",
       "protocolHash": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3"
     },
-    "bytesHex": "62696e6a6172692d617574682d76310a356135613561356135613561356135613561356135613561356135613561356135613561356135613561356135613561356135613561356135613561356135610a30313932303030302d303030302d373030302d383030302d3030303030303030303031300a63336333633363336333633363336333633363336333633363336333633363336333633363336333633363336333633363336333633363336333633363336333",
-    "signature": "3ec8834a934517082d6c0f2b7b57b06248b6c2ba105a332b45326274eef9743f1feadd7b66d21e7af544926009a7dafd364ec09ff3eae6079dec6427dff68402",
+    "bytesHex": "73706172656f6e2d617574682d76310a356135613561356135613561356135613561356135613561356135613561356135613561356135613561356135613561356135613561356135613561356135610a30313932303030302d303030302d373030302d383030302d3030303030303030303031300a63336333633363336333633363336333633363336333633363336333633363336333633363336333633363336333633363336333633363336333633363336333",
+    "signature": "30d9afbeaa1fa762dd9bb97f1585047f5550e10d182ef35c2b33a84d75a173e967b2555c77b9190bc5467c6305214424689d944d453ebc40b23d60f1eeed310a",
     "verify": [
       {
         "name": "valid",
@@ -24,7 +24,7 @@
         "nonce": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
         "nodeId": "01920000-0000-7000-8000-000000000010",
         "protocolHash": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
-        "signature": "3ec8834a934517082d6c0f2b7b57b06248b6c2ba105a332b45326274eef9743f1feadd7b66d21e7af544926009a7dafd364ec09ff3eae6079dec6427dff68402",
+        "signature": "30d9afbeaa1fa762dd9bb97f1585047f5550e10d182ef35c2b33a84d75a173e967b2555c77b9190bc5467c6305214424689d944d453ebc40b23d60f1eeed310a",
         "valid": true
       },
       {
@@ -33,7 +33,7 @@
         "nonce": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
         "nodeId": "01920000-0000-7000-8000-000000000010",
         "protocolHash": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
-        "signature": "3fc8834a934517082d6c0f2b7b57b06248b6c2ba105a332b45326274eef9743f1feadd7b66d21e7af544926009a7dafd364ec09ff3eae6079dec6427dff68402",
+        "signature": "31d9afbeaa1fa762dd9bb97f1585047f5550e10d182ef35c2b33a84d75a173e967b2555c77b9190bc5467c6305214424689d944d453ebc40b23d60f1eeed310a",
         "valid": false
       },
       {
@@ -42,7 +42,7 @@
         "nonce": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
         "nodeId": "01920000-0000-7000-8000-000000000010",
         "protocolHash": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
-        "signature": "3ec8834a934517082d6c0f2b7b57b06248b6c2ba105a332b45326274eef9743f1feadd7b66d21e7af444926009a7dafd364ec09ff3eae6079dec6427dff68402",
+        "signature": "30d9afbeaa1fa762dd9bb97f1585047f5550e10d182ef35c2b33a84d75a173e967b2555c77b9190bc4467c6305214424689d944d453ebc40b23d60f1eeed310a",
         "valid": false
       },
       {
@@ -51,7 +51,7 @@
         "nonce": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
         "nodeId": "01920000-0000-7000-8000-000000000010",
         "protocolHash": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
-        "signature": "3ec8834a934517082d6c0f2b7b57b06248b6c2ba105a332b45326274eef9743f0cbed3d8803531d2cbe18903e8a0b912374ec09ff3eae6079dec6427dff68412",
+        "signature": "30d9afbeaa1fa762dd9bb97f1585047f5550e10d182ef35c2b33a84d75a173e954864bb9911c2c639be37306e41a2339689d944d453ebc40b23d60f1eeed311a",
         "valid": false
       },
       {
@@ -60,7 +60,7 @@
         "nonce": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
         "nodeId": "01920000-0000-7000-8000-000000000010",
         "protocolHash": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
-        "signature": "3ec8834a934517082d6c0f2b7b57b06248b6c2ba105a332b45326274eef9743f1feadd7b66d21e7af544926009a7dafd364ec09ff3eae6079dec6427dff68402",
+        "signature": "30d9afbeaa1fa762dd9bb97f1585047f5550e10d182ef35c2b33a84d75a173e967b2555c77b9190bc5467c6305214424689d944d453ebc40b23d60f1eeed310a",
         "valid": false
       },
       {
@@ -69,7 +69,7 @@
         "nonce": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
         "nodeId": "01920000-0000-7000-8000-000000000011",
         "protocolHash": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
-        "signature": "3ec8834a934517082d6c0f2b7b57b06248b6c2ba105a332b45326274eef9743f1feadd7b66d21e7af544926009a7dafd364ec09ff3eae6079dec6427dff68402",
+        "signature": "30d9afbeaa1fa762dd9bb97f1585047f5550e10d182ef35c2b33a84d75a173e967b2555c77b9190bc5467c6305214424689d944d453ebc40b23d60f1eeed310a",
         "valid": false
       },
       {
@@ -78,7 +78,7 @@
         "nonce": "5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b",
         "nodeId": "01920000-0000-7000-8000-000000000010",
         "protocolHash": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
-        "signature": "3ec8834a934517082d6c0f2b7b57b06248b6c2ba105a332b45326274eef9743f1feadd7b66d21e7af544926009a7dafd364ec09ff3eae6079dec6427dff68402",
+        "signature": "30d9afbeaa1fa762dd9bb97f1585047f5550e10d182ef35c2b33a84d75a173e967b2555c77b9190bc5467c6305214424689d944d453ebc40b23d60f1eeed310a",
         "valid": false
       },
       {
@@ -87,7 +87,7 @@
         "nonce": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
         "nodeId": "01920000-0000-7000-8000-000000000010",
         "protocolHash": "c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4",
-        "signature": "3ec8834a934517082d6c0f2b7b57b06248b6c2ba105a332b45326274eef9743f1feadd7b66d21e7af544926009a7dafd364ec09ff3eae6079dec6427dff68402",
+        "signature": "30d9afbeaa1fa762dd9bb97f1585047f5550e10d182ef35c2b33a84d75a173e967b2555c77b9190bc5467c6305214424689d944d453ebc40b23d60f1eeed310a",
         "valid": false
       },
       {
@@ -96,7 +96,7 @@
         "nonce": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
         "nodeId": "01920000-0000-7000-8000-000000000010",
         "protocolHash": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
-        "signature": "3EC8834A934517082D6C0F2B7B57B06248B6C2BA105A332B45326274EEF9743F1FEADD7B66D21E7AF544926009A7DAFD364EC09FF3EAE6079DEC6427DFF68402",
+        "signature": "30D9AFBEAA1FA762DD9BB97F1585047F5550E10D182EF35C2B33A84D75A173E967B2555C77B9190BC5467C6305214424689D944D453EBC40B23D60F1EEED310A",
         "valid": false
       },
       {
@@ -105,7 +105,7 @@
         "nonce": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
         "nodeId": "01920000-0000-7000-8000-000000000010",
         "protocolHash": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
-        "signature": "3ec8834a934517082d6c0f2b7b57b06248b6c2ba105a332b45326274eef9743f1feadd7b66d21e7af544926009a7dafd364ec09ff3eae6079dec6427dff684",
+        "signature": "30d9afbeaa1fa762dd9bb97f1585047f5550e10d182ef35c2b33a84d75a173e967b2555c77b9190bc5467c6305214424689d944d453ebc40b23d60f1eeed31",
         "valid": false
       },
       {
@@ -114,7 +114,7 @@
         "nonce": "5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a",
         "nodeId": "01920000-0000-7000-8000-000000000010",
         "protocolHash": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
-        "signature": "3ec8834a934517082d6c0f2b7b57b06248b6c2ba105a332b45326274eef9743f1feadd7b66d21e7af544926009a7dafd364ec09ff3eae6079dec6427dff68402",
+        "signature": "30d9afbeaa1fa762dd9bb97f1585047f5550e10d182ef35c2b33a84d75a173e967b2555c77b9190bc5467c6305214424689d944d453ebc40b23d60f1eeed310a",
         "valid": false
       },
       {
@@ -221,7 +221,7 @@
     ]
   },
   "enroll": {
-    "domain": "binjari-enroll-v1",
+    "domain": "spareon-enroll-v1",
     "input": {
       "nonce": "6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b",
       "enrollId": "01920000-0000-7000-8000-000000000020",
@@ -229,8 +229,8 @@
       "fpStore": "7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c",
       "fpGlobal": "8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d"
     },
-    "bytesHex": "62696e6a6172692d656e726f6c6c2d76310a366236623662366236623662366236623662366236623662366236623662366236623662366236623662366236623662366236623662366236623662366236620a30313932303030302d303030302d373030302d383030302d3030303030303030303032300a643735613938303138326231306162376435346266656433633936343037336130656531373266336461613632333235616630323161363866373037353131610a376337633763376337633763376337633763376337633763376337633763376337633763376337633763376337633763376337633763376337633763376337630a38643864386438643864386438643864386438643864386438643864386438643864386438643864386438643864386438643864386438643864386438643864",
-    "signature": "220f998cedcf7f9996b1655932858bdb0420c5c1d13f96af1a4a782adec28b0e6cb4c7ac6fc56e610a829fdb593210abd5f9993f2650ddc4855968e8e13a5c0c",
+    "bytesHex": "73706172656f6e2d656e726f6c6c2d76310a366236623662366236623662366236623662366236623662366236623662366236623662366236623662366236623662366236623662366236623662366236620a30313932303030302d303030302d373030302d383030302d3030303030303030303032300a643735613938303138326231306162376435346266656433633936343037336130656531373266336461613632333235616630323161363866373037353131610a376337633763376337633763376337633763376337633763376337633763376337633763376337633763376337633763376337633763376337633763376337630a38643864386438643864386438643864386438643864386438643864386438643864386438643864386438643864386438643864386438643864386438643864",
+    "signature": "dca1acaaa8466ddd4d4a0f2013e32e473e45ae061e9ccb471de4d972fb207b98de9431fe49e2c22636468824f084e67e6ac2caad43d02274b459649f1ece5703",
     "verify": [
       {
         "name": "valid",
@@ -239,7 +239,7 @@
         "publicKey": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
         "fpStore": "7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c",
         "fpGlobal": "8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d",
-        "signature": "220f998cedcf7f9996b1655932858bdb0420c5c1d13f96af1a4a782adec28b0e6cb4c7ac6fc56e610a829fdb593210abd5f9993f2650ddc4855968e8e13a5c0c",
+        "signature": "dca1acaaa8466ddd4d4a0f2013e32e473e45ae061e9ccb471de4d972fb207b98de9431fe49e2c22636468824f084e67e6ac2caad43d02274b459649f1ece5703",
         "valid": true
       },
       {
@@ -249,7 +249,7 @@
         "publicKey": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
         "fpStore": "8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d",
         "fpGlobal": "7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c",
-        "signature": "220f998cedcf7f9996b1655932858bdb0420c5c1d13f96af1a4a782adec28b0e6cb4c7ac6fc56e610a829fdb593210abd5f9993f2650ddc4855968e8e13a5c0c",
+        "signature": "dca1acaaa8466ddd4d4a0f2013e32e473e45ae061e9ccb471de4d972fb207b98de9431fe49e2c22636468824f084e67e6ac2caad43d02274b459649f1ece5703",
         "valid": false
       },
       {
@@ -259,7 +259,7 @@
         "publicKey": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
         "fpStore": "7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c",
         "fpGlobal": "8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d",
-        "signature": "220f998cedcf7f9996b1655932858bdb0420c5c1d13f96af1a4a782adec28b0e6cb4c7ac6fc56e610a829fdb593210abd5f9993f2650ddc4855968e8e13a5c0c",
+        "signature": "dca1acaaa8466ddd4d4a0f2013e32e473e45ae061e9ccb471de4d972fb207b98de9431fe49e2c22636468824f084e67e6ac2caad43d02274b459649f1ece5703",
         "valid": false
       },
       {
@@ -269,7 +269,7 @@
         "publicKey": "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
         "fpStore": "7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c7c",
         "fpGlobal": "8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d8d",
-        "signature": "220f998cedcf7f9996b1655932858bdb0420c5c1d13f96af1a4a782adec28b0e5988bd098a2881b9e01e977e382cefbfd5f9993f2650ddc4855968e8e13a5c1c",
+        "signature": "dca1acaaa8466ddd4d4a0f2013e32e473e45ae061e9ccb471de4d972fb207b98cb68275b6445d57e0ce37fc7ce7ec5936ac2caad43d02274b459649f1ece5713",
         "valid": false
       }
     ]
@@ -284,13 +284,13 @@
         "name": "valid model manifest",
         "kind": "model",
         "signed": {
-          "manifest": "{\"artifact\":{\"bytes\":4683073536,\"sha256\":\"e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1\",\"url\":\"https://models.example.com/qwen2.5-7b/q4_k_m.gguf\"},\"contextLength\":32768,\"format\":\"gguf\",\"license\":\"Apache-2.0\",\"modelId\":\"qwen2.5-7b-instruct-q4_k_m\",\"revision\":1,\"runtime\":{\"minVersion\":\"b4567\",\"name\":\"llamacpp\"},\"schema\":\"binjari.model-manifest/1\"}",
-          "signature": "c40db697a2f2802c353950870f985c1b6a102260e225075856a1ffb2a6c820aa1cb598d4c9b330be3f32f1802a80955c4bb375eae4326771a8283124e83cfb09",
+          "manifest": "{\"artifact\":{\"bytes\":4683073536,\"sha256\":\"e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1\",\"url\":\"https://models.example.com/qwen2.5-7b/q4_k_m.gguf\"},\"contextLength\":32768,\"format\":\"gguf\",\"license\":\"Apache-2.0\",\"modelId\":\"qwen2.5-7b-instruct-q4_k_m\",\"revision\":1,\"runtime\":{\"minVersion\":\"b4567\",\"name\":\"llamacpp\"},\"schema\":\"spareon.model-manifest/1\"}",
+          "signature": "f363c11b25f09d8edba69c58ed2c7331c5f74b205d5dd0536594b6c415783587c93d713d0ead58ba18ad6c4a5dd1be30c77629e77e86803f9c4517c70fc93308",
           "keyId": "release-2026a"
         },
         "expect": "ok",
         "manifest": {
-          "schema": "binjari.model-manifest/1",
+          "schema": "spareon.model-manifest/1",
           "modelId": "qwen2.5-7b-instruct-q4_k_m",
           "revision": 1,
           "format": "gguf",
@@ -311,27 +311,27 @@
         "name": "valid release manifest",
         "kind": "release",
         "signed": {
-          "manifest": "{\"files\":[{\"bytes\":12000000,\"path\":\"binjari-agent.exe\",\"sha256\":\"f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1\",\"url\":\"https://releases.example.com/0.2.0/binjari-agent.exe\"},{\"bytes\":4000000,\"path\":\"bin/binjari-helper.exe\",\"sha256\":\"f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2\",\"url\":\"https://releases.example.com/0.2.0/binjari-helper.exe\"}],\"issuedAt\":\"2026-10-09T04:36:00.000Z\",\"platform\":\"windows-amd64\",\"schema\":\"binjari.release-manifest/1\",\"version\":\"0.2.0\"}",
-          "signature": "997cb5a9a6060a5a99ab065ad3c56c02c360c9bfe82e21a8b33316905f5c94c0af6c70a1c902e039cb76b98b19499e4e48b4cca989305c7ff0465da0cd3cbd02",
+          "manifest": "{\"files\":[{\"bytes\":12000000,\"path\":\"spareon-agent.exe\",\"sha256\":\"f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1\",\"url\":\"https://releases.example.com/0.2.0/spareon-agent.exe\"},{\"bytes\":4000000,\"path\":\"bin/spareon-helper.exe\",\"sha256\":\"f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2\",\"url\":\"https://releases.example.com/0.2.0/spareon-helper.exe\"}],\"issuedAt\":\"2026-10-09T04:36:00.000Z\",\"platform\":\"windows-amd64\",\"schema\":\"spareon.release-manifest/1\",\"version\":\"0.2.0\"}",
+          "signature": "883b929968e30204af8c40ad5f7225b506d72ec591531e2f006595f48f060fc1fad9db1e289a01c367a104e722373aee5de80dcc26cde5c6c76b152f543a6f0a",
           "keyId": "release-2026a"
         },
         "expect": "ok",
         "manifest": {
-          "schema": "binjari.release-manifest/1",
+          "schema": "spareon.release-manifest/1",
           "version": "0.2.0",
           "platform": "windows-amd64",
           "files": [
             {
-              "path": "binjari-agent.exe",
+              "path": "spareon-agent.exe",
               "sha256": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
               "bytes": 12000000,
-              "url": "https://releases.example.com/0.2.0/binjari-agent.exe"
+              "url": "https://releases.example.com/0.2.0/spareon-agent.exe"
             },
             {
-              "path": "bin/binjari-helper.exe",
+              "path": "bin/spareon-helper.exe",
               "sha256": "f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2",
               "bytes": 4000000,
-              "url": "https://releases.example.com/0.2.0/binjari-helper.exe"
+              "url": "https://releases.example.com/0.2.0/spareon-helper.exe"
             }
           ],
           "issuedAt": "2026-10-09T04:36:00.000Z"
@@ -341,27 +341,27 @@
         "name": "release manifest signed by the next key",
         "kind": "release",
         "signed": {
-          "manifest": "{\"files\":[{\"bytes\":12000000,\"path\":\"binjari-agent.exe\",\"sha256\":\"f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1\",\"url\":\"https://releases.example.com/0.2.0/binjari-agent.exe\"},{\"bytes\":4000000,\"path\":\"bin/binjari-helper.exe\",\"sha256\":\"f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2\",\"url\":\"https://releases.example.com/0.2.0/binjari-helper.exe\"}],\"issuedAt\":\"2026-10-09T04:36:00.000Z\",\"platform\":\"windows-amd64\",\"schema\":\"binjari.release-manifest/1\",\"version\":\"0.2.0\"}",
-          "signature": "21da0eef88ef906e3b7f1101d48fca766c8c99ef62b8c6bd24bdd57af66cbb13814d72f49f5bb9b2973c1fcb31909790433444d879a3a868abb8fe7e241b9d02",
+          "manifest": "{\"files\":[{\"bytes\":12000000,\"path\":\"spareon-agent.exe\",\"sha256\":\"f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1\",\"url\":\"https://releases.example.com/0.2.0/spareon-agent.exe\"},{\"bytes\":4000000,\"path\":\"bin/spareon-helper.exe\",\"sha256\":\"f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2\",\"url\":\"https://releases.example.com/0.2.0/spareon-helper.exe\"}],\"issuedAt\":\"2026-10-09T04:36:00.000Z\",\"platform\":\"windows-amd64\",\"schema\":\"spareon.release-manifest/1\",\"version\":\"0.2.0\"}",
+          "signature": "29da818147f1ddae551f2bb8292412f3d544786b269cd1b5077c236c6bae23ed747bebde8c49a8b16c6490164863b46c3190a89a583890a2424217c8cd89e500",
           "keyId": "release-2026b"
         },
         "expect": "ok",
         "manifest": {
-          "schema": "binjari.release-manifest/1",
+          "schema": "spareon.release-manifest/1",
           "version": "0.2.0",
           "platform": "windows-amd64",
           "files": [
             {
-              "path": "binjari-agent.exe",
+              "path": "spareon-agent.exe",
               "sha256": "f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1",
               "bytes": 12000000,
-              "url": "https://releases.example.com/0.2.0/binjari-agent.exe"
+              "url": "https://releases.example.com/0.2.0/spareon-agent.exe"
             },
             {
-              "path": "bin/binjari-helper.exe",
+              "path": "bin/spareon-helper.exe",
               "sha256": "f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2",
               "bytes": 4000000,
-              "url": "https://releases.example.com/0.2.0/binjari-helper.exe"
+              "url": "https://releases.example.com/0.2.0/spareon-helper.exe"
             }
           ],
           "issuedAt": "2026-10-09T04:36:00.000Z"
@@ -371,8 +371,8 @@
         "name": "unknown key id",
         "kind": "model",
         "signed": {
-          "manifest": "{\"artifact\":{\"bytes\":4683073536,\"sha256\":\"e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1\",\"url\":\"https://models.example.com/qwen2.5-7b/q4_k_m.gguf\"},\"contextLength\":32768,\"format\":\"gguf\",\"license\":\"Apache-2.0\",\"modelId\":\"qwen2.5-7b-instruct-q4_k_m\",\"revision\":1,\"runtime\":{\"minVersion\":\"b4567\",\"name\":\"llamacpp\"},\"schema\":\"binjari.model-manifest/1\"}",
-          "signature": "c40db697a2f2802c353950870f985c1b6a102260e225075856a1ffb2a6c820aa1cb598d4c9b330be3f32f1802a80955c4bb375eae4326771a8283124e83cfb09",
+          "manifest": "{\"artifact\":{\"bytes\":4683073536,\"sha256\":\"e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1\",\"url\":\"https://models.example.com/qwen2.5-7b/q4_k_m.gguf\"},\"contextLength\":32768,\"format\":\"gguf\",\"license\":\"Apache-2.0\",\"modelId\":\"qwen2.5-7b-instruct-q4_k_m\",\"revision\":1,\"runtime\":{\"minVersion\":\"b4567\",\"name\":\"llamacpp\"},\"schema\":\"spareon.model-manifest/1\"}",
+          "signature": "f363c11b25f09d8edba69c58ed2c7331c5f74b205d5dd0536594b6c415783587c93d713d0ead58ba18ad6c4a5dd1be30c77629e77e86803f9c4517c70fc93308",
           "keyId": "release-1999"
         },
         "expect": "manifest_signature_invalid"
@@ -381,8 +381,8 @@
         "name": "key id of the other key",
         "kind": "model",
         "signed": {
-          "manifest": "{\"artifact\":{\"bytes\":4683073536,\"sha256\":\"e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1\",\"url\":\"https://models.example.com/qwen2.5-7b/q4_k_m.gguf\"},\"contextLength\":32768,\"format\":\"gguf\",\"license\":\"Apache-2.0\",\"modelId\":\"qwen2.5-7b-instruct-q4_k_m\",\"revision\":1,\"runtime\":{\"minVersion\":\"b4567\",\"name\":\"llamacpp\"},\"schema\":\"binjari.model-manifest/1\"}",
-          "signature": "c40db697a2f2802c353950870f985c1b6a102260e225075856a1ffb2a6c820aa1cb598d4c9b330be3f32f1802a80955c4bb375eae4326771a8283124e83cfb09",
+          "manifest": "{\"artifact\":{\"bytes\":4683073536,\"sha256\":\"e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1\",\"url\":\"https://models.example.com/qwen2.5-7b/q4_k_m.gguf\"},\"contextLength\":32768,\"format\":\"gguf\",\"license\":\"Apache-2.0\",\"modelId\":\"qwen2.5-7b-instruct-q4_k_m\",\"revision\":1,\"runtime\":{\"minVersion\":\"b4567\",\"name\":\"llamacpp\"},\"schema\":\"spareon.model-manifest/1\"}",
+          "signature": "f363c11b25f09d8edba69c58ed2c7331c5f74b205d5dd0536594b6c415783587c93d713d0ead58ba18ad6c4a5dd1be30c77629e77e86803f9c4517c70fc93308",
           "keyId": "release-2026b"
         },
         "expect": "manifest_signature_invalid"
@@ -391,8 +391,8 @@
         "name": "manifest text changed after signing",
         "kind": "model",
         "signed": {
-          "manifest": "{\"artifact\":{\"bytes\":4683073536,\"sha256\":\"e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1\",\"url\":\"https://models.example.com/qwen2.5-7b/q4_k_m.gguf\"},\"contextLength\":32768,\"format\":\"gguf\",\"license\":\"Apache-2.0\",\"modelId\":\"qwen2.5-7b-instruct-q4_k_m\",\"revision\":2,\"runtime\":{\"minVersion\":\"b4567\",\"name\":\"llamacpp\"},\"schema\":\"binjari.model-manifest/1\"}",
-          "signature": "c40db697a2f2802c353950870f985c1b6a102260e225075856a1ffb2a6c820aa1cb598d4c9b330be3f32f1802a80955c4bb375eae4326771a8283124e83cfb09",
+          "manifest": "{\"artifact\":{\"bytes\":4683073536,\"sha256\":\"e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1\",\"url\":\"https://models.example.com/qwen2.5-7b/q4_k_m.gguf\"},\"contextLength\":32768,\"format\":\"gguf\",\"license\":\"Apache-2.0\",\"modelId\":\"qwen2.5-7b-instruct-q4_k_m\",\"revision\":2,\"runtime\":{\"minVersion\":\"b4567\",\"name\":\"llamacpp\"},\"schema\":\"spareon.model-manifest/1\"}",
+          "signature": "f363c11b25f09d8edba69c58ed2c7331c5f74b205d5dd0536594b6c415783587c93d713d0ead58ba18ad6c4a5dd1be30c77629e77e86803f9c4517c70fc93308",
           "keyId": "release-2026a"
         },
         "expect": "manifest_signature_invalid"
@@ -401,8 +401,8 @@
         "name": "release manifest presented as a model manifest (domain separation)",
         "kind": "model",
         "signed": {
-          "manifest": "{\"files\":[{\"bytes\":12000000,\"path\":\"binjari-agent.exe\",\"sha256\":\"f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1\",\"url\":\"https://releases.example.com/0.2.0/binjari-agent.exe\"},{\"bytes\":4000000,\"path\":\"bin/binjari-helper.exe\",\"sha256\":\"f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2\",\"url\":\"https://releases.example.com/0.2.0/binjari-helper.exe\"}],\"issuedAt\":\"2026-10-09T04:36:00.000Z\",\"platform\":\"windows-amd64\",\"schema\":\"binjari.release-manifest/1\",\"version\":\"0.2.0\"}",
-          "signature": "997cb5a9a6060a5a99ab065ad3c56c02c360c9bfe82e21a8b33316905f5c94c0af6c70a1c902e039cb76b98b19499e4e48b4cca989305c7ff0465da0cd3cbd02",
+          "manifest": "{\"files\":[{\"bytes\":12000000,\"path\":\"spareon-agent.exe\",\"sha256\":\"f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1\",\"url\":\"https://releases.example.com/0.2.0/spareon-agent.exe\"},{\"bytes\":4000000,\"path\":\"bin/spareon-helper.exe\",\"sha256\":\"f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2\",\"url\":\"https://releases.example.com/0.2.0/spareon-helper.exe\"}],\"issuedAt\":\"2026-10-09T04:36:00.000Z\",\"platform\":\"windows-amd64\",\"schema\":\"spareon.release-manifest/1\",\"version\":\"0.2.0\"}",
+          "signature": "883b929968e30204af8c40ad5f7225b506d72ec591531e2f006595f48f060fc1fad9db1e289a01c367a104e722373aee5de80dcc26cde5c6c76b152f543a6f0a",
           "keyId": "release-2026a"
         },
         "expect": "manifest_signature_invalid"
@@ -411,8 +411,8 @@
         "name": "model signature reused for release domain",
         "kind": "release",
         "signed": {
-          "manifest": "{\"files\":[{\"bytes\":12000000,\"path\":\"binjari-agent.exe\",\"sha256\":\"f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1\",\"url\":\"https://releases.example.com/0.2.0/binjari-agent.exe\"},{\"bytes\":4000000,\"path\":\"bin/binjari-helper.exe\",\"sha256\":\"f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2\",\"url\":\"https://releases.example.com/0.2.0/binjari-helper.exe\"}],\"issuedAt\":\"2026-10-09T04:36:00.000Z\",\"platform\":\"windows-amd64\",\"schema\":\"binjari.release-manifest/1\",\"version\":\"0.2.0\"}",
-          "signature": "b876f792e641f0c005b6ea419035fc21df96418c53bfabe21f7aacc0866fae95b6216988130b4c8e952a02a5d6c1d1eb98a827e0059ef7ef45dc00aa0658900d",
+          "manifest": "{\"files\":[{\"bytes\":12000000,\"path\":\"spareon-agent.exe\",\"sha256\":\"f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1\",\"url\":\"https://releases.example.com/0.2.0/spareon-agent.exe\"},{\"bytes\":4000000,\"path\":\"bin/spareon-helper.exe\",\"sha256\":\"f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2\",\"url\":\"https://releases.example.com/0.2.0/spareon-helper.exe\"}],\"issuedAt\":\"2026-10-09T04:36:00.000Z\",\"platform\":\"windows-amd64\",\"schema\":\"spareon.release-manifest/1\",\"version\":\"0.2.0\"}",
+          "signature": "c4373ca3535b7e8f20e788886da43828aac6b486eb85b9aac2eff4ce42e45fced3c6ae23d0a80ff7d1827001537d1a1e254e05d449b9b2d2170ff143c912e200",
           "keyId": "release-2026a"
         },
         "expect": "manifest_signature_invalid"
@@ -421,8 +421,8 @@
         "name": "non-canonical S",
         "kind": "model",
         "signed": {
-          "manifest": "{\"artifact\":{\"bytes\":4683073536,\"sha256\":\"e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1\",\"url\":\"https://models.example.com/qwen2.5-7b/q4_k_m.gguf\"},\"contextLength\":32768,\"format\":\"gguf\",\"license\":\"Apache-2.0\",\"modelId\":\"qwen2.5-7b-instruct-q4_k_m\",\"revision\":1,\"runtime\":{\"minVersion\":\"b4567\",\"name\":\"llamacpp\"},\"schema\":\"binjari.model-manifest/1\"}",
-          "signature": "c40db697a2f2802c353950870f985c1b6a102260e225075856a1ffb2a6c820aa09898e31e416431616cfe823097a74714bb375eae4326771a8283124e83cfb19",
+          "manifest": "{\"artifact\":{\"bytes\":4683073536,\"sha256\":\"e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1\",\"url\":\"https://models.example.com/qwen2.5-7b/q4_k_m.gguf\"},\"contextLength\":32768,\"format\":\"gguf\",\"license\":\"Apache-2.0\",\"modelId\":\"qwen2.5-7b-instruct-q4_k_m\",\"revision\":1,\"runtime\":{\"minVersion\":\"b4567\",\"name\":\"llamacpp\"},\"schema\":\"spareon.model-manifest/1\"}",
+          "signature": "f363c11b25f09d8edba69c58ed2c7331c5f74b205d5dd0536594b6c415783587b611679a28106b12ef4964ed3bcb9d45c77629e77e86803f9c4517c70fc93318",
           "keyId": "release-2026a"
         },
         "expect": "manifest_signature_invalid"
@@ -431,8 +431,8 @@
         "name": "signed but not canonical (whitespace)",
         "kind": "model",
         "signed": {
-          "manifest": "{\n \"schema\": \"binjari.model-manifest/1\",\n \"modelId\": \"qwen2.5-7b-instruct-q4_k_m\",\n \"revision\": 1,\n \"format\": \"gguf\",\n \"artifact\": {\n  \"url\": \"https://models.example.com/qwen2.5-7b/q4_k_m.gguf\",\n  \"sha256\": \"e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1\",\n  \"bytes\": 4683073536\n },\n \"runtime\": {\n  \"name\": \"llamacpp\",\n  \"minVersion\": \"b4567\"\n },\n \"contextLength\": 32768,\n \"license\": \"Apache-2.0\"\n}",
-          "signature": "385fd59578fc9f69d96c171ec407cf4b9c04ab3b13eecea04c374736e96e324c82684181a53be4e4dce5e433c8aeace548810c3891bdefd5897a224d4559600f",
+          "manifest": "{\n \"schema\": \"spareon.model-manifest/1\",\n \"modelId\": \"qwen2.5-7b-instruct-q4_k_m\",\n \"revision\": 1,\n \"format\": \"gguf\",\n \"artifact\": {\n  \"url\": \"https://models.example.com/qwen2.5-7b/q4_k_m.gguf\",\n  \"sha256\": \"e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1\",\n  \"bytes\": 4683073536\n },\n \"runtime\": {\n  \"name\": \"llamacpp\",\n  \"minVersion\": \"b4567\"\n },\n \"contextLength\": 32768,\n \"license\": \"Apache-2.0\"\n}",
+          "signature": "52052d17339ffd5bf16bf3eca805c4c6bb29d9e2d7ee85e5a2d5383a38fa84ee98c834586fe457ec4df04c5bc5762e4f52fd2bf2a5d202f8ec05337ce9765e00",
           "keyId": "release-2026a"
         },
         "expect": "manifest_invalid"
@@ -441,8 +441,8 @@
         "name": "signed but not canonical (key order)",
         "kind": "model",
         "signed": {
-          "manifest": "{\"schema\":\"binjari.model-manifest/1\",\"modelId\":\"qwen2.5-7b-instruct-q4_k_m\",\"revision\":1,\"format\":\"gguf\",\"artifact\":{\"url\":\"https://models.example.com/qwen2.5-7b/q4_k_m.gguf\",\"sha256\":\"e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1\",\"bytes\":4683073536},\"runtime\":{\"name\":\"llamacpp\",\"minVersion\":\"b4567\"},\"contextLength\":32768,\"license\":\"Apache-2.0\"}",
-          "signature": "319b5653ebcaecaa963bd402e8d431a95fc8ea9e4ed6875bf827b5a624620bfad5c9d5f03bf424db1b2704c249374a04bf31a1ea5950ed05ec48239255b0fa08",
+          "manifest": "{\"schema\":\"spareon.model-manifest/1\",\"modelId\":\"qwen2.5-7b-instruct-q4_k_m\",\"revision\":1,\"format\":\"gguf\",\"artifact\":{\"url\":\"https://models.example.com/qwen2.5-7b/q4_k_m.gguf\",\"sha256\":\"e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1\",\"bytes\":4683073536},\"runtime\":{\"name\":\"llamacpp\",\"minVersion\":\"b4567\"},\"contextLength\":32768,\"license\":\"Apache-2.0\"}",
+          "signature": "0726bcb18ea379271e4f7e903664c0ace010cdf18d2a225714ce042c366dc625132dd7b0fc6d25ecb3683538d920c613b7dd60026c2b754979d4bae49272ef07",
           "keyId": "release-2026a"
         },
         "expect": "manifest_invalid"
@@ -451,8 +451,8 @@
         "name": "signed but has a duplicate key",
         "kind": "model",
         "signed": {
-          "manifest": "{\"artifact\":{},\"artifact\":{\"bytes\":4683073536,\"sha256\":\"e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1\",\"url\":\"https://models.example.com/qwen2.5-7b/q4_k_m.gguf\"},\"contextLength\":32768,\"format\":\"gguf\",\"license\":\"Apache-2.0\",\"modelId\":\"qwen2.5-7b-instruct-q4_k_m\",\"revision\":1,\"runtime\":{\"minVersion\":\"b4567\",\"name\":\"llamacpp\"},\"schema\":\"binjari.model-manifest/1\"}",
-          "signature": "43b95023a5dc9e035e695579fcd60ad8bcc0b939f2a8e3cfef67db2c4991dc6c68add621231eca37af699f60edb095da04aae9e59f1afb9aac712dc861a35b0c",
+          "manifest": "{\"artifact\":{},\"artifact\":{\"bytes\":4683073536,\"sha256\":\"e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1\",\"url\":\"https://models.example.com/qwen2.5-7b/q4_k_m.gguf\"},\"contextLength\":32768,\"format\":\"gguf\",\"license\":\"Apache-2.0\",\"modelId\":\"qwen2.5-7b-instruct-q4_k_m\",\"revision\":1,\"runtime\":{\"minVersion\":\"b4567\",\"name\":\"llamacpp\"},\"schema\":\"spareon.model-manifest/1\"}",
+          "signature": "ee6c5ee5f4420adb5f9b74e63a8d482a7dd3f2b80a8566bfcc0d4c2bcb05d6f5ac551af3c397a603f35dc4c9244818185d32212bacaea63972078dec09ccd808",
           "keyId": "release-2026a"
         },
         "expect": "manifest_invalid"
@@ -461,8 +461,8 @@
         "name": "signed but has a float",
         "kind": "model",
         "signed": {
-          "manifest": "{\"artifact\":{\"bytes\":4683073536,\"sha256\":\"e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1\",\"url\":\"https://models.example.com/qwen2.5-7b/q4_k_m.gguf\"},\"contextLength\":32768,\"format\":\"gguf\",\"license\":\"Apache-2.0\",\"modelId\":\"qwen2.5-7b-instruct-q4_k_m\",\"revision\":1.0,\"runtime\":{\"minVersion\":\"b4567\",\"name\":\"llamacpp\"},\"schema\":\"binjari.model-manifest/1\"}",
-          "signature": "23f3204ef8a1b81c7610ea9591fbe72a6c565c875182fd40201edc0251d603fe4ea781be22e015608a7032a6c8cc64e71dff8a5887907dfced295235c9b6510c",
+          "manifest": "{\"artifact\":{\"bytes\":4683073536,\"sha256\":\"e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1\",\"url\":\"https://models.example.com/qwen2.5-7b/q4_k_m.gguf\"},\"contextLength\":32768,\"format\":\"gguf\",\"license\":\"Apache-2.0\",\"modelId\":\"qwen2.5-7b-instruct-q4_k_m\",\"revision\":1.0,\"runtime\":{\"minVersion\":\"b4567\",\"name\":\"llamacpp\"},\"schema\":\"spareon.model-manifest/1\"}",
+          "signature": "c663c1609ad1a4a56df461985a785cf0306c25d294036a79909f7491d27633c7564ee2eb2e94632d01513194ba1e3947246ea1e357bfdcd2d5a8b4a9769f1305",
           "keyId": "release-2026a"
         },
         "expect": "manifest_invalid"
@@ -471,8 +471,8 @@
         "name": "signed canonical but missing a required field",
         "kind": "model",
         "signed": {
-          "manifest": "{\"artifact\":{\"bytes\":4683073536,\"sha256\":\"e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1\",\"url\":\"https://models.example.com/qwen2.5-7b/q4_k_m.gguf\"},\"contextLength\":32768,\"format\":\"gguf\",\"modelId\":\"qwen2.5-7b-instruct-q4_k_m\",\"revision\":1,\"runtime\":{\"minVersion\":\"b4567\",\"name\":\"llamacpp\"},\"schema\":\"binjari.model-manifest/1\"}",
-          "signature": "f189a4d7d42cce1365631730d1920807976d55cfa5558f107f881c13a251bcad937e746a676e5cce641d2f0c1cb6510ed1811a75d4a6138bc3a2b223d51c3603",
+          "manifest": "{\"artifact\":{\"bytes\":4683073536,\"sha256\":\"e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1\",\"url\":\"https://models.example.com/qwen2.5-7b/q4_k_m.gguf\"},\"contextLength\":32768,\"format\":\"gguf\",\"modelId\":\"qwen2.5-7b-instruct-q4_k_m\",\"revision\":1,\"runtime\":{\"minVersion\":\"b4567\",\"name\":\"llamacpp\"},\"schema\":\"spareon.model-manifest/1\"}",
+          "signature": "7ab23fc928a1377c368caafd23a6e4dd060d9081ebb4e25498d0fc9765f103be29cb08b99c72cc2f7dcca54f337b0af9113661fffe6f18c65adae62d05655102",
           "keyId": "release-2026a"
         },
         "expect": "manifest_invalid"
@@ -481,8 +481,8 @@
         "name": "signed canonical but path traversal in release file",
         "kind": "release",
         "signed": {
-          "manifest": "{\"files\":[{\"bytes\":12000000,\"path\":\"../evil.exe\",\"sha256\":\"f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1\",\"url\":\"https://releases.example.com/0.2.0/binjari-agent.exe\"}],\"issuedAt\":\"2026-10-09T04:36:00.000Z\",\"platform\":\"windows-amd64\",\"schema\":\"binjari.release-manifest/1\",\"version\":\"0.2.0\"}",
-          "signature": "5da36fc693ae7edd76cd4d6431f9c58695a5a0ff5c84b5bdbbecaf03940c2b0d6902c38a91b702aa4807c0ba3b67dd33f0ad0c5357fab83bfea7915e6e3e9c03",
+          "manifest": "{\"files\":[{\"bytes\":12000000,\"path\":\"../evil.exe\",\"sha256\":\"f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1\",\"url\":\"https://releases.example.com/0.2.0/spareon-agent.exe\"}],\"issuedAt\":\"2026-10-09T04:36:00.000Z\",\"platform\":\"windows-amd64\",\"schema\":\"spareon.release-manifest/1\",\"version\":\"0.2.0\"}",
+          "signature": "80b113b12d38f2f10cba9ee2404e628a5b63f8870654adaafd9bb6305aa9e032e0969202e6339a6796397ffe43a50516b08129af177a74ec31345757380e410e",
           "keyId": "release-2026a"
         },
         "expect": "manifest_invalid"
@@ -491,8 +491,8 @@
         "name": "signed canonical but http url",
         "kind": "model",
         "signed": {
-          "manifest": "{\"artifact\":{\"bytes\":4683073536,\"sha256\":\"e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1\",\"url\":\"http://models.example.com/a.gguf\"},\"contextLength\":32768,\"format\":\"gguf\",\"license\":\"Apache-2.0\",\"modelId\":\"qwen2.5-7b-instruct-q4_k_m\",\"revision\":1,\"runtime\":{\"minVersion\":\"b4567\",\"name\":\"llamacpp\"},\"schema\":\"binjari.model-manifest/1\"}",
-          "signature": "c349b5a24b8cc4c148b06c70122563d88febeb721b9e3bcfaaafd6461c17c1e37c5d61c027d9dec1d61ec5a31b804a05a96adcd3551f0c4a7264d50d77443002",
+          "manifest": "{\"artifact\":{\"bytes\":4683073536,\"sha256\":\"e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1\",\"url\":\"http://models.example.com/a.gguf\"},\"contextLength\":32768,\"format\":\"gguf\",\"license\":\"Apache-2.0\",\"modelId\":\"qwen2.5-7b-instruct-q4_k_m\",\"revision\":1,\"runtime\":{\"minVersion\":\"b4567\",\"name\":\"llamacpp\"},\"schema\":\"spareon.model-manifest/1\"}",
+          "signature": "d9efb5e253c90c4cebd59d54660db6dd6b43cabd896e8a02fa21ec7bff64f48797f0d8672fc8dde80fdcb8bc0e6f901e275baf9ab548d6bf53e390e24427e002",
           "keyId": "release-2026a"
         },
         "expect": "manifest_invalid"

@@ -1,4 +1,4 @@
-import { fakeOutput } from '@binjari/testkit';
+import { fakeOutput } from '@spareon/testkit';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { balanceOf, txCountForJob } from '../support/ledger.js';
@@ -267,8 +267,8 @@ describe('walking skeleton: buyer → server → agent → ledger', () => {
   });
 
   it('refuses an agent that does not know the secret', async () => {
-    const { FakeAgent } = await import('@binjari/testkit');
-    const protocol = await import('@binjari/protocol');
+    const { FakeAgent } = await import('@spareon/testkit');
+    const protocol = await import('@spareon/protocol');
     await expect(
       FakeAgent.connect({
         url: h.wsUrl,

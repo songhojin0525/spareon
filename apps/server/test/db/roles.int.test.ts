@@ -1,5 +1,5 @@
-import { newUuidV7 } from '@binjari/shared';
-import { createSeededRandom, FakeClock } from '@binjari/testkit';
+import { newUuidV7 } from '@spareon/shared';
+import { createSeededRandom, FakeClock } from '@spareon/testkit';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import type pg from 'pg';
@@ -11,9 +11,9 @@ import { createFactories } from '../../src/testing/factories.js';
 import { openTestDb, type TestDb } from '../support/db.js';
 
 /**
- * 0002_app_role: the server runs as a member of binjari_app, which can use the tables but cannot
+ * 0002_app_role: the server runs as a member of spareon_app, which can use the tables but cannot
  * change history, write balances, or switch the invariant triggers off (S03 review point
- * "다른 연결 역할"). Every attempt below runs as binjari_app (session authorization).
+ * "다른 연결 역할"). Every attempt below runs as spareon_app (session authorization).
  */
 
 const clock = new FakeClock();
@@ -73,7 +73,7 @@ async function stateOf(p: Promise<unknown>): Promise<string> {
   }
 }
 
-describe('binjari_app role (least privilege)', () => {
+describe('spareon_app role (least privilege)', () => {
   let db: TestDb;
   beforeAll(async () => {
     db = await openTestDb();
@@ -83,14 +83,14 @@ describe('binjari_app role (least privilege)', () => {
   });
 
   /**
-   * Run fn as binjari_app on a dedicated connection. SET SESSION AUTHORIZATION (not SET ROLE) makes it
-   * the session user, as for a real login: SET ROLE checks are then made against binjari_app.
+   * Run fn as spareon_app on a dedicated connection. SET SESSION AUTHORIZATION (not SET ROLE) makes it
+   * the session user, as for a real login: SET ROLE checks are then made against spareon_app.
    */
   const asApp = <T>(fn: (c: pg.ClientBase, owner: string) => Promise<T>): Promise<T> =>
     db.withClient(async (c) => {
       // The migration owner (the test admin): the role an attacker would most like to become.
       const owner = (await c.query<{ u: string }>('SELECT current_user AS u')).rows[0]?.u ?? '';
-      await c.query('SET SESSION AUTHORIZATION binjari_app');
+      await c.query('SET SESSION AUTHORIZATION spareon_app');
       try {
         return await fn(c, owner);
       } finally {
@@ -105,7 +105,7 @@ describe('binjari_app role (least privilege)', () => {
           await c.query<{ table: string; privileges: string | null }>(
             `SELECT t.tablename AS table,
                     (SELECT string_agg(p, ',' ORDER BY p) FROM unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) p
-                      WHERE has_table_privilege('binjari_app', format('public.%I', t.tablename), p)) AS privileges
+                      WHERE has_table_privilege('spareon_app', format('public.%I', t.tablename), p)) AS privileges
                FROM pg_tables t WHERE t.schemaname = 'public' ORDER BY 1`,
           )
         ).rows,
@@ -115,7 +115,7 @@ describe('binjari_app role (least privilege)', () => {
       async (c) =>
         (
           await c.query<{ n: number }>(
-            `SELECT count(*)::int AS n FROM pg_class WHERE relowner = 'binjari_app'::regrole`,
+            `SELECT count(*)::int AS n FROM pg_class WHERE relowner = 'spareon_app'::regrole`,
           )
         ).rows[0]?.n,
     );
@@ -124,7 +124,7 @@ describe('binjari_app role (least privilege)', () => {
       async (c) =>
         (
           await c.query<{ rolcanlogin: boolean; rolsuper: boolean; rolbypassrls: boolean }>(
-            `SELECT rolcanlogin, rolsuper, rolbypassrls FROM pg_roles WHERE rolname = 'binjari_app'`,
+            `SELECT rolcanlogin, rolsuper, rolbypassrls FROM pg_roles WHERE rolname = 'spareon_app'`,
           )
         ).rows[0],
     );
@@ -164,7 +164,7 @@ describe('binjari_app role (least privilege)', () => {
 
   it('writes a ledger entry through Drizzle (the path S06 uses)', async () => {
     // Re-review finding: a column-level grant without `id` broke Drizzle's INSERT, which names the
-    // identity column (`VALUES (default, ...)`). Run the real ORM path as binjari_app.
+    // identity column (`VALUES (default, ...)`). Run the real ORM path as spareon_app.
     const balance = await asApp(async (c) => {
       const appDb = drizzle(c as pg.Client, { schema });
       const f = createFactories({ db: appDb, clock, random: createSeededRandom('app-role') });
@@ -271,7 +271,7 @@ describe('binjari_app role (least privilege)', () => {
       replicaMode: await stateOf(c.query('SET session_replication_role = replica')),
       replaceFunction: await stateOf(
         c.query(
-          `CREATE OR REPLACE FUNCTION public.binjari_reject_change() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RETURN NEW; END $$`,
+          `CREATE OR REPLACE FUNCTION public.spareon_reject_change() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RETURN NEW; END $$`,
         ),
       ),
       createTable: await stateOf(c.query('CREATE TABLE public.sneaky (x int)')),

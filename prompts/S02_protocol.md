@@ -21,7 +21,7 @@
 - `packages/protocol/fixtures/{valid,invalid}/`
 - `apps/agent/internal/protocol/` — Go 타입, `embed`로 내장한 스키마로 검증(`github.com/santhosh-tekuri/jsonschema/v6` 권장), 번들 해시
 - `docs/PROTOCOL.md`
-- 생성 스크립트 `pnpm --filter @binjari/protocol gen`과 "생성물이 최신인지" 검사
+- 생성 스크립트 `pnpm --filter @spareon/protocol gen`과 "생성물이 최신인지" 검사
 
 ## 상세 요구사항
 
@@ -46,7 +46,7 @@ PROTOCOL.md에 표로: 타입, 방향, 필수 필드, 의미, 기대 응답, 시
 - **정책(policy) 스키마**: 주간 일정(7일 × 48칸 30분 단위 비트맵), minIdleMinutes, maxGpuTempC, downloadWindow, modelAllowlist, transparencyMode, maxConcurrentJobs(기본 1).
 
 ### 3. 서명 대상 바이트 (위조 방지)
-- `auth.prove` 서명 대상은 정확히 다음 UTF-8 바이트로 고정한다: `"binjari-auth-v1\n" + nonce + "\n" + nodeId + "\n" + protocolHash`(nonce는 `auth.challenge`로 받은 값, 일회용·짧은 만료. 필드 이름은 ADR 0008과 맞춘다). 앞의 도메인 구분 문자열은 다른 용도의 서명(매니페스트 등)과 혼동되지 않게 하기 위한 것이다.
+- `auth.prove` 서명 대상은 정확히 다음 UTF-8 바이트로 고정한다: `"spareon-auth-v1\n" + nonce + "\n" + nodeId + "\n" + protocolHash`(nonce는 `auth.challenge`로 받은 값, 일회용·짧은 만료. 필드 이름은 ADR 0008과 맞춘다). 앞의 도메인 구분 문자열은 다른 용도의 서명(매니페스트 등)과 혼동되지 않게 하기 위한 것이다.
 - 매니페스트 서명도 정규화 규칙(JSON 키 정렬, 공백 없음, UTF-8)을 문서와 테스트 벡터로 고정한다.
 - 고정 키·고정 nonce로 만든 테스트 벡터를 TS와 Go가 똑같이 검증해야 한다.
 

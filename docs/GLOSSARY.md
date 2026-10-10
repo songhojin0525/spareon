@@ -82,9 +82,9 @@
 
 | 용어 | 코드 이름 | 뜻 |
 |---|---|---|
-| 에이전트 | `binjari-agent` | PC방 PC에 설치되는 Windows 서비스(세션 0) |
-| 헬퍼 | `binjari-helper` | 사용자 세션에서 입력 시각·전체 화면 등을 보고 이름 있는 파이프로 서비스에 알리는 프로그램(ADR 0011) |
-| 업데이터 | `binjari-updater` | 버전 폴더 교체와 자동 롤백을 하는 별도 실행 파일 |
+| 에이전트 | `spareon-agent` | PC방 PC에 설치되는 Windows 서비스(세션 0) |
+| 헬퍼 | `spareon-helper` | 사용자 세션에서 입력 시각·전체 화면 등을 보고 이름 있는 파이프로 서비스에 알리는 프로그램(ADR 0011) |
+| 업데이터 | `spareon-updater` | 버전 폴더 교체와 자동 롤백을 하는 별도 실행 파일 |
 | 노드 시뮬레이터 | `nodesim` | 가짜 노드 여러 대를 띄우는 개발·시험 도구 |
 | 런타임 | `runtime` | 모델을 실제로 돌리는 프로세스. 운영은 llama.cpp `llama-server`, 개발은 Ollama, 시험은 fake |
 | Job Object | — | Windows에서 프로세스 묶음을 한 번에 죽이는 커널 객체. 선점과 고아 런타임 방지에 쓴다 |

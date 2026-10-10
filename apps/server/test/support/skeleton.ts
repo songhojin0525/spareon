@@ -1,8 +1,8 @@
 import { randomBytes } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
 
-import * as protocol from '@binjari/protocol';
-import { FakeAgent, type FakeAgentOptions } from '@binjari/testkit';
+import * as protocol from '@spareon/protocol';
+import { FakeAgent, type FakeAgentOptions } from '@spareon/testkit';
 import type pg from 'pg';
 import { expect } from 'vitest';
 
@@ -52,7 +52,7 @@ export async function startHarness(
 ): Promise<Harness> {
   const db = await openTestDb();
   // The server's own connection runs as the least-privilege role, exactly as in production (S03).
-  const app = createDb({ url: db.url, role: 'binjari_app', maxConnections: 8 });
+  const app = createDb({ url: db.url, role: 'spareon_app', maxConnections: 8 });
   const clock = systemClock;
   const ids = createIds(clock);
   const world = await ensureSkeletonWorld(

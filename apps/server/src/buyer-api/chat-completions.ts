@@ -7,7 +7,7 @@
  */
 import { createHash, timingSafeEqual } from 'node:crypto';
 
-import { LIMITS } from '@binjari/protocol';
+import { LIMITS } from '@spareon/protocol';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 

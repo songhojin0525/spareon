@@ -3,7 +3,7 @@
 package protocol
 
 // ProtocolHash is the SHA-256 of the canonical schema bundle (bundle.json).
-const ProtocolHash = "c67e072c232742c69718f4e49fa18fdc44f2fc65f61a165e6277af3173e5c6ff"
+const ProtocolHash = "2028a45f0dfe3c6552fd7eecc6abe56391d4d2a753f37121852030463a06dda9"
 
 // Protocol limits (schemas/limits.json).
 const (

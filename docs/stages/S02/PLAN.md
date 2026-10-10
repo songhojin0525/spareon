@@ -21,9 +21,9 @@ JSON 파서 차이(TS `JSON.parse`와 Go `encoding/json`)를 없애기 위해 �
 
 ### D-d. 정규화 JSON(RFC 8785 부분집합)과 서명 대상
 - 정규화: 키는 UTF-16 코드 단위 순, 공백 없음, 문자열은 `"`·`\`·제어문자만 이스케이프(소문자 `\u00xx`), 정수만. 스키마 번들 해시와 매니페스트 서명에 쓴다.
-- `auth.prove`: `"binjari-auth-v1\n" + nonce + "\n" + nodeId + "\n" + protocolHash`(UTF-8). 각 구성요소는 줄바꿈이 들어갈 수 없는 형식(소문자 hex·UUIDv7)이고, 형식이 다르면 바이트를 만들기 전에 거부한다 → 경계 모호성 없음.
-- `enroll.complete`: `"binjari-enroll-v1\n" + nonce + "\n" + enrollId + "\n" + publicKey + "\n" + fpStore + "\n" + fpGlobal`.
-- 매니페스트: 메시지에는 매니페스트를 **정규화 JSON 문자열 그대로** 싣고(`manifest`), 서명은 `"binjari-<kind>-manifest-v1\n" + manifest` 바이트에 대해 한다. 검증 순서: 서명 확인(받은 바이트 그대로) → 엄격 파싱 → 다시 정규화한 결과가 받은 문자열과 같은지 → 매니페스트 스키마. 객체로 싣고 양쪽이 각자 정규화하는 대안은 파서 차이가 서명 우회가 될 수 있어 버림.
+- `auth.prove`: `"spareon-auth-v1\n" + nonce + "\n" + nodeId + "\n" + protocolHash`(UTF-8). 각 구성요소는 줄바꿈이 들어갈 수 없는 형식(소문자 hex·UUIDv7)이고, 형식이 다르면 바이트를 만들기 전에 거부한다 → 경계 모호성 없음.
+- `enroll.complete`: `"spareon-enroll-v1\n" + nonce + "\n" + enrollId + "\n" + publicKey + "\n" + fpStore + "\n" + fpGlobal`.
+- 매니페스트: 메시지에는 매니페스트를 **정규화 JSON 문자열 그대로** 싣고(`manifest`), 서명은 `"spareon-<kind>-manifest-v1\n" + manifest` 바이트에 대해 한다. 검증 순서: 서명 확인(받은 바이트 그대로) → 엄격 파싱 → 다시 정규화한 결과가 받은 문자열과 같은지 → 매니페스트 스키마. 객체로 싣고 양쪽이 각자 정규화하는 대안은 파서 차이가 서명 우회가 될 수 있어 버림.
 - 이진값은 모두 소문자 hex(공개키 64자, 서명 128자, nonce 64자). base64는 비정규 인코딩(같은 바이트, 다른 문자열) 문제가 있어 버림.
 
 ### D-e. 코드 생성기를 직접 만든다
@@ -61,15 +61,15 @@ JSON 파서 차이(TS `JSON.parse`와 Go `encoding/json`)를 없애기 위해 �
 - Windows 줄바꿈: 해시는 파싱 후 정규화 값이라 CRLF와 무관.
 
 ## 체크포인트
-1. **기반 유틸(TS)**: 엄격 JSON 인식기, 정규화 JSON, UUIDv7·시각 형식(`@binjari/shared`), 벡터 파일(정규화 JSON). 검증: 단위 테스트 + 속성 테스트(fast-check).
+1. **기반 유틸(TS)**: 엄격 JSON 인식기, 정규화 JSON, UUIDv7·시각 형식(`@spareon/shared`), 벡터 파일(정규화 JSON). 검증: 단위 테스트 + 속성 테스트(fast-check).
 2. **스키마 전체**: 봉투·defs(common, policy, job-input, limits, error-codes, registry)·메시지 27종·HTTPS 본문 5종·매니페스트 2종. 검증: 스키마 규칙 검사(lint) 테스트, Ajv 컴파일.
-3. **생성기**: TS 타입·메타·번들, Go 타입·메타·내장 번들, `pnpm --filter @binjari/protocol gen`, 최신성 테스트. 검증: 최신성 테스트, `tsc`, `gofmt -l`, `go vet`.
+3. **생성기**: TS 타입·메타·번들, Go 타입·메타·내장 번들, `pnpm --filter @spareon/protocol gen`, 최신성 테스트. 검증: 최신성 테스트, `tsc`, `gofmt -l`, `go vet`.
 4. **TS 코덱·서명·fixture**: decode/encode 파이프라인, 서명 바이트·검증, 매니페스트 검증, 해시, valid/invalid fixture 전부, 서명 벡터. 검증: 계약 테스트(TS), 왕복, 벡터.
 5. **Go 코덱·계약 테스트**: 같은 파이프라인, 같은 fixture·벡터, 소스 스키마에서 해시 직접 계산. 검증: `go test ./...`, Windows 교차 빌드.
 6. **문서**: `docs/PROTOCOL.md`, ADR 0017, ARCHITECTURE 12절 D24~, check-docs 필수 파일, CI 캐시 경로. 검증: `node scripts/check-docs.mjs`.
 7. **게이트**: `pnpm verify`, 적대적 검토 반영, 보고 내용.
 
 ## 체크포인트별 검증 방법
-- 1~4: `pnpm --filter @binjari/protocol test`, `pnpm --filter @binjari/shared test`, `pnpm lint`, `pnpm typecheck`
+- 1~4: `pnpm --filter @spareon/protocol test`, `pnpm --filter @spareon/shared test`, `pnpm lint`, `pnpm typecheck`
 - 3·5: `cd apps/agent && gofmt -l . && go vet ./... && go test ./...`, `GOOS=windows go build ./...`
 - 6~7: `pnpm verify`

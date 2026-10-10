@@ -1,5 +1,5 @@
 // Regenerates TS types, Go types and the embedded bundles from packages/protocol/schemas.
-// Usage: pnpm --filter @binjari/protocol gen   (test/generated.test.ts fails when the outputs are stale)
+// Usage: pnpm --filter @spareon/protocol gen   (test/generated.test.ts fails when the outputs are stale)
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 

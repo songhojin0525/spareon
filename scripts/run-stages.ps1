@@ -1,5 +1,5 @@
 ﻿<#
-  binjari 차수 자동 실행 스크립트 (Windows PowerShell 5.1 / PowerShell 7)
+  spareon 차수 자동 실행 스크립트 (Windows PowerShell 5.1 / PowerShell 7)
 
   - 한 번에 한 차수씩, 매번 새 Claude Code 프로세스로 실행합니다(매번 깨끗한 맥락).
   - Claude가 .runner/STATUS 에 STOP 을 쓰거나, 상태 파일이 없거나(한도 도달·오류 등),

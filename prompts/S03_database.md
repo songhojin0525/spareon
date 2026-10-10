@@ -20,7 +20,7 @@ v0.1 전체가 쓸 PostgreSQL 스키마를 한 번에 제대로 설계한다. �
 - `apps/server/src/db/client.ts`(풀, 트랜잭션 헬퍼, 재시도 유틸)
 - `docs/DB.md` — ERD(mermaid), 테이블별 설명, 불변식 목록과 강제 위치(DB 제약 / 앱)
 - `packages/testkit` 확장 — 마이그레이션이 적용된 템플릿 DB, 테스트 파일별 격리 DB, 팩토리, 가상 시계
-- 개발용 시드 스크립트(`pnpm --filter @binjari/server db:seed`)
+- 개발용 시드 스크립트(`pnpm --filter @spareon/server db:seed`)
 
 ## 상세 요구사항
 
