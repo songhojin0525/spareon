@@ -27,7 +27,7 @@
 - [ ] (S04, 선택) 친구 PC 2~3대로 0단계 데모를 해 본다. 왜: "남의 PC가 질문에 답하고 장부에 남는다"(로드맵 0단계)를 실제 네트워크·실제 Ollama로 처음 확인한다. 자동 데모(`pnpm demo`)는 가짜 런타임으로만 돌았다. 절차: `docs/DEMO_0.md` 3절(혼자 `pnpm demo`) → 4절(서버 `pnpm dev:server --lan`) → 5절(친구 PC에 에이전트·Ollama, `ollama ps`로 GPU/CPU 확인) → 6절(대시보드 `/dev`에서 확인) → 8절(끄기, 터널·방화벽 규칙 정리). 결과: DEMO_0.md 9절의 항목(붙은 PC 수, 완료 수, PC별 GPU와 `ollama ps`의 `PROCESSOR` 값, 막힌 곳)을 Claude에게 알려 주면 S04 REPORT와 `docs/KNOWN_UNKNOWNS.md` K17에 반영한다. 친구 PC가 없으면 내 PC(AMD RX 5700 XT) 한 대로 서버와 에이전트를 같이 띄워도 된다(`--lan` 없이, 서버 주소 `ws://127.0.0.1:8080/agent/v1/ws`).
 
 ## 이름 변경(binjari → spareon, ADR 0020)에서 추가
-- [ ] GitHub 저장소 이름을 `BINjari` → `spareon`으로 바꾼다(GitHub 저장소 Settings → General → Repository name). 왜: 코드·문서는 이미 spareon이다. GitHub가 옛 주소를 새 주소로 자동 연결하므로 push는 그대로 된다. 결과: 바꾼 뒤 `git remote set-url origin <새 주소>`(Claude에게 맡겨도 된다).
+- [x] GitHub 저장소 이름을 `BINjari` → `spareon`으로 바꾼다(GitHub 저장소 Settings → General → Repository name). 왜: 코드·문서는 이미 spareon이다. GitHub가 옛 주소를 새 주소로 자동 연결하므로 push는 그대로 된다. 결과: 바꾼 뒤 `git remote set-url origin <새 주소>`(Claude에게 맡겨도 된다). — 완료(2026-10-10): 저장소가 `songhojin0525/spareon`으로 옮겨진 것을 push 응답에서 확인했고, origin을 새 주소로 바꿨다.
 - [x] 저장소 폴더 `C:\binjari` → `C:\spareon`. 절차: 진행 중인 차수가 없을 때 Claude Code를 모두 닫는다 → 폴더 이름 바꾸기 → 새 폴더에서 Claude Code 열기. 주의: Claude Code의 프로젝트 기록(메모리)은 폴더 경로별로 저장되므로, 바꾸기 전에 Claude에게 "메모리를 새 폴더용으로 옮겨 줘"라고 하면 옮길 방법을 안내한다. — 완료(2026-10-10): 폴더를 바꿨고 메모리를 옮겼다. 새 폴더에서 `pnpm install`을 다시 했다(node_modules 연결이 옛 경로를 가리켰다).
 
 ## 나중에 (차수가 진행되면 각 차수가 구체적인 절차를 추가한다)
