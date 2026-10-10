@@ -30,6 +30,10 @@
 - [x] GitHub 저장소 이름을 `BINjari` → `spareon`으로 바꾼다(GitHub 저장소 Settings → General → Repository name). 왜: 코드·문서는 이미 spareon이다. GitHub가 옛 주소를 새 주소로 자동 연결하므로 push는 그대로 된다. 결과: 바꾼 뒤 `git remote set-url origin <새 주소>`(Claude에게 맡겨도 된다). — 완료(2026-10-10): 저장소가 `songhojin0525/spareon`으로 옮겨진 것을 push 응답에서 확인했고, origin을 새 주소로 바꿨다.
 - [x] 저장소 폴더 `C:\binjari` → `C:\spareon`. 절차: 진행 중인 차수가 없을 때 Claude Code를 모두 닫는다 → 폴더 이름 바꾸기 → 새 폴더에서 Claude Code 열기. 주의: Claude Code의 프로젝트 기록(메모리)은 폴더 경로별로 저장되므로, 바꾸기 전에 Claude에게 "메모리를 새 폴더용으로 옮겨 줘"라고 하면 옮길 방법을 안내한다. — 완료(2026-10-10): 폴더를 바꿨고 메모리를 옮겼다. 새 폴더에서 `pnpm install`을 다시 했다(node_modules 연결이 옛 경로를 가리켰다).
 
+## S05에서 추가
+- [ ] (S05, 운영 서버를 처음 켤 때 · S30) 운영자 계정은 웹 가입으로 만들 수 없다. 왜: 운영자는 돈·설정을 바꾸는 권한이라 CLI로만 만든다(docs/PERMISSIONS.md). 절차: 서버와 같은 `.env`가 있는 곳에서 `echo "<12자 이상 비밀번호>" | pnpm --filter @spareon/server cli user:create --role operator --email <내 이메일> --password-stdin`(비밀번호를 생략하면 무작위로 만들어 한 번 보여 준다). 결과: `pnpm --filter @spareon/server cli audit:tail`에 `user.create`가 남는다. 비밀번호를 잊으면 `user:set-password --email <이메일>`.
+- [ ] (S05, 배포 설정 때 · S30) 웹(Next.js) 프록시 뒤에서 서버를 돌릴 때 `TRUST_PROXY`에 프록시 주소(또는 대역)를 넣는다. 왜: 비워 두면 모든 사용자의 IP가 프록시 하나로 보여서, IP별 로그인 한도(15분에 30회)를 모든 사용자가 함께 쓰게 되고 감사 기록의 IP 해시도 쓸모없어진다(ADR 0012, 0021). 절차: 배포 구성에서 웹 → 서버 요청이 나오는 주소를 확인해 `apps/server/.env`의 `TRUST_PROXY`에 쉼표로 적는다. 결과: S30 런북에 값을 기록한다.
+
 ## 나중에 (차수가 진행되면 각 차수가 구체적인 절차를 추가한다)
 - [ ] Windows PC + GPU에서 실기 확인 (S18~S22, `docs/manual-tests/`). 지금은 AMD RX 5700 XT 1대로 Vulkan 경로를 확인한다(ADR 0019). CUDA 경로(세션 0 CUDA K1, nvidia-smi 전력 K8)는 NVIDIA PC가 생기면 확인한다. 보고할 때 GPU·백엔드를 함께 적는다.
 - [ ] 오픈소스 모델 후보 확정과 라이선스 확인 (S09, `docs/MODEL_CANDIDATES.md`)

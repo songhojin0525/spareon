@@ -53,6 +53,8 @@ export interface AuthDeps extends AuditDeps {
   readonly limiter: RateLimiter;
   readonly session: SessionConfig;
   readonly config: AuthConfig;
+  /** Where background failures (an audit write after the answer) are reported. */
+  readonly log?: { error(obj: object, msg: string): void };
 }
 
 export interface PublicUser {
@@ -94,7 +96,9 @@ export class AuthService {
     const start = performance.now();
     const { db, limiter, config } = this.deps;
     const ip = await limiter.hit(`login:ip:${input.ipHash}`, config.loginIpRule);
-    const account = await limiter.peek(accountKey(input.email), config.loginAccountRule);
+    // Every attempt counts before the password is checked, so parallel guesses cannot all slip past
+    // the limit (a success clears the count).
+    const account = await limiter.hit(accountKey(input.email), config.loginAccountRule);
     if (!ip.allowed || !account.allowed) {
       await this.#padFrom(start);
       return {
@@ -111,18 +115,21 @@ export class AuthService {
       ? await verifyPassword(user.passwordHash, input.password)
       : await verifyAgainstDummy(input.password);
     if (!ok || user === undefined) {
-      await limiter.hit(accountKey(input.email), config.loginAccountRule);
+      await this.#padFrom(start);
       if (user !== undefined) {
-        await recordAudit(db, this.deps, {
+        // Written after the answer is timed and not awaited: an existing account must not answer
+        // later than an unknown one (WEB-07).
+        void recordAudit(db, this.deps, {
           actor: { kind: 'system', via: 'web' },
           action: 'auth.login_failed',
           targetKind: 'user',
           targetId: user.id,
           data: { reason: user.disabledAt !== null ? 'disabled' : 'bad_credentials' },
           ipHash: input.ipHash,
+        }).catch((err: unknown) => {
+          this.deps.log?.error({ err }, 'audit of a failed login could not be written');
         });
       }
-      await this.#padFrom(start);
       return { kind: 'invalid' };
     }
     await limiter.reset(accountKey(input.email));

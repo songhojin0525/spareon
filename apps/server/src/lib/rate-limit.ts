@@ -68,9 +68,10 @@ export class MemoryRateLimiter implements RateLimiter {
 
   #evict(now: number): void {
     for (const [k, w] of this.#windows) if (w.resetAt <= now) this.#windows.delete(k);
-    // Still full: drop the oldest entries (insertion order). Under a flood of distinct keys this
-    // forgets some counts, which only weakens limiting for the flooded keys; it never blocks anyone.
-    const excess = this.#windows.size - this.#maxKeys + 1;
+    // Still full: drop the oldest tenth (insertion order) at once, so a flood of distinct keys costs
+    // one scan per maxKeys/10 new keys, not one per request. It forgets some counts, which only
+    // weakens limiting for the flooded keys; it never blocks anyone.
+    const excess = this.#windows.size - this.#maxKeys + Math.max(1, Math.floor(this.#maxKeys / 10));
     if (excess > 0) {
       let n = 0;
       for (const k of this.#windows.keys()) {

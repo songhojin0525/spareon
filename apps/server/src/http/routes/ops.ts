@@ -27,14 +27,21 @@ export function registerOpsRoutes(router: Router): void {
     summary: 'All operator settings with their current values',
     tags: ['ops'],
     response: z.object({
-      data: z.array(z.object({ key: z.string(), value: z.unknown(), description: z.string() })),
+      data: z.array(
+        z.object({
+          key: z.string(),
+          value: z.unknown(),
+          invalidStored: z.unknown().optional(),
+          description: z.string(),
+        }),
+      ),
     }),
     handler: async () => {
       const values = await readAllSettings(ctx.db);
       return {
-        data: Object.entries(values).map(([key, value]) => ({
+        data: Object.entries(values).map(([key, v]) => ({
           key,
-          value,
+          ...v,
           description: isSettingKey(key) ? SETTINGS[key].description : '',
         })),
       };

@@ -199,28 +199,61 @@ export class Router {
     return { role: 'buyer', via: 'api_key', userId: key.userId, apiKey: key };
   }
 
-  /** Per-key requests per minute and concurrent requests (THREAT_MODEL BUY-01, BUY-08). */
+  /**
+   * Concurrent requests and requests per minute, per API key and per buyer (all keys together), so
+   * many keys cannot multiply a buyer's budget (THREAT_MODEL BUY-01, BUY-08). Concurrency is checked
+   * first: a request refused for concurrency does not spend the per-minute budget.
+   */
   async #apiKeyLimits(key: ApiKeyPrincipal): Promise<() => void> {
-    const rpm = key.rateLimitRpm ?? (await this.ctx.settings.get('api_keys.default_rpm'));
-    const d = await this.ctx.limiter.hit(`api_key:rpm:${key.apiKeyId}`, {
-      limit: rpm,
-      windowMs: 60_000,
-    });
-    if (!d.allowed) {
-      throw tooManyRequests(
-        'rate_limited',
-        `Rate limit of ${String(rpm)} requests per minute exceeded for this API key.`,
-        d.retryAfterMs,
-      );
-    }
-    const max = await this.ctx.settings.get('api_keys.default_concurrency');
-    const release = this.ctx.concurrency.tryAcquire(key.apiKeyId, max);
-    if (release === undefined) {
+    const { settings, concurrency, limiter } = this.ctx;
+    const keyMax = await settings.get('api_keys.default_concurrency');
+    const buyerMax = await settings.get('buyers.concurrency');
+    const releaseKey = concurrency.tryAcquire(`key:${key.apiKeyId}`, keyMax);
+    if (releaseKey === undefined) {
       throw tooManyRequests(
         'concurrency_limited',
-        `At most ${String(max)} concurrent requests per API key.`,
+        `At most ${String(keyMax)} concurrent requests per API key.`,
         1_000,
       );
+    }
+    const releaseBuyer = concurrency.tryAcquire(`buyer:${key.userId}`, buyerMax);
+    if (releaseBuyer === undefined) {
+      releaseKey();
+      throw tooManyRequests(
+        'concurrency_limited',
+        `At most ${String(buyerMax)} concurrent requests per buyer (all API keys together).`,
+        1_000,
+      );
+    }
+    const release = (): void => {
+      releaseKey();
+      releaseBuyer();
+    };
+    try {
+      const keyRpm = key.rateLimitRpm ?? (await settings.get('api_keys.default_rpm'));
+      const k = await limiter.hit(`api_key:rpm:${key.apiKeyId}`, {
+        limit: keyRpm,
+        windowMs: 60_000,
+      });
+      if (!k.allowed) {
+        throw tooManyRequests(
+          'rate_limited',
+          `Rate limit of ${String(keyRpm)} requests per minute exceeded for this API key.`,
+          k.retryAfterMs,
+        );
+      }
+      const buyerRpm = await settings.get('buyers.rpm');
+      const u = await limiter.hit(`buyer:rpm:${key.userId}`, { limit: buyerRpm, windowMs: 60_000 });
+      if (!u.allowed) {
+        throw tooManyRequests(
+          'rate_limited',
+          `Rate limit of ${String(buyerRpm)} requests per minute exceeded for this buyer (all API keys).`,
+          u.retryAfterMs,
+        );
+      }
+    } catch (err) {
+      release();
+      throw err;
     }
     return release;
   }

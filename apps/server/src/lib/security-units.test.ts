@@ -132,6 +132,7 @@ describe('cookies', () => {
 });
 
 describe('canonical request hash (idempotency)', () => {
+  const K = Buffer.alloc(32, 7);
   it('ignores key order and formatting, not values', () => {
     fc.assert(
       fc.property(fc.dictionary(fc.string(), fc.jsonValue()), (obj) => {
@@ -139,9 +140,13 @@ describe('canonical request hash (idempotency)', () => {
         expect(canonicalJson(reversed)).toBe(canonicalJson(obj));
       }),
     );
-    expect(requestHash({ a: 1, b: [1, 2] }).equals(requestHash({ b: [1, 2], a: 1 }))).toBe(true);
-    expect(requestHash({ a: 1 }).equals(requestHash({ a: 2 }))).toBe(false);
-    expect(requestHash({ a: [1, 2] }).equals(requestHash({ a: [2, 1] }))).toBe(false);
+    expect(requestHash(K, { a: 1, b: [1, 2] }).equals(requestHash(K, { b: [1, 2], a: 1 }))).toBe(
+      true,
+    );
+    expect(requestHash(K, { a: 1 }).equals(requestHash(K, { a: 2 }))).toBe(false);
+    expect(requestHash(K, { a: [1, 2] }).equals(requestHash(K, { a: [2, 1] }))).toBe(false);
+    // Keyed: a different server key gives a different hash for the same request.
+    expect(requestHash(K, { a: 1 }).equals(requestHash(Buffer.alloc(32, 8), { a: 1 }))).toBe(false);
   });
 });
 

@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { CURRENT_TERMS_VERSION } from '../../src/auth/users.js';
 import { MemoryRateLimiter } from '../../src/lib/rate-limit.js';
-import { type Harness, startHarness } from '../support/skeleton.js';
+import { type Harness, startHarness, waitFor } from '../support/skeleton.js';
 import {
   Browser,
   createTestUser,
@@ -62,11 +62,18 @@ describe('people auth: login, sessions, CSRF (runs the real server)', () => {
     expect(e1.code).toBe('invalid_credentials');
     expect([e1.code, e1.message]).toEqual([e2.code, e2.message]);
     expect(b.sessionToken).toBeUndefined();
-    const audit = await h.query<{ n: number }>(
-      `SELECT count(*)::int AS n FROM audit_log WHERE action = 'auth.login_failed' AND target_id = $1`,
-      [owner.id],
+    // The failure audit is written after the (timed) answer.
+    await waitFor(
+      async () =>
+        ((
+          await h.query<{ n: number }>(
+            `SELECT count(*)::int AS n FROM audit_log WHERE action = 'auth.login_failed' AND target_id = $1`,
+            [owner.id],
+          )
+        )[0]?.n ?? 0) >= 1,
+      5_000,
+      'the failed-login audit row',
     );
-    expect(audit[0]?.n).toBeGreaterThanOrEqual(1);
   });
 
   it('locks an account after 5 failures for 15 minutes, even for the right password, and the same for unknown emails', async () => {
@@ -314,5 +321,74 @@ describe('https deployment cookies', () => {
     const cookies = res.headers.getSetCookie();
     expect(cookies.find((c) => c.startsWith('__Host-spareon_session='))).toMatch(/; Secure/);
     expect(cookies.find((c) => c.startsWith('__Host-spareon_csrf='))).toMatch(/; Secure/);
+  });
+});
+
+describe('per-IP and parallel limits (production rules: login 30/15 min per IP, 5 per account, signup 10/h per IP)', () => {
+  let h: Harness;
+  beforeAll(async () => {
+    h = await startHarness();
+  });
+  afterAll(async () => {
+    await h.close();
+  });
+
+  it('parallel wrong passwords cannot get past the 5-attempt account limit', async () => {
+    const u = await createTestUser(h, 'buyer');
+    const b = Browser.of(h);
+    await b.primeCsrf();
+    const results = await Promise.all(
+      Array.from({ length: 12 }, (_, i) =>
+        b.request('POST', '/api/auth/login', {
+          body: { email: u.email, password: `wrong-password-${String(i)}` },
+        }),
+      ),
+    );
+    const statuses = results.map((r) => r.status);
+    expect(statuses.filter((s) => s === 401).length).toBeLessThanOrEqual(5);
+    expect(statuses.filter((s) => s === 429).length).toBeGreaterThanOrEqual(7);
+    // Locked: even the right password waits for the window.
+    expect((await b.login(u.email, u.password)).status).toBe(429);
+  });
+
+  it('limits login attempts per IP across different accounts', async () => {
+    const b = Browser.of(h);
+    await b.primeCsrf();
+    // 30 per 15 minutes from one IP; the earlier test used 13 of them.
+    const statuses: number[] = [];
+    for (let i = 0; i < 20; i++) {
+      const res = await b.request('POST', '/api/auth/login', {
+        body: { email: `ip-${String(i)}@test.spareon`, password: 'whatever-password-1' },
+      });
+      statuses.push(res.status);
+    }
+    expect(statuses.slice(0, 17).every((s) => s === 401)).toBe(true);
+    const limited = statuses.slice(17);
+    expect(limited).toEqual([429, 429, 429]);
+    const again = await b.request('POST', '/api/auth/login', {
+      body: { email: 'another@test.spareon', password: 'whatever-password-1' },
+    });
+    expect(again.status).toBe(429);
+    expect(Number(again.headers.get('retry-after'))).toBeGreaterThan(0);
+  });
+
+  it('limits sign-ups per IP to 10 an hour', async () => {
+    const b = Browser.of(h);
+    await b.primeCsrf();
+    const statuses: number[] = [];
+    for (let i = 0; i < 11; i++) {
+      const res = await b.request('POST', '/api/auth/signup', {
+        body: {
+          email: `s${String(i)}@test.spareon`,
+          password: 'a long enough password',
+          displayName: 's',
+          role: 'buyer',
+          termsVersion: CURRENT_TERMS_VERSION,
+        },
+      });
+      statuses.push(res.status);
+    }
+    expect(statuses.slice(0, 10).every((s) => s === 202)).toBe(true);
+    expect(statuses[10]).toBe(429);
   });
 });

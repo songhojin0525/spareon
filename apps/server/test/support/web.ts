@@ -62,7 +62,12 @@ export class Browser {
       if (/max-age=0/i.test(c) || value === '') this.cookies.delete(name);
       else this.cookies.set(name, value);
     }
-    return res;
+    // Read the whole body now, as a browser does: an unread large body keeps the connection busy.
+    const body = await res.arrayBuffer();
+    return new Response(body.byteLength === 0 ? null : body, {
+      status: res.status,
+      headers: res.headers,
+    });
   }
 
   /** GET /api/auth/csrf (sets the CSRF cookie). */

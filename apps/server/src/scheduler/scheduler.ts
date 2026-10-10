@@ -249,7 +249,14 @@ export class Scheduler implements AgentJobSink {
   async submit(
     buyerId: string,
     req: ChatRequest,
-    options: { apiKeyId?: string } = {},
+    options: {
+      apiKeyId?: string;
+      /**
+       * Runs inside the job's creating transaction (after the hold and the job row), so whatever it
+       * records commits with the job or not at all (e.g. the idempotency claim's job id).
+       */
+      onCreate?: (tx: Tx, jobId: string) => Promise<void>;
+    } = {},
   ): Promise<{ jobId: string; outcome: Promise<JobOutcome> }> {
     const { db, clock, ids, cipher, config } = this.#deps;
     const [model] = await db
@@ -300,6 +307,7 @@ export class Scheduler implements AgentJobSink {
           createdAt: now,
           statusChangedAt: now,
         });
+        await options.onCreate?.(tx, jobId);
         await tx.insert(jobPayloads).values({
           id: ids.newId(),
           jobId,

@@ -1,3 +1,4 @@
+import net, { type AddressInfo } from 'node:net';
 import { Writable } from 'node:stream';
 
 import { afterAll, describe, expect, it } from 'vitest';
@@ -34,7 +35,7 @@ describe('buildApp', () => {
     throw new AppError('custom_code', 418, 'Short and stout.', { fields: ['a'] });
   });
   app.post('/test/crash', () => {
-    throw new Error('internal detail for operators');
+    throw new Error(`internal detail with ${MARKER}`);
   });
   app.post('/test/zod', (req) => {
     const r = z.object({ n: z.number() }).safeParse(req.body);
@@ -77,7 +78,7 @@ describe('buildApp', () => {
     });
   });
 
-  it('hides unexpected errors behind 500 internal_error (the log keeps the message for operators)', async () => {
+  it('hides unexpected errors behind 500 internal_error, and keeps their message out of the log', async () => {
     const res = await app.inject({
       method: 'POST',
       url: '/test/crash',
@@ -87,7 +88,9 @@ describe('buildApp', () => {
     expect(res.statusCode).toBe(500);
     expect(res.json<{ error: { code: string } }>().error.code).toBe('internal_error');
     expect(res.body).not.toContain('internal detail');
-    expect(logs.text()).toContain('internal detail for operators');
+    // The log keeps the error type and stack frames, never a non-database error message.
+    expect(logs.text()).toContain('"message":"message withheld"');
+    expect(logs.text()).not.toContain('internal detail');
   });
 
   it('reports validation failures by path only, never by value', async () => {
@@ -125,5 +128,43 @@ describe('buildApp', () => {
     const text = logs.text();
     expect(text).toContain('"route":"/test/crash"');
     expect(text).not.toContain(MARKER);
+  });
+});
+
+describe('shutdown', () => {
+  const stuckRequest = async (drainMs: number): Promise<number> => {
+    const app = buildApp({ clock: fixedClock(new Date(0)), closeDrainMs: drainMs });
+    // A request that never finishes (a stuck handler or a client that never lets it complete).
+    app.get('/stuck', () => new Promise(() => undefined));
+    await app.listen({ host: '127.0.0.1', port: 0 });
+    const { port } = app.server.address() as AddressInfo;
+    const socket = net.connect(port, '127.0.0.1');
+    socket.on('error', () => undefined);
+    await new Promise<void>((resolve) => socket.once('connect', resolve));
+    socket.write('GET /stuck HTTP/1.1\r\nHost: x\r\n\r\n');
+    await new Promise((r) => setTimeout(r, 200));
+    const start = performance.now();
+    const closed = app.close().then(() => performance.now() - start);
+    const took = await Promise.race([
+      closed,
+      new Promise<number>((r) =>
+        setTimeout(() => {
+          r(-1);
+        }, 3_000),
+      ),
+    ]);
+    socket.destroy();
+    await closed;
+    return took;
+  };
+
+  it('close() destroys connections still busy after the drain time, so shutdown always ends', async () => {
+    const took = await stuckRequest(200);
+    expect(took).toBeGreaterThanOrEqual(150);
+    expect(took).toBeLessThan(2_000);
+  });
+
+  it('without the drain a stuck request would hold close() (the backstop is what ends it)', async () => {
+    expect(await stuckRequest(10_000)).toBe(-1);
   });
 });

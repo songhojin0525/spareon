@@ -1,5 +1,6 @@
 import pino, { type DestinationStream, type Logger, type LoggerOptions } from 'pino';
 
+import { toDbError } from '../db/errors.js';
 import { AppError } from './errors.js';
 import { safeErrorText } from './safe-error.js';
 
@@ -62,7 +63,10 @@ export function serializeError(err: unknown): Record<string, unknown> {
   } else if (err instanceof SyntaxError || (typeof status === 'number' && status < 500)) {
     out['message'] = 'client error (message withheld)';
   } else {
-    out['message'] = safeErrorText(err);
+    // Database errors are reduced to SQLSTATE, table and constraint (safe). Any other message could
+    // one day carry buyer text (absolute rule 4): only its type, code and stack frames are kept.
+    const db = toDbError(err);
+    out['message'] = db.sqlState !== undefined ? safeErrorText(err) : 'message withheld';
     // Stack frames without the first line (which repeats the message).
     if (typeof err.stack === 'string') out['stack'] = err.stack.split('\n').slice(1, 8).join('\n');
   }

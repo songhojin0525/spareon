@@ -1,7 +1,14 @@
-import type { FakeAgent } from '@spareon/testkit';
+import { type FakeAgent, FakeClock } from '@spareon/testkit';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { chatBody, expectSettled, type Harness, startHarness } from '../support/skeleton.js';
+import { Idempotency, requestHash } from '../../src/lib/idempotency.js';
+import {
+  chatBody,
+  expectSettled,
+  type Harness,
+  startHarness,
+  waitFor,
+} from '../support/skeleton.js';
 import type { ErrorBody } from '../support/web.js';
 
 interface Completion {
@@ -88,7 +95,18 @@ describe('Idempotency-Key on POST /v1/chat/completions (BUY-02)', () => {
     const slow = await h.agent('idem-slow', { behavior: { delayMs: 1_500, progressEveryMs: 200 } });
     const key = freshKey();
     const first = call(chatBody('slow one'), key);
-    await new Promise((r) => setTimeout(r, 300));
+    // The claim holds its job id once the job exists: the first request is surely running then.
+    await waitFor(
+      async () =>
+        (
+          await h.query<{ n: number }>(
+            `SELECT count(*)::int AS n FROM idempotency_keys WHERE key = $1 AND response ? 'jobId'`,
+            [key],
+          )
+        )[0]?.n === 1,
+      10_000,
+      'the first request to create its job',
+    );
     const second = await call(chatBody('slow one'), key);
     expect(second.status).toBe(409);
     expect(((await second.json()) as ErrorBody).error.code).toBe('idempotency_in_progress');
@@ -143,12 +161,93 @@ describe('Idempotency-Key on POST /v1/chat/completions (BUY-02)', () => {
     const key = freshKey();
     const body = chatBody('stale claim');
     const buyer = h.world.buyerId;
-    const { requestHash } = await import('../../src/lib/idempotency.js');
     await h.query(
       `INSERT INTO idempotency_keys (scope, key, request_hash, status, created_at, expires_at)
        VALUES ($1, $2, $3, 'in_progress', now() - interval '20 minutes', now() + interval '1 day')`,
-      [`buyer:${buyer}:chat`, key, requestHash(body)],
+      [`buyer:${buyer}:chat`, key, requestHash(h.server.idempotencyHashKey, body)],
     );
     expect((await call(body, key)).status).toBe(200);
+  });
+
+  /** Put a claim of `key` back to "unfinished" as a dead process would leave it. */
+  const unfinish = async (key: string, jobId: string, ageMinutes: number) => {
+    await h.query(
+      `UPDATE idempotency_keys SET status = 'in_progress', response = $2::jsonb, response_status = NULL,
+              completed_at = NULL, created_at = now() - make_interval(mins => $3)
+        WHERE key = $1`,
+      [key, JSON.stringify({ jobId }), ageMinutes],
+    );
+  };
+
+  it('a claim whose job completed but was never recorded is answered as charged-and-lost, never re-run', async () => {
+    const key = freshKey();
+    const first = await call(chatBody('charged once'), key);
+    const jobId = ((await first.json()) as Completion).id.replace(/^chatcmpl-/, '');
+    // As if the process died between the capture and recording the result.
+    await unfinish(key, jobId, 20);
+    const before = await captures();
+    const jobsBefore = (await h.query<{ n: number }>('SELECT count(*)::int AS n FROM jobs'))[0]?.n;
+    const res = await call(chatBody('charged once'), key);
+    expect(res.status).toBe(500);
+    expect(((await res.json()) as ErrorBody).error.code).toBe('result_undelivered');
+    expect(await captures()).toBe(before);
+    expect((await h.query<{ n: number }>('SELECT count(*)::int AS n FROM jobs'))[0]?.n).toBe(
+      jobsBefore,
+    );
+    // Recorded now: the same answer again.
+    expect((await call(chatBody('charged once'), key)).status).toBe(500);
+  });
+
+  it('a recent unfinished claim whose job completed answers in_progress (its request may still record it)', async () => {
+    const key = freshKey();
+    const first = await call(chatBody('recent'), key);
+    const jobId = ((await first.json()) as Completion).id.replace(/^chatcmpl-/, '');
+    await unfinish(key, jobId, 0);
+    expect((await call(chatBody('recent'), key)).status).toBe(409);
+  });
+
+  it('a claim whose job ended without a charge (e.g. no capacity, or canceled by a restart) runs again at once', async () => {
+    const key = freshKey();
+    await fast.kill(); // no node: the job expires with no_capacity and nothing is charged
+    expect((await call(chatBody('expire me'), key)).status).toBe(503);
+    const [job] = await h.query<{ id: string; status: string }>(
+      'SELECT id, status FROM jobs ORDER BY created_at DESC LIMIT 1',
+    );
+    expect(job?.status).toBe('expired');
+    // As if the process had died before releasing the claim.
+    await h.query(
+      `INSERT INTO idempotency_keys (scope, key, request_hash, status, response, created_at, expires_at)
+       VALUES ($1, $2, $3, 'in_progress', $4::jsonb, now(), now() + interval '1 day')`,
+      [
+        `buyer:${h.world.buyerId}:chat`,
+        key,
+        requestHash(h.server.idempotencyHashKey, chatBody('expire me')),
+        JSON.stringify({ jobId: job?.id }),
+      ],
+    );
+    fast = await h.agent('idem-c');
+    expect((await call(chatBody('expire me'), key)).status).toBe(200);
+  });
+
+  it('only the owner of a claim can complete or release it (a late request cannot free a taken-over key)', async () => {
+    const clock = new FakeClock();
+    const idem = new Idempotency(h.app.db, clock, { ttlMs: 86_400_000, staleAfterMs: 1_000 });
+    const hash = requestHash(h.server.idempotencyHashKey, { x: 1 });
+    const scope = `test:${freshKey()}`;
+    const a = await idem.claim(scope, 'k', hash);
+    expect(a.kind).toBe('claimed');
+    clock.advance(2_000);
+    const b = await idem.claim(scope, 'k', hash); // stale and nothing attached: taken over
+    expect(b.kind).toBe('claimed');
+    if (a.kind !== 'claimed' || b.kind !== 'claimed') throw new Error('unreachable');
+    await idem.release(scope, 'k', a.token);
+    await idem.complete(scope, 'k', a.token, 200, { from: 'a' });
+    expect((await idem.claim(scope, 'k', hash)).kind).toBe('in_progress');
+    await idem.complete(scope, 'k', b.token, 200, { from: 'b' });
+    expect(await idem.claim(scope, 'k', hash)).toEqual({
+      kind: 'replay',
+      status: 200,
+      response: { from: 'b' },
+    });
   });
 });

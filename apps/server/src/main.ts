@@ -36,6 +36,11 @@ try {
 }
 
 const logger = createLogger({ level: env.LOG_LEVEL });
+if (env.NODE_ENV === 'production' && env.TRUST_PROXY === undefined) {
+  // Behind the web app's proxy (ADR 0012) every client would share the proxy's IP: per-IP login
+  // limits become global and audit IP hashes useless. Set TRUST_PROXY to the proxy addresses.
+  logger.warn('TRUST_PROXY is not set: client IPs are the socket addresses (wrong behind a proxy)');
+}
 const clock = systemClock;
 const ids = createIds(clock);
 const handle = createDb({

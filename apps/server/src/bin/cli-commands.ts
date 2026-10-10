@@ -243,8 +243,14 @@ export async function runCli(argv: readonly string[], deps: CliDeps): Promise<nu
         const [key] = rest;
         if (key === undefined) {
           const all = await readAllSettings(deps.db);
-          for (const k of SETTING_KEYS)
-            deps.out(`${k} = ${JSON.stringify(all[k])}  # ${SETTINGS[k].description}`);
+          for (const k of SETTING_KEYS) {
+            const v = all[k];
+            const bad =
+              v.invalidStored === undefined
+                ? ''
+                : ` (stored ${JSON.stringify(v.invalidStored)} is invalid and ignored)`;
+            deps.out(`${k} = ${JSON.stringify(v.value)}${bad}  # ${SETTINGS[k].description}`);
+          }
           return 0;
         }
         if (!isSettingKey(key))

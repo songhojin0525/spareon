@@ -82,6 +82,16 @@ export function registerResourceRoutes(router: Router): void {
     response: apiKeySchema.extend({ key: z.string() }),
     handler: async ({ principal, body, ipHash }) => {
       const actor = actorOf(principal);
+      // A buyer may only lower their key's limit; raising it above the default is an operator
+      // decision (CLI key:create --rpm).
+      const ceiling = await ctx.settings.get('api_keys.default_rpm');
+      if (body.rateLimitRpm !== undefined && body.rateLimitRpm > ceiling) {
+        throw new AppError(
+          'rpm_above_default',
+          400,
+          `rateLimitRpm may not exceed the default of ${String(ceiling)} requests per minute.`,
+        );
+      }
       try {
         const created = await withTransaction(ctx.db, async (tx) => {
           const k = await createApiKey(tx, ctx.apiKeys, {

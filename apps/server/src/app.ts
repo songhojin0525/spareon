@@ -52,6 +52,11 @@ export interface AppDeps {
   readonly logger?: Logger;
   /** Proxies allowed to set X-Forwarded-For (ADR 0012). */
   readonly trustProxy?: string[] | false;
+  /**
+   * close() waits this long for in-flight responses (e.g. a client that stops reading a large body),
+   * then destroys the remaining connections so shutdown always ends (default 10 s).
+   */
+  readonly closeDrainMs?: number;
 }
 
 export interface RegisteredRoute {
@@ -103,6 +108,21 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     genReqId: () => ids.newId(),
     trustProxy: deps.trustProxy ?? false,
   }) as unknown as FastifyInstance;
+
+  // Shutdown always ends: after the drain time, connections still open are destroyed.
+  let drainTimer: NodeJS.Timeout | undefined;
+  app.addHook('preClose', (done) => {
+    drainTimer = setTimeout(() => {
+      app.log.warn('closing: destroying connections still open after the drain time');
+      app.server.closeAllConnections();
+    }, deps.closeDrainMs ?? 10_000);
+    drainTimer.unref();
+    done();
+  });
+  app.addHook('onClose', (_instance, done) => {
+    clearTimeout(drainTimer);
+    done();
+  });
 
   const routes: RegisteredRoute[] = [];
   routesByApp.set(app, routes);
@@ -175,6 +195,8 @@ export interface ServerDeps {
   readonly auth?: Partial<AuthConfig>;
   readonly idempotency?: Partial<IdempotencyConfig>;
   readonly limiter?: RateLimiter;
+  /** See AppDeps.closeDrainMs. */
+  readonly closeDrainMs?: number;
   /** Sessions and idempotency keys past their life are deleted this often (default 10 min). */
   readonly maintenanceIntervalMs?: number;
 }
@@ -186,6 +208,8 @@ export interface Server {
   readonly router: Router;
   readonly http: HttpContext;
   readonly idempotency: Idempotency;
+  /** Key of the request hashes stored with idempotency claims. */
+  readonly idempotencyHashKey: Buffer;
 }
 
 const DAY_MS = 86_400_000;
@@ -202,8 +226,10 @@ export async function buildServer(deps: ServerDeps): Promise<Server> {
     ids,
     ...(deps.logger === undefined ? {} : { logger: deps.logger }),
     trustProxy: trustProxyList(env),
+    ...(deps.closeDrainMs === undefined ? {} : { closeDrainMs: deps.closeDrainMs }),
   });
   const sessions = new SessionRegistry();
+  const schedulerConfig = { ...DEFAULT_SCHEDULER_CONFIG, ...deps.scheduler };
   const scheduler = new Scheduler({
     db: deps.db,
     clock,
@@ -212,7 +238,7 @@ export async function buildServer(deps: ServerDeps): Promise<Server> {
     sessions,
     buyerPriceVersionId: deps.world.priceVersionId,
     log: app.log,
-    config: { ...DEFAULT_SCHEDULER_CONFIG, ...deps.scheduler },
+    config: schedulerConfig,
   });
 
   const sessionConfig: SessionConfig = {
@@ -249,8 +275,19 @@ export async function buildServer(deps: ServerDeps): Promise<Server> {
     limiter: http.limiter,
     session: sessionConfig,
     config: { ...DEFAULT_AUTH_CONFIG, ...deps.auth },
+    log: app.log,
   });
-  const idempotencyConfig = { ...DEFAULT_IDEMPOTENCY_CONFIG, ...deps.idempotency };
+  // An unfinished claim is stale once its request must be over: job deadline + waiter backstop + 1 min.
+  const minStaleMs = schedulerConfig.jobDeadlineMs + schedulerConfig.waiterSlackMs + 60_000;
+  const idempotencyConfig = {
+    ...DEFAULT_IDEMPOTENCY_CONFIG,
+    staleAfterMs: minStaleMs,
+    ...deps.idempotency,
+  };
+  if (idempotencyConfig.staleAfterMs < minStaleMs) {
+    throw new Error('idempotency staleAfterMs must exceed the job deadline plus the waiter slack');
+  }
+  const idempotencyHashKey = deriveKey(env.SESSION_SECRET, 'idempotency-request-hash');
   const idempotency = new Idempotency(deps.db, clock, idempotencyConfig);
   const router = new Router(app, http);
 
@@ -287,6 +324,7 @@ export async function buildServer(deps: ServerDeps): Promise<Server> {
     idempotency,
     payloads: { db: deps.db, clock, ids, cipher: deps.cipher },
     replayRetentionMs: idempotencyConfig.ttlMs,
+    idempotencyHashKey,
   });
 
   await app.register(websocket, {
@@ -346,5 +384,5 @@ export async function buildServer(deps: ServerDeps): Promise<Server> {
     await lock?.release();
     lock = undefined;
   });
-  return { app, scheduler, sessions, router, http, idempotency };
+  return { app, scheduler, sessions, router, http, idempotency, idempotencyHashKey };
 }

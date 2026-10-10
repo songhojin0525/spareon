@@ -10,13 +10,21 @@
  * arrives with S09/S12).
  */
 import { LIMITS } from '@spareon/protocol';
+import { eq } from 'drizzle-orm';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 
+import { jobs } from '../db/schema/index.js';
 import { InsufficientCreditError } from '../ledger/skeleton.js';
 import type { Clock } from '../lib/clock.js';
 import { AppError, badRequest, conflict } from '../lib/errors.js';
-import { type Idempotency, IDEMPOTENCY_KEY_RE, requestHash } from '../lib/idempotency.js';
+import {
+  type ClaimResolver,
+  type ClaimToken,
+  type Idempotency,
+  IDEMPOTENCY_KEY_RE,
+  requestHash,
+} from '../lib/idempotency.js';
 import { safeErrorText } from '../lib/safe-error.js';
 import { type PayloadDeps, readOutput, storeOutput } from '../retention/payloads.js';
 import {
@@ -32,6 +40,8 @@ export interface BuyerApiDeps {
   readonly scheduler: Scheduler;
   readonly clock: Clock;
   readonly idempotency: Idempotency;
+  /** Key for the request hash stored with an idempotency claim (derived from SESSION_SECRET). */
+  readonly idempotencyHashKey: Uint8Array;
   readonly payloads: PayloadDeps;
   /** How long an output kept for idempotent replay lives (24 h, T27). */
   readonly replayRetentionMs: number;
@@ -255,7 +265,12 @@ export async function handleChatCompletion(
     );
   }
   const scope = `buyer:${call.buyerId}:chat`;
-  const claim = await deps.idempotency.claim(scope, header, requestHash(body));
+  const claim = await deps.idempotency.claim(
+    scope,
+    header,
+    requestHash(deps.idempotencyHashKey, body),
+    resolverFor(deps),
+  );
   if (claim.kind === 'mismatch') {
     throw conflict(
       'idempotency_key_reused',
@@ -282,24 +297,63 @@ export async function handleChatCompletion(
     call.reply.header('idempotent-replayed', 'true');
     return responseOf(rec, text);
   }
-  return run(deps, call, { scope, key: header });
+  return run(deps, call, { scope, key: header, token: claim.token });
+}
+
+const attachedSchema = z.object({ jobId: z.uuid() });
+
+/**
+ * An unfinished claim of this buyer's key, found by another request. The claim records its job id in
+ * the job's own transaction, so the job's state says what happened: still open → in progress; ended
+ * without a charge (failed, expired, canceled — e.g. by a restart) → the key may run again; completed
+ * but never recorded (the process died or the record failed after the charge) → answer that it was
+ * charged and the result is lost, never run it a second time.
+ */
+function resolverFor(deps: BuyerApiDeps): ClaimResolver {
+  return async (attached, stale) => {
+    const parsed = attachedSchema.safeParse(attached);
+    if (!parsed.success) return stale ? { kind: 'take_over' } : { kind: 'in_progress' };
+    const [job] = await deps.payloads.db
+      .select({ status: jobs.status })
+      .from(jobs)
+      .where(eq(jobs.id, parsed.data.jobId));
+    if (job === undefined || ['failed', 'expired', 'canceled'].includes(job.status)) {
+      return { kind: 'take_over' };
+    }
+    if (job.status === 'completed' && stale) {
+      const err = outcomeError({
+        status: 'failed',
+        jobId: parsed.data.jobId,
+        code: 'result_undelivered',
+      });
+      const record: ReplayRecord = {
+        kind: 'error',
+        code: err.code,
+        status: err.httpStatus,
+        message: err.publicMessage,
+      };
+      return { kind: 'complete', status: err.httpStatus, response: record };
+    }
+    return { kind: 'in_progress' };
+  };
 }
 
 async function run(
   deps: BuyerApiDeps,
   call: ChatCall,
-  idem: { scope: string; key: string } | undefined,
+  idem: { scope: string; key: string; token: ClaimToken } | undefined,
 ): Promise<ChatResponse> {
   const { req, reply, body } = call;
-  const claim = { settled: false };
+  const claim = { settled: false, jobCreated: false };
   const settle = async (record: ReplayRecord | undefined): Promise<void> => {
     if (idem === undefined || claim.settled) return;
     claim.settled = true;
-    if (record === undefined) await deps.idempotency.release(idem.scope, idem.key);
+    if (record === undefined) await deps.idempotency.release(idem.scope, idem.key, idem.token);
     else
       await deps.idempotency.complete(
         idem.scope,
         idem.key,
+        idem.token,
         record.kind === 'error' ? record.status : 200,
         record,
       );
@@ -322,7 +376,17 @@ async function run(
     try {
       submitted = await deps.scheduler.submit(call.buyerId, toChatRequest(body), {
         apiKeyId: call.apiKeyId,
+        ...(idem === undefined
+          ? {}
+          : {
+              // The claim learns its job id in the job's own transaction (no window where a job
+              // exists that the claim does not know about).
+              onCreate: async (tx, jobId) => {
+                await deps.idempotency.attach(tx, idem.scope, idem.key, idem.token, { jobId });
+              },
+            }),
       });
+      claim.jobCreated = true;
     } catch (err) {
       if (err instanceof ModelNotFoundError) {
         throw new AppError(
@@ -367,8 +431,9 @@ async function run(
     }
     return responseOf(record, outcome.text);
   } finally {
-    // Anything that ended before a job outcome (validation, model, credit, server error) charged
-    // nothing: free the key so the buyer can retry with it.
-    if (!claim.settled) await settle(undefined);
+    // Anything that ended before a job existed (model, credit, server error) charged nothing: free the
+    // key so the buyer can retry with it. Once a job exists, an unsettled claim stays: the next request
+    // with this key asks the job's state (resolverFor) instead of running it again.
+    if (!claim.settled && !claim.jobCreated) await settle(undefined);
   }
 }

@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { API_KEY_RE } from '../../src/api-keys/api-keys.js';
 import { ensureDevModel } from '../../src/skeleton/bootstrap.js';
-import { chatBody, type Harness, startHarness } from '../support/skeleton.js';
+import { chatBody, type Harness, startHarness, waitFor } from '../support/skeleton.js';
 import { createTestUser, type ErrorBody, loggedIn, type TestUser } from '../support/web.js';
 
 interface KeyOut {
@@ -31,6 +31,9 @@ describe('buyer API keys', () => {
   afterAll(async () => {
     await h.close();
   });
+
+  const jobCount = async (): Promise<number> =>
+    (await h.query<{ n: number }>('SELECT count(*)::int AS n FROM jobs'))[0]?.n ?? 0;
 
   it('shows the key once; lists only the prefix; stores only an HMAC', async () => {
     const b = await loggedIn(h, buyer);
@@ -159,8 +162,10 @@ describe('buyer API keys', () => {
     h.server.http.settings.invalidate();
     try {
       // No agent: the first request waits in the queue (up to queueWaitMs) and holds the only slot.
+      const before = await jobCount();
       const first = h.chat(chatBody('slow'), { apiKey: h.apiKey });
-      await new Promise((r) => setTimeout(r, 300));
+      // The first request holds its slot once its job exists (it then waits in the queue).
+      await waitFor(async () => (await jobCount()) > before, 10_000, 'the first job');
       const second = await h.chat(chatBody('second'), { apiKey: h.apiKey });
       expect(second.status).toBe(429);
       expect(await codeOf(second)).toBe('concurrency_limited');
@@ -186,5 +191,42 @@ describe('buyer API keys', () => {
     const res = await b.request('POST', '/api/api-keys', { body: { name: 'one too many' } });
     expect(res.status).toBe(409);
     expect(await codeOf(res)).toBe('too_many_keys');
+  });
+
+  it('a buyer cannot raise a key above the default rate; operators can (CLI)', async () => {
+    const b = await loggedIn(h, buyer);
+    const res = await b.request('POST', '/api/api-keys', {
+      body: { name: 'greedy', rateLimitRpm: 10_000 },
+    });
+    expect(res.status).toBe(400);
+    expect(await codeOf(res)).toBe('rpm_above_default');
+  });
+
+  it("per-buyer limits apply across all of the buyer's keys", async () => {
+    const u = await createTestUser(h, 'buyer');
+    const b = await loggedIn(h, u);
+    const keys: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      keys.push(
+        (
+          (await (
+            await b.request('POST', '/api/api-keys', { body: { name: `k${String(i)}` } })
+          ).json()) as KeyOut
+        ).key ?? '',
+      );
+    }
+    await h.query(`INSERT INTO settings (key, value, updated_at) VALUES ('buyers.rpm', '4'::jsonb, now())
+                   ON CONFLICT (key) DO UPDATE SET value = '4'::jsonb`);
+    h.server.http.settings.invalidate();
+    try {
+      const statuses: number[] = [];
+      for (let i = 0; i < 6; i++)
+        statuses.push((await h.chat(chatBody('x'), { apiKey: keys[i % 3] ?? '' })).status);
+      // No credit: accepted requests end 402; the fifth and sixth hit the buyer's 4 per minute.
+      expect(statuses).toEqual([402, 402, 402, 402, 429, 429]);
+    } finally {
+      await h.query(`UPDATE settings SET value = '10000'::jsonb WHERE key = 'buyers.rpm'`);
+      h.server.http.settings.invalidate();
+    }
   });
 });

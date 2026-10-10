@@ -3,8 +3,9 @@
  * the real account and key functions (S05). Used by `pnpm dev:server`, `pnpm demo` and the integration
  * test harness. Never called by the production entry point (src/main.ts).
  *
- * It also raises the per-key concurrency setting to DEV_CONCURRENCY (development database only): the
- * demo and the scheduling tests send bursts of requests with this one key.
+ * It also raises the concurrency and per-buyer rate settings (DEV_LIMITS, development and test
+ * databases only, audited): the demo and the scheduling tests send bursts of requests with this one
+ * key. Tests of the limits themselves set their own values.
  */
 import { MICRO_CR_PER_CR } from '@spareon/shared';
 import { and, eq, isNull, sql } from 'drizzle-orm';
@@ -21,7 +22,11 @@ import { writeSetting } from '../lib/settings.js';
 
 export const DEV_BUYER_SETTING_KEY = 'dev.buyer';
 export const DEV_KEY_NAME = 'dev-stack';
-export const DEV_CONCURRENCY = 64;
+export const DEV_LIMITS = {
+  'api_keys.default_concurrency': 64,
+  'buyers.concurrency': 64,
+  'buyers.rpm': 10_000,
+} as const;
 /** Recorded won per CR for the development top-up (dev seed rate, not a real quote). */
 const DEV_KRW_PER_CR = 1_400n;
 
@@ -108,7 +113,18 @@ export async function ensureDevBuyer(
       .where(
         and(eq(apiKeys.userId, buyerId), eq(apiKeys.name, DEV_KEY_NAME), isNull(apiKeys.revokedAt)),
       );
-    await writeSetting(tx, deps.clock, 'api_keys.default_concurrency', DEV_CONCURRENCY, null);
+    for (const [key, value] of Object.entries(DEV_LIMITS) as [keyof typeof DEV_LIMITS, number][]) {
+      const w = await writeSetting(tx, deps.clock, key, value, null);
+      if (w.previous !== w.value) {
+        await recordAudit(tx, deps, {
+          actor: { kind: 'system', via: 'dev-stack' },
+          action: 'settings.set',
+          targetKind: 'setting',
+          targetId: key,
+          data: { previous: w.previous, value: w.value },
+        });
+      }
+    }
     const key = await createApiKey(tx, deps, { userId: buyerId, name: DEV_KEY_NAME });
     await recordAudit(tx, deps, {
       actor: { kind: 'system', via: 'dev-stack' },

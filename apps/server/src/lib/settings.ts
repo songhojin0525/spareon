@@ -27,6 +27,16 @@ export const SETTINGS = {
     default: 4,
     description: 'Concurrent requests per API key.',
   },
+  'buyers.rpm': {
+    schema: z.number().int().min(1).max(1_000_000),
+    default: 120,
+    description: 'Requests per minute per buyer, all of their API keys together.',
+  },
+  'buyers.concurrency': {
+    schema: z.number().int().min(1).max(1_024),
+    default: 8,
+    description: 'Concurrent requests per buyer, all of their API keys together.',
+  },
 } as const;
 
 export type SettingKey = keyof typeof SETTINGS;
@@ -101,16 +111,29 @@ export async function readSetting<K extends SettingKey>(
   return (r.success ? r.data : SETTINGS[key].default) as SettingValue<K>;
 }
 
-export async function readAllSettings(db: Db | Tx): Promise<Record<SettingKey, unknown>> {
+export interface EffectiveSetting {
+  /** The value the server uses (the default when unset or when the stored value is invalid). */
+  readonly value: unknown;
+  /** A stored value that does not validate (and is therefore ignored), if any. */
+  readonly invalidStored?: unknown;
+}
+
+/** Every registry setting as the server applies it (same rule as readSetting). */
+export async function readAllSettings(db: Db | Tx): Promise<Record<SettingKey, EffectiveSetting>> {
   const rows = await db
     .select({ key: settings.key, value: settings.value })
     .from(settings)
     .where(inArray(settings.key, SETTING_KEYS));
-  const out = Object.fromEntries(SETTING_KEYS.map((k) => [k, SETTINGS[k].default])) as Record<
-    SettingKey,
-    unknown
-  >;
-  for (const r of rows) if (isSettingKey(r.key)) out[r.key] = r.value;
+  const out = Object.fromEntries(
+    SETTING_KEYS.map((k) => [k, { value: SETTINGS[k].default }]),
+  ) as Record<SettingKey, EffectiveSetting>;
+  for (const r of rows) {
+    if (!isSettingKey(r.key)) continue;
+    const ok = SETTINGS[r.key].schema.safeParse(r.value).success;
+    out[r.key] = ok
+      ? { value: r.value }
+      : { value: SETTINGS[r.key].default, invalidStored: r.value };
+  }
   return out;
 }
 
