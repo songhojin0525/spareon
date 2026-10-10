@@ -140,9 +140,7 @@ export class Router {
               : ANONYMOUS;
         const access = row.access[principal.role];
         if (access === 'deny') {
-          throw principal.role === 'anonymous'
-            ? unauthenticated(unauthMessage(row.auth))
-            : forbidden();
+          throw principal.role === 'anonymous' ? unauthenticatedFor(row.auth) : forbidden();
         }
         if (row.auth !== 'api_key' && UNSAFE.has(row.method)) this.#checkCsrf(req, principal);
         const params = parse(def.params, req.params, 'params');
@@ -295,8 +293,11 @@ export class Router {
   }
 }
 
-function unauthMessage(auth: string): string {
-  return auth === 'api_key' ? 'Invalid API key.' : 'Login required.';
+/** 401 for a missing login, or (buyer API) the OpenAI-compatible invalid_api_key. */
+function unauthenticatedFor(auth: string): AppError {
+  return auth === 'api_key'
+    ? new AppError('invalid_api_key', 401, 'Invalid API key.')
+    : unauthenticated('Login required.');
 }
 
 function parse(schema: Schema | undefined, value: unknown, where: string): unknown {
