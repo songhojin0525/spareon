@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -67,12 +68,21 @@ type ollamaRequest struct {
 	Options  ollamaOptions   `json:"options"`
 }
 
-// Release implements Runtime: ask Ollama to unload every configured model now (keep_alive 0). Without
-// this Ollama keeps a model in GPU memory for 5 minutes after the last request.
+// Release implements Runtime: ask Ollama to unload, now (keep_alive 0), every configured model it has
+// loaded. Without this Ollama keeps a model in GPU memory for 5 minutes after the last request. Only
+// models listed by /api/ps are unloaded: on some Ollama versions an unload request for a model that is
+// not loaded loads it first, which would take GPU memory at the very moment the customer arrives.
 func (o *Ollama) Release(ctx context.Context) error {
+	loaded, err := o.loaded(ctx)
+	if err != nil {
+		return fmt.Errorf("ollama release: %w", err)
+	}
 	var errs []error
 	for _, id := range o.Models() {
 		name := o.Names[id]
+		if !loaded[ollamaTagged(name)] {
+			continue
+		}
 		raw, err := json.Marshal(struct {
 			Model     string `json:"model"`
 			KeepAlive int    `json:"keep_alive"`
@@ -103,6 +113,49 @@ func (o *Ollama) Release(ctx context.Context) error {
 		return fmt.Errorf("ollama release: %w", err)
 	}
 	return nil
+}
+
+// loaded returns the names (always with a tag) of the models Ollama has in memory (GET /api/ps).
+func (o *Ollama) loaded(ctx context.Context) (map[string]bool, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, o.BaseURL+"/api/ps", nil)
+	if err != nil {
+		return nil, fmt.Errorf("list loaded models: %w", err)
+	}
+	resp, err := o.client().Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("list loaded models: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	data, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if err != nil {
+		return nil, fmt.Errorf("list loaded models: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("list loaded models: ollama answered HTTP %d", resp.StatusCode)
+	}
+	var ps struct {
+		Models []struct {
+			Name  string `json:"name"`
+			Model string `json:"model"`
+		} `json:"models"`
+	}
+	if err := json.Unmarshal(data, &ps); err != nil {
+		return nil, errors.New("list loaded models: ollama response is not valid JSON")
+	}
+	out := map[string]bool{}
+	for _, m := range ps.Models {
+		out[ollamaTagged(m.Name)] = true
+		out[ollamaTagged(m.Model)] = true
+	}
+	return out, nil
+}
+
+// ollamaTagged adds Ollama's implicit ":latest" tag to a model name without one.
+func ollamaTagged(name string) string {
+	if name == "" || strings.Contains(name, ":") {
+		return name
+	}
+	return name + ":latest"
 }
 
 type ollamaResponse struct {

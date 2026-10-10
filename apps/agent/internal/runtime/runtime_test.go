@@ -193,9 +193,14 @@ func TestOllamaCancel(t *testing.T) {
 	}
 }
 
-func TestOllamaReleaseUnloadsEveryModel(t *testing.T) {
+func TestOllamaReleaseUnloadsOnlyLoadedModels(t *testing.T) {
 	var got []map[string]any
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && r.URL.Path == "/api/ps" {
+			// "plain" is configured without a tag; Ollama lists it as plain:latest. "other" is not ours.
+			_, _ = w.Write([]byte(`{"models":[{"name":"a:1b","model":"a:1b"},{"name":"gone:1b","model":"gone:1b"},{"name":"plain:latest","model":"plain:latest"},{"name":"other:7b","model":"other:7b"}]}`))
+			return
+		}
 		if r.Method != http.MethodPost || r.URL.Path != "/api/generate" {
 			t.Errorf("unexpected %s %s", r.Method, r.URL.Path)
 		}
@@ -211,11 +216,13 @@ func TestOllamaReleaseUnloadsEveryModel(t *testing.T) {
 		_, _ = w.Write([]byte(`{"done":true,"done_reason":"unload"}`))
 	}))
 	defer srv.Close()
-	o := &Ollama{BaseURL: srv.URL, Names: map[string]string{"a-1b": "a:1b", "gone-1b": "gone:1b"}}
+	o := &Ollama{BaseURL: srv.URL, Names: map[string]string{"a-1b": "a:1b", "gone-1b": "gone:1b", "idle-1b": "idle:1b", "plain": "plain"}}
 	if err := o.Release(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 2 {
+	// Sorted by protocol id: a-1b, gone-1b, plain. idle:1b is not loaded, so it gets no request (an
+	// unload request could load it on older Ollama versions); other:7b is not configured.
+	if len(got) != 3 || got[0]["model"] != "a:1b" || got[1]["model"] != "gone:1b" || got[2]["model"] != "plain" {
 		t.Fatalf("requests = %v", got)
 	}
 	for _, b := range got {
