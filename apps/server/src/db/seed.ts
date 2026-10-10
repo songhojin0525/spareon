@@ -16,7 +16,7 @@ import { fxRates, settings } from './schema/index.js';
  *
  * - Idempotent: the `dev.seed` setting marks a seeded database; a second run changes nothing.
  * - Local only: refuses a non-local DATABASE_URL unless SPAREON_ALLOW_REMOTE_SEED=1 (never seed production).
- * - Users get an unusable password hash: nobody can log in until S05 provides real accounts.
+ * - Users get an unusable password hash: they cannot log in (real accounts come from sign-up or the CLI).
  * - No real money: TEST_TOPUP is a recorded test top-up (ARCHITECTURE 9.2), not a payment.
  */
 

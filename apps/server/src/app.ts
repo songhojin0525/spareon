@@ -54,6 +54,18 @@ export interface AppDeps {
   readonly trustProxy?: string[] | false;
 }
 
+export interface RegisteredRoute {
+  readonly method: string;
+  readonly url: string;
+}
+
+const routesByApp = new WeakMap<FastifyInstance, RegisteredRoute[]>();
+
+/** Every route registered on an app built by buildApp (the route ↔ permission table test reads it). */
+export function registeredRoutes(app: FastifyInstance): readonly RegisteredRoute[] {
+  return routesByApp.get(app) ?? [];
+}
+
 export interface HealthResponse {
   readonly status: 'ok';
   readonly time: string;
@@ -91,6 +103,15 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     genReqId: () => ids.newId(),
     trustProxy: deps.trustProxy ?? false,
   }) as unknown as FastifyInstance;
+
+  const routes: RegisteredRoute[] = [];
+  routesByApp.set(app, routes);
+  app.addHook('onRoute', (opts) => {
+    for (const method of [opts.method].flat()) {
+      // HEAD routes are added automatically for every GET.
+      if (method !== 'HEAD') routes.push({ method, url: opts.url });
+    }
+  });
 
   app.addHook('onRequest', (req, reply, done) => {
     void reply.header('x-request-id', req.id);
