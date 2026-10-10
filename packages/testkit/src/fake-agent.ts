@@ -62,6 +62,8 @@ export interface FakeBehavior {
   readonly delayMs: number;
   /** Send job.progress this often while generating (0 = never). */
   readonly progressEveryMs: number;
+  /** Ack job.cancel but keep running and report the result anyway (a late completion). */
+  readonly ignoreCancel: boolean;
 }
 
 export interface FakeAgentOptions {
@@ -142,6 +144,7 @@ export class FakeAgent {
   #heartbeat: NodeJS.Timeout | undefined;
   readonly #running = new Map<string, { cancel: () => void }>();
   #closed = false;
+  #quiet = false;
 
   constructor(opts: FakeAgentOptions) {
     this.#opts = opts;
@@ -153,6 +156,7 @@ export class FakeAgent {
       run: 'complete',
       delayMs: 20,
       progressEveryMs: 0,
+      ignoreCancel: false,
       ...opts.behavior,
     };
   }
@@ -238,6 +242,7 @@ export class FakeAgent {
         });
       });
       ws.addEventListener('message', (ev: MessageEvent) => {
+        if (this.#quiet) return;
         const decoded = this.#codec.decodeMessage(String(ev.data), 'agent');
         if (!decoded.ok) {
           this.received.push(`invalid:${decoded.code}`);
@@ -277,8 +282,10 @@ export class FakeAgent {
             return;
           case 'job.cancel': {
             const id = (msg.payload as { attemptId: string }).attemptId;
-            this.#running.get(id)?.cancel();
-            this.#running.delete(id);
+            if (!this.behavior.ignoreCancel) {
+              this.#running.get(id)?.cancel();
+              this.#running.delete(id);
+            }
             this.stats.canceled++;
             this.#send('ack', { result: 'ok' }, msg.id);
             return;
@@ -382,7 +389,18 @@ export class FakeAgent {
     await this.#closeSocket();
   }
 
-  /** Drop the connection without saying anything (a crash or a pulled cable). */
+  /**
+   * Stop talking without closing: no heartbeats, no answers, every message ignored (a hung process). The
+   * WebSocket stack itself still answers a close frame; a pulled cable would not.
+   */
+  goQuiet(): void {
+    this.#quiet = true;
+    clearInterval(this.#heartbeat);
+    for (const r of this.#running.values()) r.cancel();
+    this.#running.clear();
+  }
+
+  /** Drop the connection without saying anything (a crash: the OS closes the socket). */
   async kill(): Promise<void> {
     for (const r of this.#running.values()) r.cancel();
     this.#running.clear();

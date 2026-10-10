@@ -30,7 +30,7 @@ import { setNodeCapabilities, setNodeStatus, touchNode, upsertDevNode } from '..
 import type { Clock } from '../lib/clock.js';
 import type { Ids } from '../lib/ids.js';
 import { safeErrorText } from '../lib/safe-error.js';
-import type { AgentJobSink, AgentSession, SessionRegistry } from './session.js';
+import type { AgentJobSink, AgentSession, SendResult, SessionRegistry } from './session.js';
 
 export const AGENT_WS_PATH = '/agent/v1/ws';
 
@@ -42,6 +42,7 @@ export interface GatewayConfig {
   /** T9: heartbeat interval announced in auth.ok. */
   readonly heartbeatIntervalMs: number;
   /** Rejected messages tolerated per connection before it is closed. */
+  // SKELETON(S11): a per-connection count, not PROTOCOL's per-minute rate limit.
   readonly maxRejectedMessages: number;
 }
 
@@ -72,6 +73,11 @@ const WS_POLICY_VIOLATION = 1008;
 const WS_TOO_BIG = 1009;
 const WS_INTERNAL = 1011;
 const WS_GOING_AWAY = 1001;
+/**
+ * After a close frame, wait this long for the peer's reply, then drop the TCP connection. A peer that
+ * stopped answering (pulled cable) would otherwise keep the socket for ws's 30-second close timeout.
+ */
+const CLOSE_GRACE_MS = 1_000;
 
 let connectionOrder = 0;
 
@@ -110,8 +116,8 @@ function handleConnection(socket: WebSocket, deps: GatewayDeps): void {
     type: T,
     payload: PayloadOf<T>,
     corr?: string,
-  ): boolean => {
-    if (socket.readyState !== socket.OPEN) return false;
+  ): SendResult => {
+    if (socket.readyState !== socket.OPEN) return 'closed';
     let text: string;
     try {
       text = encode(type, payload, corr);
@@ -121,16 +127,43 @@ function handleConnection(socket: WebSocket, deps: GatewayDeps): void {
         { type, err: err instanceof Error ? err.message : 'encode failed' },
         'refused to send',
       );
-      return false;
+      return 'invalid';
     }
     socket.send(text);
-    return true;
+    return 'sent';
+  };
+
+  /**
+   * The session ends when the server decides it (idle, policy, replaced) or when the socket closes,
+   * whichever comes first: from then on it gets no offers and its attempts are lost (D-d).
+   */
+  let ended = false;
+  const endSession = (): void => {
+    phase = 'closed';
+    clearTimeout(authTimer);
+    if (idleTimer !== undefined) clearTimeout(idleTimer);
+    const s = session;
+    if (s === undefined || ended) return;
+    ended = true;
+    s.closed = true;
+    queue = queue
+      .then(async () => {
+        deps.sessions.remove(s);
+        await deps.sink.onSessionClosed(s);
+      })
+      .catch((err: unknown) => {
+        log.error({ err: safeErrorText(err) }, 'session close failed');
+      });
   };
 
   const close = (code: number, reason: string): void => {
     if (socket.readyState === socket.OPEN || socket.readyState === socket.CONNECTING) {
       socket.close(code, reason);
+      setTimeout(() => {
+        if (socket.readyState !== socket.CLOSED) socket.terminate();
+      }, CLOSE_GRACE_MS).unref();
     }
+    endSession();
   };
 
   const fail = (code: ErrorCode): void => {
@@ -301,6 +334,7 @@ function handleConnection(socket: WebSocket, deps: GatewayDeps): void {
         if (paused) {
           // The server never paused this node (no kill switches before S10): the agent paused itself,
           // e.g. on an invalid stop command (PROTOCOL 4절). Re-send the current control state.
+          // SKELETON(S11): control state (pause, kill switches) is not stored; it is always active.
           send('control.resume', { scope: 'node', reason: 'operatorRequest' });
         }
         await deps.sink.onSessionStatus(s);
@@ -378,22 +412,7 @@ function handleConnection(socket: WebSocket, deps: GatewayDeps): void {
       });
   });
 
-  socket.on('close', () => {
-    phase = 'closed';
-    clearTimeout(authTimer);
-    if (idleTimer !== undefined) clearTimeout(idleTimer);
-    const s = session;
-    if (s === undefined) return;
-    s.closed = true;
-    queue = queue
-      .then(async () => {
-        deps.sessions.remove(s);
-        await deps.sink.onSessionClosed(s);
-      })
-      .catch((err: unknown) => {
-        log.error({ err: safeErrorText(err) }, 'session close failed');
-      });
-  });
+  socket.on('close', endSession);
 
   socket.on('error', () => {
     close(WS_INTERNAL, 'socket error');

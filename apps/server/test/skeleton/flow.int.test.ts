@@ -1,9 +1,10 @@
 import { fakeOutput } from '@binjari/testkit';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { balanceOf, ledgerBalanced, txCountForJob } from '../support/ledger.js';
+import { balanceOf, txCountForJob } from '../support/ledger.js';
 import {
   chatBody,
+  expectSettled,
   type Harness,
   startHarness,
   TEST_AGENT_SECRET,
@@ -20,42 +21,6 @@ interface ChatErr {
 }
 
 const jobIdOf = (res: ChatOk): string => res.id.replace(/^chatcmpl-/, '');
-
-/** Facts every finished job must satisfy, whatever happened on the way. */
-async function expectSettled(h: Harness): Promise<void> {
-  const open = await h.query<{ n: number }>(
-    `SELECT count(*)::int AS n FROM jobs WHERE status IN ('queued', 'offered', 'running')`,
-  );
-  expect(open[0]?.n).toBe(0);
-  const activeAttempts = await h.query<{ n: number }>(
-    `SELECT count(*)::int AS n FROM job_attempts WHERE status IN ('offered', 'running')`,
-  );
-  expect(activeAttempts[0]?.n).toBe(0);
-  const activeHolds = await h.query<{ n: number }>(
-    `SELECT count(*)::int AS n FROM holds WHERE status = 'active'`,
-  );
-  expect(activeHolds[0]?.n).toBe(0);
-  // Completed jobs were captured exactly once, the others released exactly once (no double charge).
-  const money = await h.query<{ status: string; captures: number; releases: number }>(
-    `SELECT j.status,
-            count(*) FILTER (WHERE t.kind = 'JOB_CAPTURE')::int AS captures,
-            count(*) FILTER (WHERE t.kind = 'JOB_RELEASE')::int AS releases
-       FROM jobs j LEFT JOIN ledger_transactions t ON t.idempotency_key LIKE 'job:' || j.id || ':%'
-      GROUP BY j.id, j.status`,
-  );
-  for (const m of money) {
-    if (m.status === 'completed') expect([m.captures, m.releases]).toEqual([1, 0]);
-    else expect([m.captures, m.releases]).toEqual([0, 1]);
-  }
-  expect(await ledgerBalanced(h.db)).toBe(true);
-  // Buyer total (wallet + hold) = top-up − captured costs.
-  const captured = await h.query<{ total: string }>(
-    `SELECT coalesce(sum(cost_ucr), 0)::text AS total FROM jobs WHERE status = 'completed'`,
-  );
-  const wallet = await balanceOf(h.db, 'buyer_wallet', h.world.buyerId);
-  const hold = await balanceOf(h.db, 'buyer_hold', h.world.buyerId);
-  expect(wallet + hold).toBe(10n * 1_000_000n - BigInt(captured[0]?.total ?? '0'));
-}
 
 describe('walking skeleton: buyer → server → agent → ledger', () => {
   let h: Harness;
@@ -211,8 +176,11 @@ describe('walking skeleton: buyer → server → agent → ledger', () => {
     const res = await h.chat(chatBody('twice'));
     expect(res.status).toBe(200);
     const jobId = jobIdOf((await res.json()) as ChatOk);
-    // Give the second job.complete time to arrive and be processed.
-    await new Promise((r) => setTimeout(r, 300));
+    // The gateway handles one connection's messages in order: once two heartbeats sent after this point
+    // are acknowledged, the second job.complete (sent right after the first) has been processed.
+    const acks = (): number => dup.received.filter((t) => t === 'heartbeat.ack').length;
+    const seen = acks();
+    await waitFor(() => acks() >= seen + 2, 5_000, 'two heartbeat acks after the duplicate');
     expect(await txCountForJob(h.db, jobId, 'JOB_CAPTURE')).toBe(1);
     const earnings = await h.query<{ n: number }>(
       'SELECT count(*)::int AS n FROM earnings WHERE job_id = $1',
@@ -308,7 +276,7 @@ describe('walking skeleton: buyer → server → agent → ledger', () => {
         name: 'intruder',
         protocol,
       }),
-    ).rejects.toThrow(/auth_invalid_signature|closed/);
+    ).rejects.toThrow(/auth\.fail auth_invalid_signature/);
   });
 
   it('marks a node offline when its connection drops', async () => {

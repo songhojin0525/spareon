@@ -192,3 +192,39 @@ func TestOllamaCancel(t *testing.T) {
 		t.Fatal("Generate did not return after cancel")
 	}
 }
+
+func TestOllamaReleaseUnloadsEveryModel(t *testing.T) {
+	var got []map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/generate" {
+			t.Errorf("unexpected %s %s", r.Method, r.URL.Path)
+		}
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Error(err)
+		}
+		got = append(got, body)
+		if body["model"] == "gone:1b" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		_, _ = w.Write([]byte(`{"done":true,"done_reason":"unload"}`))
+	}))
+	defer srv.Close()
+	o := &Ollama{BaseURL: srv.URL, Names: map[string]string{"a-1b": "a:1b", "gone-1b": "gone:1b"}}
+	if err := o.Release(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("requests = %v", got)
+	}
+	for _, b := range got {
+		if b["keep_alive"] != float64(0) || len(b) != 2 {
+			t.Errorf("unload body = %v, want {model, keep_alive: 0}", b)
+		}
+	}
+	down := &Ollama{BaseURL: "http://127.0.0.1:1", Names: map[string]string{"a-1b": "a:1b"}}
+	if err := down.Release(context.Background()); err == nil {
+		t.Error("Release with Ollama down: want an error")
+	}
+}

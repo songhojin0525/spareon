@@ -12,7 +12,7 @@ import { startTestDatabase } from '@binjari/testkit';
 
 import { buildServer, type Server } from '../app.js';
 import { isNonLoopbackHost, parseEnv, type ServerEnv } from '../config.js';
-import { createDb, type DbHandle } from '../db/client.js';
+import { assertSessionRole, createDb, type DbHandle } from '../db/client.js';
 import { migrate } from '../db/migrate.js';
 import { isLocalDatabaseUrl } from '../db/seed.js';
 import type { GatewayConfig } from '../gateway/gateway.js';
@@ -77,16 +77,25 @@ export async function startDevStack(options: DevStackOptions): Promise<DevStack>
   if (options.env['NODE_ENV'] === 'production') {
     throw new DevStackError('the development server refuses NODE_ENV=production');
   }
-  const apiKey = options.env['DEV_API_KEY'] ?? devSecret('dev-key');
-  const agentSecret = options.env['DEV_AGENT_SECRET'] ?? devSecret('dev-agent');
+  // Blank counts as unset (as in parseEnv): a fresh key is generated instead of an empty one.
+  const given = (name: string): string | undefined => {
+    const v = options.env[name];
+    return v === undefined || v.trim() === '' ? undefined : v;
+  };
+  const apiKey = given('DEV_API_KEY') ?? devSecret('dev-key');
+  const agentSecret = given('DEV_AGENT_SECRET') ?? devSecret('dev-agent');
   const generatedSecrets =
-    options.env['DEV_API_KEY'] === undefined || options.env['DEV_AGENT_SECRET'] === undefined;
+    given('DEV_API_KEY') === undefined || given('DEV_AGENT_SECRET') === undefined;
+  if (options.lan !== true && given('HOST') !== undefined) {
+    log('HOST is ignored by the development server: it listens on 127.0.0.1 unless --lan is given');
+  }
   const env = parseEnv({
     ...options.env,
     NODE_ENV: 'development',
     DEV_API_KEY: apiKey,
     DEV_AGENT_SECRET: agentSecret,
-    HOST: options.lan === true ? '0.0.0.0' : (options.env['HOST'] ?? '127.0.0.1'),
+    // Only the explicit --lan flag opens the server to other machines (S04 "하지 말 것").
+    HOST: options.lan === true ? '0.0.0.0' : '127.0.0.1',
     PORT: String(options.port ?? options.env['PORT'] ?? 8080),
   });
 
@@ -114,6 +123,7 @@ export async function startDevStack(options: DevStackOptions): Promise<DevStack>
     });
     // The server itself always runs with the least-privilege role (S03).
     app = createDb({ url: adminUrl, role: env.DB_ROLE, applicationName: 'binjari-dev-server' });
+    await assertSessionRole(app, env.DB_ROLE);
     const ids = createIds(options.clock);
     const world = await ensureSkeletonWorld(
       app.db,

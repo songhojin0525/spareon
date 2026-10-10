@@ -61,6 +61,7 @@ export interface SchedulerConfig {
   readonly jobDeadlineMs: number;
   /** T22: holds expire this long after the job deadline (the deadline sweep resolves them first). */
   readonly holdGraceMs: number;
+  // SKELETON(S06): hold expiry is recorded but not enforced; job endings and the deadline sweep release holds.
   /** T27: encrypted input is deleted after this long. */
   readonly payloadRetentionMs: number;
   /** How often sweep() runs; 0 = only when called (tests). */
@@ -170,6 +171,24 @@ export class Scheduler implements AgentJobSink {
           this.#sweeping = undefined;
         });
     }, ms);
+  }
+
+  /**
+   * Run once before start(): end every job a previous server process left unfinished, without charging.
+   * Nobody waits for those jobs any more (the buyer's HTTP request died with that process), so a retry
+   * that completes would charge for an answer nobody receives.
+   * SKELETON(S12): waiting buyers live in this process's memory; durable job results replace this.
+   */
+  async recoverAfterRestart(): Promise<number> {
+    const open = await this.#deps.db
+      .select({ id: jobs.id })
+      .from(jobs)
+      .where(inArray(jobs.status, ['queued', 'offered', 'running']));
+    for (const j of open) await this.#finalize(j.id, 'canceled', 'server_restart');
+    if (open.length > 0) {
+      this.#deps.log.warn({ jobs: open.length }, 'released jobs left unfinished by a previous run');
+    }
+    return open.length;
   }
 
   async stop(): Promise<void> {
@@ -403,7 +422,10 @@ export class Scheduler implements AgentJobSink {
       timeLimitMs: Math.max(1_000, offered.deadlineAt.getTime() - clock.now().getTime()),
       leaseTtlMs: config.leaseMs,
     });
-    if (!sent) {
+    if (sent === 'invalid') {
+      // The input breaks the protocol (it would fail on every node): end the job now, without charging.
+      await this.#finalize(jobId, 'failed', 'input_invalid');
+    } else if (sent === 'closed') {
       // The connection is gone; the close handler or the offer timeout puts the job back.
       this.#deps.log.warn({ jobId, nodeId: session.nodeId }, 'offer not sent');
     }
@@ -676,14 +698,16 @@ export class Scheduler implements AgentJobSink {
         ),
       );
     for (const a of offered) {
-      await this.#endAttempt({
-        attemptId: a.id,
-        nodeId: null,
-        from: 'offered',
-        to: 'timed_out',
-        code: 'offer_timeout',
-        retryable: true,
-      });
+      await this.#isolated('offer timeout', () =>
+        this.#endAttempt({
+          attemptId: a.id,
+          nodeId: null,
+          from: 'offered',
+          to: 'timed_out',
+          code: 'offer_timeout',
+          retryable: true,
+        }),
+      );
     }
     const expiredLeases = await db
       .select({ id: jobAttempts.id, nodeId: jobAttempts.nodeId })
@@ -692,19 +716,21 @@ export class Scheduler implements AgentJobSink {
         and(eq(jobAttempts.status, 'running'), lte(jobAttempts.leaseExpiresAt, new Date(now))),
       );
     for (const a of expiredLeases) {
-      const ended = await this.#endAttempt({
-        attemptId: a.id,
-        nodeId: null,
-        from: 'running',
-        to: 'lost',
-        code: 'lease_expired',
-        retryable: true,
+      await this.#isolated('lease expiry', async () => {
+        const ended = await this.#endAttempt({
+          attemptId: a.id,
+          nodeId: null,
+          from: 'running',
+          to: 'lost',
+          code: 'lease_expired',
+          retryable: true,
+        });
+        // The node may still be computing (alive but silent): tell it to stop.
+        if (ended)
+          this.#deps.sessions
+            .get(a.nodeId)
+            ?.send('job.cancel', { attemptId: a.id, reason: 'superseded' });
       });
-      // The node may still be computing (alive but silent): tell it to stop.
-      if (ended)
-        this.#deps.sessions
-          .get(a.nodeId)
-          ?.send('job.cancel', { attemptId: a.id, reason: 'superseded' });
     }
     const pastDeadline = await db
       .select({ id: jobs.id })
@@ -715,7 +741,9 @@ export class Scheduler implements AgentJobSink {
           lte(jobs.deadlineAt, new Date(now)),
         ),
       );
-    for (const j of pastDeadline) await this.#finalize(j.id, 'expired', 'deadline');
+    for (const j of pastDeadline) {
+      await this.#isolated('deadline', () => this.#finalize(j.id, 'expired', 'deadline'));
+    }
     const starving = await db
       .select({ id: jobs.id })
       .from(jobs)
@@ -725,13 +753,24 @@ export class Scheduler implements AgentJobSink {
           lte(jobs.statusChangedAt, new Date(now - config.queueWaitMs)),
         ),
       );
-    for (const j of starving) await this.#finalize(j.id, 'expired', 'no_capacity');
+    for (const j of starving) {
+      await this.#isolated('no capacity', () => this.#finalize(j.id, 'expired', 'no_capacity'));
+    }
     // T27: buyer content is deleted when its retention ends (ADR 0010).
     await db.delete(jobPayloads).where(lte(jobPayloads.expiresAt, new Date(now)));
     if (offered.length + expiredLeases.length > 0) this.kick();
   }
 
   // ---------------------------------------------------------------- internals
+
+  /** One sweep item: a failure is logged (metadata only) and does not stop the rules after it. */
+  async #isolated(rule: string, fn: () => Promise<unknown>): Promise<void> {
+    try {
+      await fn();
+    } catch (err) {
+      this.#deps.log.error({ rule, err: safeErrorText(err) }, 'sweep item failed');
+    }
+  }
 
   async #jobOfAttempt(
     tx: Tx,

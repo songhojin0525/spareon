@@ -43,9 +43,22 @@ export interface DbHandle {
 
 const ROLE_RE = /^[a-z_][a-z0-9_]{0,62}$/;
 
+/** True when the URL carries libpq `options`, which node-postgres lets override the role option. */
+function urlHasOptions(url: string): boolean {
+  try {
+    return new URL(url).searchParams.has('options');
+  } catch {
+    return false;
+  }
+}
+
 export function createDb(config: DbConfig): DbHandle {
   if (config.role !== undefined && !ROLE_RE.test(config.role)) {
     throw new Error('createDb: role must be a plain lowercase identifier');
+  }
+  if (config.role !== undefined && urlHasOptions(config.url)) {
+    // node-postgres takes `options` from the URL over the config: the role would silently be dropped.
+    throw new Error('createDb: the database URL must not set "options" when a role is required');
   }
   const pool = new pg.Pool({
     ...(config.role === undefined ? {} : { options: `-c role=${config.role}` }),
@@ -70,6 +83,18 @@ export function createDb(config: DbConfig): DbHandle {
       await pool.end();
     },
   };
+}
+
+/**
+ * Fail unless a pooled session really runs as `role` (call once at startup). Least privilege must not
+ * depend on how a connection URL or a pooler treats startup options.
+ */
+export async function assertSessionRole(handle: DbHandle, role: string): Promise<void> {
+  const { rows } = await handle.pool.query<{ u: string }>('SELECT current_user AS u');
+  const actual = rows[0]?.u;
+  if (actual !== role) {
+    throw new Error(`database session runs as ${String(actual)}, expected ${role}`);
+  }
 }
 
 export interface TransactionOptions extends PgTransactionConfig {

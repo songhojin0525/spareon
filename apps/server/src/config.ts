@@ -22,12 +22,10 @@ const envSchema = z.object({
     .optional(),
   /**
    * The server always runs its database sessions as this role (S03: least privilege, triggers cannot
-   * be disabled), even when the connection URL names a more powerful login.
+   * be disabled), even when the connection URL names a more powerful login. Only binjari_app is
+   * accepted: the variable exists so a wrong value fails loudly instead of being ignored.
    */
-  DB_ROLE: z
-    .string()
-    .regex(/^[a-z_][a-z0-9_]{0,62}$/)
-    .default('binjari_app'),
+  DB_ROLE: z.literal('binjari_app').default('binjari_app'),
   // SKELETON(S05): one development API key stands in for buyer accounts and API keys.
   DEV_API_KEY: devSecret.optional(),
   // SKELETON(S11): agents authenticate with keys derived from this shared secret instead of enrollment.

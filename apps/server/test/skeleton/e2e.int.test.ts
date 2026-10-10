@@ -28,7 +28,8 @@ describe('E2E: 2 nodes, 20 requests, one node drops mid-way', () => {
         body: (await res.json()) as { id?: string; error?: { code: string } },
       })),
     );
-    // Drop node A while it is in the middle of a job (no goodbye: like a crash or a pulled cable).
+    // Drop node A while it is in the middle of a job (no goodbye: like a crash, the OS closes the socket;
+    // a hung node that stops answering is covered by the idle test in time-limits.int.test.ts).
     await waitFor(() => a.stats.completed >= 2 && a.runningAttempts.length === 1, 15_000, 'A busy');
     await a.kill();
     const results = await Promise.all(responses);

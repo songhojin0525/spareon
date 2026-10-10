@@ -75,6 +75,10 @@ export function bearerMatches(header: string | undefined, key: string | undefine
 }
 
 const encoder = new TextEncoder();
+/** A lone UTF-16 surrogate cannot be encoded as UTF-8 JSON: the protocol codec refuses it. */
+const LONE_SURROGATE = /\p{Cs}/u;
+/** Room for the job.offer envelope and params around the messages (ids, model, limits). */
+const OFFER_OVERHEAD_BYTES = 16 * 1024;
 
 /** OpenAI-style error for a job that ended without a result (nothing was charged). */
 function outcomeError(
@@ -135,9 +139,27 @@ export function registerChatCompletions(app: FastifyInstance, deps: BuyerApiDeps
         'Streaming is not supported yet (stream must be false).',
       );
     }
+    const texts = [
+      ...body.messages.map((m) => m.content),
+      ...(body.stop === undefined ? [] : [body.stop].flat()),
+    ];
+    if (texts.some((t) => LONE_SURROGATE.test(t))) {
+      return sendError(
+        reply,
+        400,
+        'invalid_request_error',
+        'invalid_text',
+        'Text contains an unpaired UTF-16 surrogate.',
+      );
+    }
     let inlineBytes = 0;
     for (const m of body.messages) inlineBytes += encoder.encode(m.content).length;
-    if (inlineBytes > LIMITS.maxInlineTextBytes) {
+    // JSON escaping can grow the text (control characters become \u00XX): the offer must still fit.
+    const escapedBytes = encoder.encode(JSON.stringify(body.messages)).length;
+    if (
+      inlineBytes > LIMITS.maxInlineTextBytes ||
+      escapedBytes > LIMITS.maxMessageBytes - OFFER_OVERHEAD_BYTES
+    ) {
       // SKELETON(S12): large inputs go through inputRef.
       return sendError(
         reply,
@@ -156,6 +178,19 @@ export function registerChatCompletions(app: FastifyInstance, deps: BuyerApiDeps
       topPMilli: Math.max(1, Math.round((body.top_p ?? 1) * 1000)),
       stop: body.stop === undefined ? [] : typeof body.stop === 'string' ? [body.stop] : body.stop,
     };
+    // The buyer may hang up at any time, even while the job is being created: cancel then (the hold is
+    // released unless the job already completed).
+    const hangup: { gone: boolean; jobId: string | undefined } = { gone: false, jobId: undefined };
+    const cancel = (id: string): void => {
+      void deps.scheduler.cancel(id).catch((err: unknown) => {
+        request.log.error({ err: safeErrorText(err) }, 'cancel failed');
+      });
+    };
+    reply.raw.once('close', () => {
+      if (reply.raw.writableEnded) return;
+      hangup.gone = true;
+      if (hangup.jobId !== undefined) cancel(hangup.jobId);
+    });
     let submitted: Awaited<ReturnType<Scheduler['submit']>>;
     try {
       submitted = await deps.scheduler.submit(deps.devBuyerId, req);
@@ -181,15 +216,8 @@ export function registerChatCompletions(app: FastifyInstance, deps: BuyerApiDeps
       request.log.error({ err: safeErrorText(err) }, 'submit failed');
       return sendError(reply, 500, 'server_error', 'internal_error', 'Internal error.');
     }
-    // The buyer hung up before the answer: cancel (the hold is released unless it already completed).
-    const onClose = (): void => {
-      if (!reply.raw.writableEnded) {
-        void deps.scheduler.cancel(submitted.jobId).catch((err: unknown) => {
-          request.log.error({ err: safeErrorText(err) }, 'cancel failed');
-        });
-      }
-    };
-    reply.raw.once('close', onClose);
+    hangup.jobId = submitted.jobId;
+    if (hangup.gone) cancel(submitted.jobId);
     const outcome = await submitted.outcome;
     if (outcome.status !== 'completed') return outcomeError(reply, outcome);
     return reply.code(200).send({

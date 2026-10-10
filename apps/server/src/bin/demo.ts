@@ -14,6 +14,7 @@ import { FakeAgent } from '@binjari/testkit';
 
 import { formatMicro } from '../dev/dashboard.js';
 import { devNodeLabel } from '../fleet/nodes.js';
+import { SKELETON_JOB_PRICE_UCR } from '../ledger/skeleton.js';
 import { systemClock } from '../lib/clock.js';
 import { safeErrorText } from '../lib/safe-error.js';
 import { type DevStack, startDevStack } from '../skeleton/dev-stack.js';
@@ -186,6 +187,16 @@ async function main(): Promise<number> {
       'SELECT currency, sum(amount)::text AS total FROM ledger_postings GROUP BY currency ORDER BY currency',
     );
     const ledgerZero = sums.every((s) => BigInt(s.total) === 0n);
+    // The ledger sums to zero by construction (DB trigger); these also catch double or missing charges.
+    const { rows: money } = await pool.query<{ captures: number; active_holds: number }>(
+      `SELECT (SELECT count(*)::int FROM ledger_transactions WHERE kind = 'JOB_CAPTURE') AS captures,
+              (SELECT count(*)::int FROM holds WHERE status = 'active') AS active_holds`,
+    );
+    const walletAfter = await balance('buyer_wallet', stack.world.buyerId);
+    const chargedRight =
+      money[0]?.captures === done &&
+      money[0].active_holds === 0 &&
+      walletAfter === walletBefore - BigInt(done) * SKELETON_JOB_PRICE_UCR;
 
     out();
     out('작업을 처리한 PC');
@@ -194,7 +205,7 @@ async function main(): Promise<number> {
     out('잔액 (CR)');
     const rows: [string, bigint][] = [
       ['구매자 지갑 (시작)', walletBefore],
-      ['구매자 지갑 (끝)', await balance('buyer_wallet', stack.world.buyerId)],
+      ['구매자 지갑 (끝)', walletAfter],
       ['구매자 홀드', await balance('buyer_hold', stack.world.buyerId)],
       ['매장 미성숙 수익 (70%)', await balance('store_pending', stack.world.storeId)],
       ['플랫폼 매출 (30%)', await balance('platform_revenue', null)],
@@ -205,11 +216,14 @@ async function main(): Promise<number> {
     out('원장 합 (통화별, 최소 단위)');
     for (const s of sums) out(`  ${s.currency.padEnd(4)} ${s.total}`);
     out();
-    const ok = done === REQUESTS && ledgerZero;
+    out(
+      `과금 확인: 캡처 ${String(money[0]?.captures ?? 0)}건 = 완료 ${String(done)}건, 남은 홀드 ${String(money[0]?.active_holds ?? 0)}건, 지갑 감소 = 완료 × 단가 → ${chargedRight ? '정상' : '이상'}`,
+    );
+    const ok = done === REQUESTS && ledgerZero && chargedRight;
     out(
       ok
         ? `${String(done)}/${String(REQUESTS)} 완료, 원장 합 0`
-        : `실패: ${String(done)}/${String(REQUESTS)} 완료, 원장 합 ${ledgerZero ? '0' : '0 아님'}`,
+        : `실패: ${String(done)}/${String(REQUESTS)} 완료, 원장 합 ${ledgerZero ? '0' : '0 아님'}, 과금 ${chargedRight ? '정상' : '이상'}`,
     );
     return ok ? 0 : 1;
   } finally {

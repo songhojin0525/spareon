@@ -274,7 +274,8 @@ func TestServerCancelStopsTheJob(t *testing.T) {
 }
 
 func TestCtrlCReportsPreemptedAndExits(t *testing.T) {
-	h, c := start(t, Config{AlwaysAvailable: true, Runtime: &runtime.Fake{ModelIDs: []string{"fake-echo"}, Delay: time.Hour}})
+	rt := &runtime.Fake{ModelIDs: []string{"fake-echo"}, Delay: time.Hour}
+	h, c := start(t, Config{AlwaysAvailable: true, Runtime: rt})
 	_, attemptID := c.offer("fake-echo")
 	c.expect(t, "job.accept", time.Second)
 	h.cancel()
@@ -291,10 +292,15 @@ func TestCtrlCReportsPreemptedAndExits(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("Run did not return after cancel")
 	}
+	// The runtime was asked to free GPU memory before Run returned (Ollama keeps models loaded otherwise).
+	if rt.Releases() < 1 {
+		t.Fatal("Ctrl+C did not release the runtime's GPU memory")
+	}
 }
 
 func TestInvalidKillPausesUntilResume(t *testing.T) {
-	_, c := start(t, Config{AlwaysAvailable: true, Runtime: &runtime.Fake{ModelIDs: []string{"fake-echo"}, Delay: time.Hour}})
+	rt := &runtime.Fake{ModelIDs: []string{"fake-echo"}, Delay: time.Hour}
+	_, c := start(t, Config{AlwaysAvailable: true, Runtime: rt})
 	_, attemptID := c.offer("fake-echo")
 	c.expect(t, "job.accept", time.Second)
 	// A control.kill whose payload is invalid: the agent cannot tell what it meant, so it stops.
@@ -306,6 +312,9 @@ func TestInvalidKillPausesUntilResume(t *testing.T) {
 	st := c.expect(t, "status", time.Second).Payload.(*protocol.StatusPayload)
 	if st.Eligible || st.State != protocol.StatusStatePaused {
 		t.Fatalf("status = %+v", st)
+	}
+	if rt.Releases() != 1 {
+		t.Fatalf("fail-safe pause released the runtime %d times, want 1", rt.Releases())
 	}
 	_, _ = c.offer("fake-echo")
 	if r := c.expect(t, "job.reject", time.Second).Payload.(*protocol.JobRejectPayload); r.Reason != protocol.JobRejectReasonPolicy {

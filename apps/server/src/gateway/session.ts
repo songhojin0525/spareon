@@ -8,6 +8,8 @@ import type {
   ServerMessageType,
 } from '@binjari/protocol';
 
+export type SendResult = 'sent' | 'closed' | 'invalid';
+
 /** One authenticated agent connection, as the scheduler sees it. */
 export interface AgentSession {
   readonly sessionId: string;
@@ -24,8 +26,11 @@ export interface AgentSession {
   /** Attempts offered through this connection that may still be active (lost when it closes). */
   readonly attemptIds: Set<string>;
   readonly closed: boolean;
-  /** Encode (schema-checked) and send. False when the connection is gone or the message is invalid. */
-  send<T extends ServerMessageType>(type: T, payload: PayloadOf<T>, corr?: string): boolean;
+  /**
+   * Encode (schema-checked) and send. 'closed': the connection is gone. 'invalid': the message breaks the
+   * protocol (nothing was sent; for a job.offer this means the job's input cannot be delivered at all).
+   */
+  send<T extends ServerMessageType>(type: T, payload: PayloadOf<T>, corr?: string): SendResult;
   close(code: number, reason: string): void;
 }
 

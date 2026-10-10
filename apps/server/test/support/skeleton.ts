@@ -4,6 +4,7 @@ import type { AddressInfo } from 'node:net';
 import * as protocol from '@binjari/protocol';
 import { FakeAgent, type FakeAgentOptions } from '@binjari/testkit';
 import type pg from 'pg';
+import { expect } from 'vitest';
 
 import { buildServer, type Server } from '../../src/app.js';
 import { parseEnv } from '../../src/config.js';
@@ -15,6 +16,7 @@ import { createPayloadCipher } from '../../src/lib/payload-cipher.js';
 import type { SchedulerConfig } from '../../src/scheduler/scheduler.js';
 import { ensureSkeletonWorld, type SkeletonWorld } from '../../src/skeleton/bootstrap.js';
 import { openTestDb, type TestDb } from './db.js';
+import { balanceOf, ledgerBalanced } from './ledger.js';
 
 export const TEST_API_KEY = 'test-api-key-0123456789abcdef';
 export const TEST_AGENT_SECRET = 'test-agent-secret-0123456789abcdef';
@@ -141,3 +143,39 @@ export const chatBody = (content: string, extra: Record<string, unknown> = {}) =
   max_tokens: 16,
   ...extra,
 });
+
+/** Facts every finished job must satisfy, whatever happened on the way. */
+export async function expectSettled(h: Harness): Promise<void> {
+  const open = await h.query<{ n: number }>(
+    `SELECT count(*)::int AS n FROM jobs WHERE status IN ('queued', 'offered', 'running')`,
+  );
+  expect(open[0]?.n).toBe(0);
+  const activeAttempts = await h.query<{ n: number }>(
+    `SELECT count(*)::int AS n FROM job_attempts WHERE status IN ('offered', 'running')`,
+  );
+  expect(activeAttempts[0]?.n).toBe(0);
+  const activeHolds = await h.query<{ n: number }>(
+    `SELECT count(*)::int AS n FROM holds WHERE status = 'active'`,
+  );
+  expect(activeHolds[0]?.n).toBe(0);
+  // Completed jobs were captured exactly once, the others released exactly once (no double charge).
+  const money = await h.query<{ status: string; captures: number; releases: number }>(
+    `SELECT j.status,
+            count(*) FILTER (WHERE t.kind = 'JOB_CAPTURE')::int AS captures,
+            count(*) FILTER (WHERE t.kind = 'JOB_RELEASE')::int AS releases
+       FROM jobs j LEFT JOIN ledger_transactions t ON t.idempotency_key LIKE 'job:' || j.id || ':%'
+      GROUP BY j.id, j.status`,
+  );
+  for (const m of money) {
+    if (m.status === 'completed') expect([m.captures, m.releases]).toEqual([1, 0]);
+    else expect([m.captures, m.releases]).toEqual([0, 1]);
+  }
+  expect(await ledgerBalanced(h.db)).toBe(true);
+  // Buyer total (wallet + hold) = top-up − captured costs.
+  const captured = await h.query<{ total: string }>(
+    `SELECT coalesce(sum(cost_ucr), 0)::text AS total FROM jobs WHERE status = 'completed'`,
+  );
+  const wallet = await balanceOf(h.db, 'buyer_wallet', h.world.buyerId);
+  const hold = await balanceOf(h.db, 'buyer_hold', h.world.buyerId);
+  expect(wallet + hold).toBe(10n * 1_000_000n - BigInt(captured[0]?.total ?? '0'));
+}

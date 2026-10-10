@@ -50,6 +50,10 @@ type Runtime interface {
 	// Models are the protocol model ids this runtime can serve.
 	Models() []string
 	Generate(ctx context.Context, req Request) (Result, error)
+	// Release frees the GPU memory the runtime holds (unloads its models). The agent calls it whenever
+	// work stops for the customer or the operator (Ctrl+C, pause, kill, server silence), not after a
+	// normal completion. It must be safe to call at any time and more than once.
+	Release(ctx context.Context) error
 }
 
 // Error carries the protocol error code for job.fail. Buyer content never goes into Err.

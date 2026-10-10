@@ -44,6 +44,7 @@ type Config struct {
 	ReconnectMin       time.Duration // default 1s
 	ReconnectMax       time.Duration // default 10s
 	ShutdownGrace      time.Duration // time to report job.preempted on exit, default 1s
+	ReleaseTimeout     time.Duration // time to let the runtime free GPU memory, default 5s
 }
 
 func (c *Config) defaults() {
@@ -59,6 +60,7 @@ func (c *Config) defaults() {
 	set(&c.ReconnectMin, time.Second)
 	set(&c.ReconnectMax, 10*time.Second)
 	set(&c.ShutdownGrace, time.Second)
+	set(&c.ReleaseTimeout, 5*time.Second)
 	if c.Logf == nil {
 		c.Logf = func(string, ...any) {}
 	}
@@ -109,8 +111,9 @@ func New(cfg Config) (*Agent, error) {
 	threads := int64(goruntime.NumCPU())
 	a.caps = protocol.CapabilitiesPayload{
 		// SKELETON(S19): GPU inventory (nvidia-smi / DXGI per ADR 0019) is not read yet.
-		GPUs:            nil,
-		CPU:             protocol.CapabilitiesCPU{Model: protocol.SanitizeDisplayText(goruntime.GOARCH + " cpu"), Cores: threads, Threads: threads},
+		GPUs: nil,
+		CPU:  protocol.CapabilitiesCPU{Model: protocol.SanitizeDisplayText(goruntime.GOARCH + " cpu"), Cores: threads, Threads: threads},
+		// SKELETON(S17): RAM and cache disk sizes are not measured yet (reported as 0).
 		RAMMb:           0,
 		CacheDiskFreeMb: 0,
 		Runtime:         protocol.RuntimeInfo{Name: protocol.RuntimeName(cfg.Runtime.Name()), Version: protocol.SanitizeToken(cfg.Runtime.Version())},
@@ -188,6 +191,11 @@ type session struct {
 	job     *runningJob
 	results chan jobResult
 	ctx     context.Context // session lifetime (not the caller's ctx: shutdown still needs to write)
+	// outer is the caller's ctx (Ctrl+C). A running job stops the moment it is canceled, even while
+	// the main loop is busy (for example blocked writing to a stalled connection).
+	outer context.Context
+	// writeTimeout bounds each write; shutdown lowers it to ShutdownGrace.
+	writeTimeout time.Duration
 }
 
 func (s *session) send(msgType string, corr *string, payload any) error {
@@ -201,7 +209,7 @@ func (s *session) send(msgType string, corr *string, payload any) error {
 	}
 	s.writeMu.Lock()
 	defer s.writeMu.Unlock()
-	wctx, cancel := context.WithTimeout(context.Background(), s.a.cfg.HandshakeTimeout)
+	wctx, cancel := context.WithTimeout(context.Background(), s.writeTimeout)
 	defer cancel()
 	if err := s.conn.Write(wctx, websocket.MessageText, data); err != nil {
 		return fmt.Errorf("send %s: %w", msgType, err)
@@ -325,7 +333,7 @@ func (a *Agent) session(ctx context.Context) (bool, error) {
 
 	sessCtx, endSession := context.WithCancel(context.Background())
 	defer endSession()
-	s := &session{a: a, conn: conn, results: make(chan jobResult, 1), ctx: sessCtx}
+	s := &session{a: a, conn: conn, results: make(chan jobResult, 1), ctx: sessCtx, outer: ctx, writeTimeout: a.cfg.HandshakeTimeout}
 
 	hsCtx, cancelHs := context.WithTimeout(ctx, a.cfg.HandshakeTimeout)
 	err = s.handshake(hsCtx)
@@ -398,6 +406,7 @@ func (a *Agent) session(ctx context.Context) (bool, error) {
 			}
 		case <-progress.C:
 			if s.job != nil {
+				// SKELETON(S19): the runtime does not report tokens while generating (TokensSoFar 0).
 				if err := s.send("job.progress", nil, protocol.JobProgressPayload{AttemptID: s.job.attemptID, TokensSoFar: 0}); err != nil {
 					s.stopJob("")
 					return true, err
@@ -405,8 +414,9 @@ func (a *Agent) session(ctx context.Context) (bool, error) {
 			}
 		case <-silence.C:
 			if time.Since(lastServer) > a.cfg.ServerSilenceLimit {
-				// T13: without the server we cannot receive a kill switch — stop working.
+				// T13: without the server we cannot receive a kill switch — stop working, free the GPU.
 				s.stopJob("")
+				s.release()
 				return true, ErrServerSilent
 			}
 		case m, ok := <-in:
@@ -439,6 +449,7 @@ func (s *session) onInvalid(de *protocol.DecodeError) error {
 		s.a.cfg.Logf("서버가 보낸 잘못된 메시지(%s): 안전을 위해 멈춥니다", de.Code)
 		s.stopJob(protocol.JobPreemptedReasonPause)
 		s.paused = true
+		s.release()
 		if err := s.status(); err != nil {
 			return err
 		}
@@ -475,6 +486,7 @@ func (s *session) handle(msg *protocol.Message) error {
 	case *protocol.ControlPausePayload:
 		s.stopJob(protocol.JobPreemptedReasonPause)
 		s.paused = true
+		s.release()
 		a.cfg.Logf("일시정지 (%s)", p.Reason)
 		if err := s.ack(msg.ID, ""); err != nil {
 			return err
@@ -483,6 +495,7 @@ func (s *session) handle(msg *protocol.Message) error {
 	case *protocol.ControlKillPayload:
 		s.stopJob(protocol.JobPreemptedReasonKill)
 		s.paused = true
+		s.release()
 		a.cfg.Logf("킬스위치 (%s)", p.Reason)
 		if err := s.ack(msg.ID, ""); err != nil {
 			return err
@@ -548,7 +561,13 @@ func (s *session) onOffer(offerID string, p *protocol.JobOfferPayload) error {
 		req.Messages = append(req.Messages, runtime.Message{Role: string(m.Role), Content: m.Content})
 	}
 	limit := time.Duration(p.TimeLimitMs) * time.Millisecond
-	jobCtx, cancel := context.WithTimeout(s.ctx, limit)
+	jobCtx, cancelJob := context.WithTimeout(s.ctx, limit)
+	// Ctrl+C cancels the generation directly, without waiting for the main loop.
+	stopOnExit := context.AfterFunc(s.outer, cancelJob)
+	cancel := func() {
+		stopOnExit()
+		cancelJob()
+	}
 	s.job = &runningJob{attemptID: p.AttemptID, cancel: cancel, started: time.Now()}
 	a.cfg.Logf("작업 시작: %s (모델 %s)", short(p.AttemptID), p.Model.ID)
 	go func(attemptID string) {
@@ -613,12 +632,29 @@ func (s *session) stopJob(reason protocol.JobPreemptedReason) {
 	}
 }
 
-// shutdown is Ctrl+C: stop the job, tell the server, close the connection.
+// release asks the runtime to free GPU memory (bounded by ReleaseTimeout). A failure is logged: the
+// job is already stopped, and there is nothing else the agent can do about the runtime.
+func (s *session) release() {
+	ctx, cancel := context.WithTimeout(context.Background(), s.a.cfg.ReleaseTimeout)
+	defer cancel()
+	if err := s.a.cfg.Runtime.Release(ctx); err != nil {
+		s.a.cfg.Logf("GPU 메모리 해제 실패: %v", err)
+	}
+}
+
+// shutdown is Ctrl+C: stop the job, free the GPU, tell the server (within ShutdownGrace), close.
 func (s *session) shutdown() {
 	if s.job != nil {
 		s.a.cfg.Logf("종료: 진행 중 작업 %s를 중단하고 서버에 알립니다", short(s.job.attemptID))
 	}
+	released := make(chan struct{})
+	go func() {
+		defer close(released)
+		s.release()
+	}()
+	s.writeTimeout = s.a.cfg.ShutdownGrace
 	s.stopJob(protocol.JobPreemptedReasonShutdown)
+	<-released
 	ctx, cancel := context.WithTimeout(context.Background(), s.a.cfg.ShutdownGrace)
 	defer cancel()
 	done := make(chan struct{})

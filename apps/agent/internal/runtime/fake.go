@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -17,7 +18,18 @@ type Fake struct {
 	ModelIDs []string
 	// Delay simulates generation time (canceled immediately by ctx).
 	Delay time.Duration
+
+	releases atomic.Int64
 }
+
+// Release implements Runtime: the fake holds no GPU memory; it only counts calls (for tests).
+func (f *Fake) Release(context.Context) error {
+	f.releases.Add(1)
+	return nil
+}
+
+// Releases is how many times Release was called.
+func (f *Fake) Releases() int64 { return f.releases.Load() }
 
 // Name implements Runtime.
 func (f *Fake) Name() string { return "fake" }

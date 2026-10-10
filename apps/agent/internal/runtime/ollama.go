@@ -67,6 +67,44 @@ type ollamaRequest struct {
 	Options  ollamaOptions   `json:"options"`
 }
 
+// Release implements Runtime: ask Ollama to unload every configured model now (keep_alive 0). Without
+// this Ollama keeps a model in GPU memory for 5 minutes after the last request.
+func (o *Ollama) Release(ctx context.Context) error {
+	var errs []error
+	for _, id := range o.Models() {
+		name := o.Names[id]
+		raw, err := json.Marshal(struct {
+			Model     string `json:"model"`
+			KeepAlive int    `json:"keep_alive"`
+		}{Model: name, KeepAlive: 0})
+		if err != nil {
+			errs = append(errs, fmt.Errorf("encode unload %s: %w", id, err))
+			continue
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, o.BaseURL+"/api/generate", bytes.NewReader(raw))
+		if err != nil {
+			errs = append(errs, fmt.Errorf("unload %s: %w", id, err))
+			continue
+		}
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := o.client().Do(req)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("unload %s: %w", id, err))
+			continue
+		}
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 64<<10))
+		_ = resp.Body.Close()
+		// 404: the model is not there, so it holds no memory either.
+		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound {
+			errs = append(errs, fmt.Errorf("unload %s: ollama answered HTTP %d", id, resp.StatusCode))
+		}
+	}
+	if err := errors.Join(errs...); err != nil {
+		return fmt.Errorf("ollama release: %w", err)
+	}
+	return nil
+}
+
 type ollamaResponse struct {
 	Message struct {
 		Content string `json:"content"`

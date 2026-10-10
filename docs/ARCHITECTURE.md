@@ -1019,7 +1019,8 @@ DB가 강제하는 부분(트리거·제약·최소 권한 역할 `binjari_app`)
 | `issuanceMode` | `marketplace` | 다른 값이면 시작 거부(발행형은 시뮬레이터 전용) | 설정 | S07, S08 |
 | 킬스위치 | 꺼짐 | 범위 안 노드 즉시 멈춤·오퍼 금지 | DB(`kill_switches`) | S10, S11 |
 | `DEV_API_KEY`, `DEV_AGENT_SECRET`, `DEV_DASHBOARD` | 없음 | 운영(`NODE_ENV=production`, `NODE_ENV`가 없을 때 포함)에서 설정돼 있으면 시작 거부 | 환경변수 | S04, S05 |
-| `HOST` | `127.0.0.1` | `0.0.0.0`이면 LAN에 열림. 개발 서버는 `--lan` 플래그로만 켠다 | 환경변수 | S04, S30 |
+| `HOST` | `127.0.0.1` | `0.0.0.0`이면 LAN에 열림. 개발 서버(`pnpm dev:server`)는 `HOST`를 무시하고 `--lan` 플래그로만 연다 | 환경변수 | S04, S30 |
+| `DB_ROLE` | `binjari_app` | 다른 값이면 시작 거부. 연결 URL에 `options`가 있으면 역할 옵션이 덮어써지므로 거부하고, 개발 서버는 시작할 때 `current_user`가 `binjari_app`인지 확인한다 | 환경변수 | S03, S04 |
 | `--always-available` | 없음 | 개발 콘솔에서만, 서비스 모드에서는 거부 | 에이전트 플래그 | S18 |
 | 샌드박스 충전 한도 | 계정당 소액, 전체 일일 상한 | TCR 발행 남용 방지 | 설정 | S25 |
 

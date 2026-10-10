@@ -101,9 +101,9 @@ export async function buildServer(deps: ServerDeps): Promise<Server> {
     registerDevDashboard(app, { db: deps.db, clock: deps.clock, sessions, world: deps.world });
   }
 
-  app.addHook('onReady', () => {
+  app.addHook('onReady', async () => {
+    await scheduler.recoverAfterRestart();
     scheduler.start();
-    return Promise.resolve();
   });
   app.addHook('onClose', async () => {
     await scheduler.stop();

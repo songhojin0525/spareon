@@ -1,7 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { createDb, withTransaction } from '../../src/db/client.js';
+import { assertSessionRole, createDb, withTransaction } from '../../src/db/client.js';
 import { DbError, sqlState, toDbError } from '../../src/db/errors.js';
 import { openTestDb, type TestDb } from '../support/db.js';
 
@@ -184,5 +184,22 @@ describe('createDb role option (the server always runs as binjari_app)', () => {
 
   it('refuses a role that is not a plain identifier', () => {
     expect(() => createDb({ url: db.url, role: 'x; DROP' })).toThrow(/plain lowercase/);
+  });
+
+  it('refuses a URL whose options would silently replace the role', () => {
+    const url = `${db.url}${db.url.includes('?') ? '&' : '?'}options=-c%20search_path%3Dpublic`;
+    expect(() => createDb({ url, role: 'binjari_app' })).toThrow(/options/);
+  });
+
+  it('assertSessionRole passes as binjari_app and fails for a session without the role', async () => {
+    const app = createDb({ url: db.url, role: 'binjari_app', maxConnections: 1 });
+    const owner = createDb({ url: db.url, maxConnections: 1 });
+    try {
+      await expect(assertSessionRole(app, 'binjari_app')).resolves.toBeUndefined();
+      await expect(assertSessionRole(owner, 'binjari_app')).rejects.toThrow(/expected binjari_app/);
+    } finally {
+      await app.close();
+      await owner.close();
+    }
   });
 });
